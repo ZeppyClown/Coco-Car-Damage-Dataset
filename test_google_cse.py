@@ -3,10 +3,11 @@ Quick test of Google Custom Search API
 """
 import httpx
 import json
+from app.core.config import settings
 
 # Your credentials
-API_KEY = "AIzaSyCKiI5JyMZnSZge2oo7KPQ_qkxG3U3WQ6I"
-CSE_ID = "02003e178602543fc"
+API_KEY = settings.GOOGLE_API_KEY
+CSE_ID = settings.GOOGLE_CSE_ID
 
 def test_google_cse():
     """Test Google Custom Search API"""

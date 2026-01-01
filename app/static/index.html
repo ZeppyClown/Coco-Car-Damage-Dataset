@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🤖 Automotive Intelligence Assistant</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .capabilities {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+
+        .capabilities h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+
+        .capability-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .capability-item {
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea10 0%, #764ba210 100%);
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .capability-item strong {
+            color: #667eea;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .capability-item small {
+            color: #777;
+            font-size: 0.9em;
+        }
+
+        .query-card {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+
+        .query-card h2 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .input-container {
+            position: relative;
+            margin-bottom: 10px;
+        }
+
+        #queryInput {
+            width: 100%;
+            padding: 15px 20px;
+            font-size: 1.1em;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            resize: vertical;
+            min-height: 80px;
+            font-family: inherit;
+        }
+
+        #queryInput:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .button-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .submit-btn {
+            flex: 1;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .submit-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .clear-btn {
+            padding: 15px 30px;
+            background: #f0f0f0;
+            color: #333;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .clear-btn:hover {
+            background: #e0e0e0;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .response-card {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+
+        .intent-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9em;
+            margin-bottom: 15px;
+        }
+
+        .intent-diagnostics { background: #ff5252; color: white; }
+        .intent-valuation { background: #4CAF50; color: white; }
+        .intent-paint_code { background: #2196F3; color: white; }
+        .intent-parts { background: #FF9800; color: white; }
+        .intent-specifications { background: #9C27B0; color: white; }
+        .intent-general { background: #607D8B; color: white; }
+
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .section h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+
+        .section h4 {
+            color: #555;
+            margin: 15px 0 10px 0;
+            font-size: 1.1em;
+        }
+
+        .key-value {
+            display: grid;
+            grid-template-columns: 200px 1fr;
+            gap: 15px;
+            margin-bottom: 10px;
+            padding: 10px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .key-value:last-child {
+            border-bottom: none;
+        }
+
+        .key {
+            font-weight: 600;
+            color: #555;
+        }
+
+        .value {
+            color: #333;
+        }
+
+        .list-item {
+            padding: 10px 15px;
+            background: white;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            border-left: 3px solid #667eea;
+        }
+
+        .list-item strong {
+            color: #667eea;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .assumption {
+            padding: 8px 12px;
+            background: #fff9c4;
+            border-left: 3px solid #fbc02d;
+            margin-bottom: 8px;
+            border-radius: 5px;
+            font-size: 0.95em;
+        }
+
+        .confidence-bar {
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s;
+        }
+
+        .price-range {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #4CAF50;
+            color: white;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 1.2em;
+            margin: 10px 0;
+        }
+
+        .metadata {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .metadata strong {
+            color: #333;
+        }
+
+        .error-message {
+            background: #ff5252;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .code {
+            font-family: monospace;
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .next-steps {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #2196F3;
+        }
+
+        .next-steps h4 {
+            color: #1976d2;
+            margin-bottom: 10px;
+        }
+
+        .next-steps li {
+            margin: 5px 0;
+            color: #333;
+        }
+
+        .json-viewer {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: monospace;
+            font-size: 0.9em;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .toggle-json {
+            background: #f0f0f0;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .toggle-json:hover {
+            background: #e0e0e0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🤖 Automotive Intelligence Assistant</h1>
+            <p>Multi-modal automotive intelligence system - Ask anything about diagnostics, valuations, paint codes, parts, or specifications</p>
+        </div>
+
+        <!-- Capabilities -->
+        <div class="capabilities">
+            <h3>💡 What I Can Help With</h3>
+            <div class="capability-grid">
+                <div class="capability-item">
+                    <strong>🔧 Diagnostics</strong>
+                    <small>Analyze fault codes, diagnose issues, estimate repair costs</small>
+                </div>
+                <div class="capability-item">
+                    <strong>💰 Valuations</strong>
+                    <small>Estimate vehicle value, market analysis, selling tips</small>
+                </div>
+                <div class="capability-item">
+                    <strong>🎨 Paint Codes</strong>
+                    <small>Find paint codes, color matching, product recommendations</small>
+                </div>
+                <div class="capability-item">
+                    <strong>🔩 Parts Search</strong>
+                    <small>Find compatible parts, compare prices, check availability</small>
+                </div>
+                <div class="capability-item">
+                    <strong>📋 Specifications</strong>
+                    <small>Vehicle specs, features, technical details</small>
+                </div>
+                <div class="capability-item">
+                    <strong>❓ General Questions</strong>
+                    <small>Automotive knowledge, advice, recommendations</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Query Input -->
+        <div class="query-card">
+            <h2>💬 Ask Me Anything</h2>
+            <div class="input-container">
+                <textarea
+                    id="queryInput"
+                    placeholder="Examples:
+• My 2015 Honda Civic has code P0420, what's wrong?
+• How much is my 2018 Toyota Camry with 75,000 km worth?
+• I need the paint code for my white BMW 3-series
+• Find brake pads for my 2017 Mazda CX-5"
+                ></textarea>
+            </div>
+            <div class="button-row">
+                <button class="submit-btn" id="submitBtn" onclick="submitQuery()">
+                    🚀 Get Answer
+                </button>
+                <button class="clear-btn" onclick="clearResults()">
+                    Clear
+                </button>
+            </div>
+        </div>
+
+        <!-- Loading -->
+        <div id="loading" class="loading" style="display: none;">
+            <div class="loading-spinner"></div>
+            <h3>Processing your query...</h3>
+            <p>Analyzing intent and executing intelligent modules</p>
+        </div>
+
+        <!-- Error -->
+        <div id="errorMessage" class="error-message" style="display: none;"></div>
+
+        <!-- Response -->
+        <div id="response" style="display: none;"></div>
+    </div>
+
+    <script>
+        let lastResponse = null;
+
+        // Allow Enter to submit (Shift+Enter for new line)
+        document.getElementById('queryInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                submitQuery();
+            }
+        });
+
+        async function submitQuery() {
+            const query = document.getElementById('queryInput').value.trim();
+
+            if (!query) {
+                alert('Please enter a query');
+                return;
+            }
+
+            // Show loading
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('response').style.display = 'none';
+            document.getElementById('errorMessage').style.display = 'none';
+            document.getElementById('submitBtn').disabled = true;
+
+            try {
+                // Call the unified query endpoint
+                const formData = new FormData();
+                formData.append('text', query);
+
+                const response = await fetch('/api/v1/query', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.status}`);
+                }
+
+                const data = await response.json();
+                lastResponse = data;
+
+                // Hide loading
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('submitBtn').disabled = false;
+
+                // Display response
+                displayResponse(data);
+
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('submitBtn').disabled = false;
+                document.getElementById('errorMessage').textContent = `Error: ${error.message}. Make sure the API server is running on port 8000.`;
+                document.getElementById('errorMessage').style.display = 'block';
+            }
+        }
+
+        function displayResponse(data) {
+            const responseDiv = document.getElementById('response');
+            responseDiv.innerHTML = '';
+            responseDiv.style.display = 'block';
+
+            // Intent badge
+            const intentClass = `intent-${data.intent.replace('_', '')}`;
+            const intentBadge = `<span class="intent-badge ${intentClass}">Intent: ${data.intent.replace('_', ' ').toUpperCase()}</span>`;
+
+            // Confidence
+            const confidencePercent = (data.confidence * 100).toFixed(0);
+            const confidenceBar = `
+                <div style="margin: 15px 0;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                        <span style="font-weight: 600;">Classification Confidence</span>
+                        <span style="font-weight: 600; color: #667eea;">${confidencePercent}%</span>
+                    </div>
+                    <div class="confidence-bar">
+                        <div class="confidence-fill" style="width: ${confidencePercent}%"></div>
+                    </div>
+                </div>
+            `;
+
+            let content = `
+                <div class="response-card">
+                    ${intentBadge}
+                    ${confidenceBar}
+            `;
+
+            // Display based on module executed
+            const result = data.result;
+            const moduleExecuted = result.module_executed;
+
+            // Intent understood
+            if (result.intent_understood) {
+                content += `
+                    <div class="section">
+                        <h3>🧠 Understanding</h3>
+                        <p style="font-size: 1.1em; color: #333;">${result.intent_understood}</p>
+                    </div>
+                `;
+            }
+
+            // Module-specific rendering
+            if (moduleExecuted === 'diagnostics_service') {
+                content += renderDiagnostics(result);
+            } else if (moduleExecuted === 'valuation_service') {
+                content += renderValuation(result);
+            } else if (moduleExecuted === 'paint_code_service') {
+                content += renderPaintCode(result);
+            } else if (moduleExecuted === 'parts_search_service') {
+                content += renderPartsSearch(result);
+            } else if (moduleExecuted.endsWith('_missing_data')) {
+                content += renderMissingData(result);
+            } else {
+                // Generic rendering
+                content += `
+                    <div class="section">
+                        <h3>📝 Response</h3>
+                        <p>${result.message || JSON.stringify(result, null, 2)}</p>
+                    </div>
+                `;
+            }
+
+            // Reasoning
+            if (result.reasoning) {
+                content += `
+                    <div class="section">
+                        <h3>💭 Reasoning</h3>
+                        <p style="font-size: 1.05em; line-height: 1.6;">${result.reasoning}</p>
+                    </div>
+                `;
+            }
+
+            // Assumptions
+            if (result.assumptions && result.assumptions.length > 0) {
+                content += `
+                    <div class="section">
+                        <h3>⚠️ Assumptions</h3>
+                        ${result.assumptions.map(a => `<div class="assumption">• ${a}</div>`).join('')}
+                    </div>
+                `;
+            }
+
+            // Next steps
+            if (result.next_steps && result.next_steps.length > 0) {
+                content += `
+                    <div class="next-steps">
+                        <h4>📌 Next Steps</h4>
+                        <ol>
+                            ${result.next_steps.map(step => `<li>${step}</li>`).join('')}
+                        </ol>
+                    </div>
+                `;
+            }
+
+            // Metadata
+            if (data.metadata) {
+                content += `
+                    <div class="metadata">
+                        <strong>Metadata:</strong>
+                        Processing Time: ${data.metadata.processing_time_ms}ms |
+                        Module: ${moduleExecuted}
+                    </div>
+                `;
+            }
+
+            // Raw JSON toggle
+            content += `
+                <button class="toggle-json" onclick="toggleJson()">View Raw JSON Response</button>
+                <div id="jsonViewer" class="json-viewer" style="display: none;">
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                </div>
+            `;
+
+            content += `</div>`;
+            responseDiv.innerHTML = content;
+        }
+
+        function renderDiagnostics(result) {
+            let html = '';
+
+            // Fault code analysis
+            if (result.fault_code_analysis) {
+                const fca = result.fault_code_analysis;
+                html += `
+                    <div class="section">
+                        <h3>🔍 Fault Code Analysis</h3>
+                        <div class="key-value">
+                            <div class="key">Code:</div>
+                            <div class="value"><span class="code">${fca.code}</span></div>
+                        </div>
+                        <div class="key-value">
+                            <div class="key">Description:</div>
+                            <div class="value">${fca.description}</div>
+                        </div>
+                        <div class="key-value">
+                            <div class="key">System:</div>
+                            <div class="value">${fca.system}</div>
+                        </div>
+                        <div class="key-value">
+                            <div class="key">Severity:</div>
+                            <div class="value"><strong>${fca.severity.toUpperCase()}</strong></div>
+                        </div>
+                        <div style="margin-top: 15px;">
+                            <strong>Explanation:</strong>
+                            <p style="margin-top: 8px; line-height: 1.6;">${fca.explanation}</p>
+                        </div>
+                        ${fca.safety ? `
+                            <div style="margin-top: 15px; padding: 15px; background: ${fca.safety.driveable ? '#e8f5e9' : '#ffebee'}; border-radius: 8px;">
+                                <strong style="color: ${fca.safety.driveable ? '#2e7d32' : '#c62828'};">
+                                    ${fca.safety.driveable ? '✅ Safe to Drive (Short Distance)' : '❌ Not Safe to Drive'}
+                                </strong>
+                                <p style="margin-top: 8px;">${fca.safety.explanation}</p>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }
+
+            // Likely causes
+            if (result.likely_causes && result.likely_causes.length > 0) {
+                html += `
+                    <div class="section">
+                        <h3>🎯 Likely Causes (Ranked)</h3>
+                        ${result.likely_causes.map((cause, i) => `
+                            <div class="list-item">
+                                <strong>${i + 1}. ${cause.cause} (${(cause.probability * 100).toFixed(0)}% probability)</strong>
+                                <p style="margin-top: 5px; color: #666;">${cause.explanation}</p>
+                                ${cause.cost_estimate ? `
+                                    <div class="price-range" style="font-size: 1em; margin-top: 10px;">
+                                        $${cause.cost_estimate.total_cost.min}-${cause.cost_estimate.total_cost.max} ${cause.cost_estimate.total_cost.currency}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+
+            // Diagnostic steps
+            if (result.diagnostic_steps && result.diagnostic_steps.length > 0) {
+                html += `
+                    <div class="section">
+                        <h3>🔧 Diagnostic Steps</h3>
+                        ${result.diagnostic_steps.map(step => `
+                            <div class="list-item">
+                                <strong>Step ${step.step}: ${step.action}</strong>
+                                <p style="margin-top: 5px; color: #666;">${step.explanation}</p>
+                                <p style="margin-top: 5px; font-size: 0.9em;">
+                                    <strong>Tools:</strong> ${step.tools_needed.join(', ')} |
+                                    <strong>Time:</strong> ${step.estimated_time}
+                                </p>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+
+            // Cost estimate
+            if (result.cost_estimate) {
+                const ce = result.cost_estimate;
+                html += `
+                    <div class="section">
+                        <h3>💰 Cost Estimate</h3>
+                        <div class="key-value">
+                            <div class="key">Parts:</div>
+                            <div class="value">$${ce.parts_cost.min}-${ce.parts_cost.max} ${ce.parts_cost.currency}</div>
+                        </div>
+                        <div class="key-value">
+                            <div class="key">Labor:</div>
+                            <div class="value">$${ce.labor_cost.min}-${ce.labor_cost.max} ${ce.labor_cost.currency}</div>
+                        </div>
+                        <div class="key-value">
+                            <div class="key">Total:</div>
+                            <div class="value">
+                                <span class="price-range">$${ce.total_cost.min}-${ce.total_cost.max} ${ce.total_cost.currency}</span>
+                            </div>
+                        </div>
+                        <p style="margin-top: 10px; font-style: italic; color: #666;">${ce.explanation}</p>
+                    </div>
+                `;
+            }
+
+            return html;
+        }
+
+        function renderValuation(result) {
+            let html = '';
+
+            // Valuation estimate
+            if (result.valuation_estimate) {
+                const ve = result.valuation_estimate;
+                html += `
+                    <div class="section">
+                        <h3>💎 Valuation Estimate</h3>
+                        <div class="key-value">
+                            <div class="key">Retail Value:</div>
+                            <div class="value"><span class="price-range" style="font-size: 1em;">$${ve.retail_value.min.toLocaleString()}-${ve.retail_value.max.toLocaleString()} ${ve.retail_value.currency}</span></div>
+                        </div>
+                        <div class="key-value">
+                            <div class="key">Private Party:</div>
+                            <div class="value"><span class="price-range" style="font-size: 1em; background: #2196F3;">$${ve.private_party.min.toLocaleString()}-${ve.private_party.max.toLocaleString()} ${ve.private_party.currency}</span></div>
+                        </div>
+                        <div class="key-value">
+                            <div class="key">Trade-In Value:</div>
+                            <div class="value"><span class="price-range" style="font-size: 1em; background: #FF9800;">$${ve.trade_in_value.min.toLocaleString()}-${ve.trade_in_value.max.toLocaleString()} ${ve.trade_in_value.currency}</span></div>
+                        </div>
+                        <p style="margin-top: 15px; color: #666; line-height: 1.6;">${ve.explanation}</p>
+                        <div style="margin-top: 10px;">
+                            <strong>Confidence:</strong> ${(ve.confidence * 100).toFixed(0)}%
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Depreciation factors
+            if (result.depreciation_factors && result.depreciation_factors.length > 0) {
+                html += `
+                    <div class="section">
+                        <h3>📊 Value Factors</h3>
+                        ${result.depreciation_factors.map(factor => `
+                            <div class="list-item">
+                                <strong>${factor.factor}: ${factor.impact > 0 ? '+' : ''}${factor.impact.toFixed(1)}%</strong>
+                                <p style="margin-top: 5px; color: #666;">${factor.explanation}</p>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+
+            // Market analysis
+            if (result.market_analysis) {
+                const ma = result.market_analysis;
+                html += `
+                    <div class="section">
+                        <h3>📈 Market Analysis</h3>
+                        <div class="key-value">
+                            <div class="key">Demand Level:</div>
+                            <div class="value">${ma.demand_level.toUpperCase()}</div>
+                        </div>
+                        <div class="key-value">
+                            <div class="key">Supply Level:</div>
+                            <div class="value">${ma.supply_level.toUpperCase()}</div>
+                        </div>
+                        <div class="key-value">
+                            <div class="key">Market Trend:</div>
+                            <div class="value">${ma.market_trend.toUpperCase()}</div>
+                        </div>
+                        <div class="key-value">
+                            <div class="key">Typical Days to Sell:</div>
+                            <div class="value">${ma.typical_days_to_sell}</div>
+                        </div>
+                        <p style="margin-top: 15px; color: #666; line-height: 1.6;">${ma.explanation}</p>
+                    </div>
+                `;
+            }
+
+            // Selling tips
+            if (result.selling_tips && result.selling_tips.length > 0) {
+                html += `
+                    <div class="section">
+                        <h3>💡 Selling Tips</h3>
+                        <ol>
+                            ${result.selling_tips.map(tip => `<li style="margin: 8px 0;">${tip}</li>`).join('')}
+                        </ol>
+                    </div>
+                `;
+            }
+
+            return html;
+        }
+
+        function renderPaintCode(result) {
+            let html = '';
+
+            // Paint code result
+            if (result.paint_code || result.color_name) {
+                html += `
+                    <div class="section">
+                        <h3>🎨 Paint Code Information</h3>
+                        ${result.paint_code ? `
+                            <div class="key-value">
+                                <div class="key">Paint Code:</div>
+                                <div class="value"><span class="code" style="font-size: 1.2em;">${result.paint_code}</span></div>
+                            </div>
+                        ` : ''}
+                        ${result.color_name ? `
+                            <div class="key-value">
+                                <div class="key">Color Name:</div>
+                                <div class="value">${result.color_name}</div>
+                            </div>
+                        ` : ''}
+                        ${result.alternative_names && result.alternative_names.length > 0 ? `
+                            <div class="key-value">
+                                <div class="key">Alternative Names:</div>
+                                <div class="value">${result.alternative_names.join(', ')}</div>
+                            </div>
+                        ` : ''}
+                        <div style="margin-top: 10px;">
+                            <strong>Confidence:</strong> ${(result.confidence * 100).toFixed(0)}%
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Paint code locations
+            if (result.paint_code_locations && result.paint_code_locations.length > 0) {
+                html += `
+                    <div class="section">
+                        <h3>📍 Where to Find Paint Code</h3>
+                        ${result.paint_code_locations.map((loc, i) => `
+                            <div class="list-item">
+                                <strong>${i + 1}. ${loc.location}</strong>
+                                <p style="margin-top: 5px; color: #666;">${loc.description}</p>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+
+            // Verification steps
+            if (result.verification_steps && result.verification_steps.length > 0) {
+                html += `
+                    <div class="section">
+                        <h3>✅ Verification Steps</h3>
+                        <ol>
+                            ${result.verification_steps.map(step => `<li style="margin: 8px 0;">${step}</li>`).join('')}
+                        </ol>
+                    </div>
+                `;
+            }
+
+            // Recommended products
+            if (result.recommended_products && result.recommended_products.length > 0) {
+                html += `
+                    <div class="section">
+                        <h3>🛒 Recommended Products (Singapore)</h3>
+                        ${result.recommended_products.map(product => `
+                            <div class="list-item">
+                                <strong>${product.product_type}: ${product.brand}</strong>
+                                <p style="margin-top: 5px; color: #666;">${product.product_name}</p>
+                                <div style="margin-top: 8px;">
+                                    <strong>Price:</strong> ${product.estimated_price} |
+                                    <strong>Where:</strong> ${product.where_to_buy}
+                                </div>
+                                <p style="margin-top: 5px; font-size: 0.9em; font-style: italic;">${product.notes}</p>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+
+            // Professional advice
+            if (result.professional_advice) {
+                html += `
+                    <div class="section">
+                        <h3>👨‍🔧 Professional Advice</h3>
+                        <p style="line-height: 1.6; color: #333;">${result.professional_advice}</p>
+                    </div>
+                `;
+            }
+
+            return html;
+        }
+
+        function renderPartsSearch(result) {
+            return `
+                <div class="section">
+                    <h3>🔩 Parts Search</h3>
+                    <p>${result.message}</p>
+                    ${result.search_query ? `<p style="margin-top: 10px;"><strong>Searching for:</strong> ${result.search_query}</p>` : ''}
+                    ${result.vehicle_context ? `<p style="margin-top: 10px;"><strong>Vehicle:</strong> ${JSON.stringify(result.vehicle_context)}</p>` : ''}
+                </div>
+            `;
+        }
+
+        function renderMissingData(result) {
+            return `
+                <div class="section" style="background: #fff9c4; border-left-color: #fbc02d;">
+                    <h3>⚠️ More Information Needed</h3>
+                    <p style="font-size: 1.1em; margin-bottom: 15px;">${result.message}</p>
+                    ${result.explanation ? `<p style="margin-bottom: 15px;">${result.explanation}</p>` : ''}
+                    ${result.missing_fields ? `
+                        <div>
+                            <strong>Missing:</strong>
+                            <ul style="margin-top: 10px;">
+                                ${result.missing_fields.map(field => `<li>${field}</li>`).join('')}
+                            </ul>
+                        </div>
+                    ` : ''}
+                    ${result.example ? `
+                        <div style="margin-top: 15px; padding: 15px; background: white; border-radius: 8px;">
+                            <strong>Example:</strong>
+                            <p style="margin-top: 5px; font-style: italic;">${result.example}</p>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        function toggleJson() {
+            const viewer = document.getElementById('jsonViewer');
+            viewer.style.display = viewer.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function clearResults() {
+            document.getElementById('queryInput').value = '';
+            document.getElementById('response').style.display = 'none';
+            document.getElementById('errorMessage').style.display = 'none';
+            document.getElementById('queryInput').focus();
+        }
+
+        // Auto-focus on input
+        document.getElementById('queryInput').focus();
+    </script>
+</body>
+</html>

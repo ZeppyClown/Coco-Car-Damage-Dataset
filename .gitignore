@@ -50,6 +50,7 @@ Thumbs.db
 # Database
 *.db
 *.sqlite
+test.db
 
 # ML
 *.pth
@@ -60,3 +61,7 @@ Thumbs.db
 # Misc
 *.bak
 *.tmp
+
+# Documentation
+*.md
+!README.md

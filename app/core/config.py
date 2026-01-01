@@ -38,6 +38,52 @@ class Settings(BaseSettings):
     KBB_API_KEY: Optional[str] = None
     EDMUNDS_API_KEY: Optional[str] = None
 
+    # Phase 3: Parts APIs - Singapore Focus (HYBRID SYSTEM)
+    # Google Custom Search API - Active (searches Lazada, Shopee, Carousell)
+    GOOGLE_API_KEY: Optional[str] = None
+    GOOGLE_CSE_ID: Optional[str] = None  # Custom Search Engine ID
+    GOOGLE_CSE_RATE_LIMIT: int = 100  # Free tier: 100 queries/day
+
+    # eBay API Credentials - Ready to activate (waiting for credentials)
+    EBAY_APP_ID: Optional[str] = None
+    EBAY_DEV_ID: Optional[str] = None
+    EBAY_CERT_ID: Optional[str] = None
+    EBAY_ENVIRONMENT: str = "PRODUCTION"  # or SANDBOX
+    EBAY_MARKETPLACE: str = "EBAY_SG"  # Singapore marketplace
+
+    # Lazada API Credentials
+    LAZADA_APP_KEY: Optional[str] = None
+    LAZADA_APP_SECRET: Optional[str] = None
+    LAZADA_REGION: str = "SG"  # Singapore
+
+    # Shopee API Credentials
+    SHOPEE_PARTNER_ID: Optional[str] = None
+    SHOPEE_PARTNER_KEY: Optional[str] = None
+    SHOPEE_SHOP_ID: Optional[str] = None
+
+    # Amazon PA-API Credentials (Optional)
+    AMAZON_ACCESS_KEY: Optional[str] = None
+    AMAZON_SECRET_KEY: Optional[str] = None
+    AMAZON_ASSOCIATE_TAG: Optional[str] = None
+    AMAZON_REGION: str = "sg"
+
+    # API Rate Limits
+    EBAY_RATE_LIMIT: int = 5000  # calls per day
+    LAZADA_RATE_LIMIT: int = 10000  # calls per day
+    SHOPEE_RATE_LIMIT: int = 10000  # calls per day
+
+    # Parts Search Settings
+    SEARCH_CACHE_TTL: int = 3600  # 1 hour
+    PARTS_CACHE_TTL: int = 86400  # 24 hours
+    DEFAULT_RESULTS_LIMIT: int = 20
+    MIN_SEARCH_CONFIDENCE: float = 0.5
+    SINGAPORE_PRIORITY: bool = True  # Prioritize Singapore sellers
+
+    # HYBRID SYSTEM: Data Source Flags
+    USE_SYNTHETIC_DATA: bool = True  # Set to False when real APIs are ready
+    USE_GOOGLE_CSE: bool = True  # ✅ ACTIVE - Google Custom Search for real-time data
+    USE_EBAY_API: bool = False  # Set to True when credentials are added
+
     # Performance
     CACHE_TTL_SECONDS: int = 3600
     MAX_WORKERS: int = 4

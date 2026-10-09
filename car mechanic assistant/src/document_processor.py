@@ -57,6 +57,22 @@ class DocumentProcessor:
             cleaned["year_start"] = cleaned["year_end"] = int(cleaned.pop("year"))
         cleaned.setdefault("year_start", 0)
         cleaned.setdefault("year_end", 9999)
+        if cleaned["year_start"] > cleaned["year_end"]:
+            raise ValueError("Year bounds are reversed")
+        engines = metadata.get("affected_engines", [])
+        if "engine" in cleaned:
+            # Source notes also encode multiple engines as K20_K24 or a code plus description.
+            codes = re.findall(r"\b[NMBSK]\d{2}[A-Z0-9]*\b", cleaned["engine"].replace("_", " "), re.I)
+            engines = codes or [cleaned["engine"]]
+        if engines:
+            if not isinstance(engines, list) or not all(isinstance(value, str) and value.strip() for value in engines):
+                raise ValueError("Engine options require a list of nonempty strings")
+            options = sorted({canonical_vehicle_value(value) for value in engines})
+            cleaned["engine_options"] = json.dumps(options)
+            cleaned["engine"] = options[0] if len(options) == 1 else ""
+        if cleaned["scope"] == "generic" and (any(cleaned.get(key) for key in ("make", "model", "engine", "engine_options"))
+                or cleaned["year_start"] != 0 or cleaned["year_end"] != 9999):
+            raise ValueError("A generic source cannot have restricted vehicle applicability")
         return cleaned
 
     def _extract_metadata(self, content, path):
@@ -157,6 +173,9 @@ class DocumentProcessor:
             if not content.strip():
                 raise ValueError("Document has no usable text")
             tags = self._extract_metadata(content, path)
+            sidecar = path.with_suffix(path.suffix + ".metadata.json")
+            record["metadata_hash"] = hashlib.sha256(json.dumps(tags, sort_keys=True).encode()).hexdigest()
+            record["sidecar_hash"] = hashlib.sha256(sidecar.read_bytes()).hexdigest() if sidecar.exists() else None
             tags.update({"source_file": relative, "source_id": hashlib.sha256(relative.encode()).hexdigest(),
                          "document_hash": digest, "filename": path.name, "folder": self._get_folder_name(path)})
             tags.setdefault("language", "ja" if re.search(r"[\u3040-\u30ff]", content) else "zh" if re.search(r"[\u4e00-\u9fff]", content) else "en")

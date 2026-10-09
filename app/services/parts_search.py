@@ -152,7 +152,8 @@ class PartsSearchEngine:
 
     def _hash_query(self, query, vehicle, filters=None, limit=20, singapore_only=True):
         payload = {"query": query.strip().casefold(), "vehicle": vehicle or {}, "filters": filters or {},
-                   "limit": limit, "singapore_only": singapore_only, "synthetic": settings.USE_SYNTHETIC_DATA}
+                   "limit": limit, "singapore_only": singapore_only, "synthetic": settings.USE_SYNTHETIC_DATA,
+                   "providers": {"google_cse": self.google_cse is not None, "ebay": self.ebay_adapter is not None}}
         return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
 

@@ -12,7 +12,7 @@
     <div class="container">
         <header>
             <h1>🔧 Car Mechanic Assistant</h1>
-            <p class="subtitle">AI-Powered Diagnostic & Repair Guidance</p>
+            <p class="subtitle">Prototype: source notes require qualified mechanic review before repair use.</p>
         </header>
 
         <!-- <div class="info-box">
@@ -283,6 +283,8 @@
                         <div class="source-folder">${folderName}</div>
                         <div class="source-file">${fileName} · ${escapeHTML(source.location || "")}</div>
                         <div class="source-id">${escapeHTML(source.id || "")}</div>
+                        <div>${escapeHTML(source.corpus_kind || "Prototype repair note")} · ${escapeHTML(source.language || "")}</div>
+                        <div>${escapeHTML(source.source_url || "No authorised original source recorded")}</div>
                         <div>${escapeHTML(source.excerpt || "")}</div>
                     </div>
                     <div class="source-score">Score: ${score}</div>

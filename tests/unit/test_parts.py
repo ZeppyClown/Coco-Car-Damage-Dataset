@@ -129,3 +129,24 @@ def test_fit_selection_is_case_insensitive(test_db):
     result = CompatibilityChecker().check_compatibility(test_db, part.id,
         {"make": "Honda", "model": "Civic", "year": 2015, "engine": "k20"}, strict=True)
     assert result["compatible"]
+
+
+def test_cache_key_changes_when_provider_is_activated():
+    engine = PartsSearchEngine()
+    engine.google_cse = engine.ebay_adapter = None
+    original = engine._hash_query('pads', None)
+    engine.ebay_adapter = object()
+    assert engine._hash_query('pads', None) != original
+
+
+def test_identify_price_range_excludes_nonshipping_offer(client, test_db, monkeypatch):
+    from app.api.v1 import parts
+    part = catalogue(test_db)
+    test_db.add(PartPrice(part_id=part.id, price_sgd=10, price=10, currency='SGD', ships_to_singapore=False))
+    test_db.commit()
+    engine = PartsSearchEngine()
+    engine._fulltext_search = lambda *args: [engine._result(part, 0.5)]
+    monkeypatch.setattr(parts, 'get_search_engine', lambda: engine)
+    response = client.post('/api/v1/parts/identify', data={'description': 'brake pads'})
+    assert response.status_code == 200
+    assert response.json()['matches'][0]['price_range'] == {'min': 45.0, 'max': 45.0, 'currency': 'SGD'}

@@ -43,7 +43,7 @@ Updated: 9 October 2026. This records a new implementation and verification batc
 | Retrieval evaluation | Independent JSONL labels, eight explicit diagnostic categories, fixed-denominator distinct-passage Precision@5, separate Hit@5, category/language results, missing-query counts and duplicate/unlabelled-query rejection. | Evaluator regression proving a single hit earns 20% P@5, not 100%. No real precision result exists yet. |
 | Reproducible entrypoints | Package imports, module CLI builders/evaluator/smoke runner, safe environment example, minimal pinned requirements and assistant Docker recipe. | Imports/dependency resolution and automated suite. Container runtime remains unchecked. |
 
-## Verification record
+## First-build verification record (before the later audit)
 
 Environment: Python 3.12.5 on macOS; PostgreSQL 14 in a disposable cluster on localhost port 55439. Compose specifies PostgreSQL 16; that image is not runtime-tested here. Existing system PostgreSQL and original Chroma data were preserved.
 
@@ -79,4 +79,32 @@ Google Custom Search is closed to new customers and existing customers must migr
 
 Every subsequent feature must update this file and the relevant quickstart or design guide in the same change. Record actual checks, known limits and evidence gates. Commit that implementation and its Markdown together, then push to the authorised GitHub repository. Exclude secrets, manual originals, private feedback and built indexes. Preserve unrelated user changes.
 
-Current guides are README.md, QUICKSTART.md and this file. Older assistant summaries are marked as historical snapshots. The old keyword smoke runner remains a development aid; its success percentage is not retrieval precision.
+Current guides include README.md, QUICKSTART.md, RESUME_VERIFICATION.md, COMPANY_QUESTIONS.md, PUBLIC_REFERENCE_RESEARCH.md and this file. Older assistant summaries are marked as historical snapshots. The old keyword smoke runner remains a development aid; its success percentage is not retrieval precision.
+
+
+## Verification audit and corrective batch — 9 October 2026
+
+This later batch supersedes the first-build counts and the first-build confidence in retrieval. See [RESUME_VERIFICATION.md](RESUME_VERIFICATION.md) for each résumé claim, exact checked scope and unresolved content risk. Company questions are retained in [COMPANY_QUESTIONS.md](COMPANY_QUESTIONS.md); industry examples/search alternatives are in [PUBLIC_REFERENCE_RESEARCH.md](PUBLIC_REFERENCE_RESEARCH.md).
+
+| New or corrected feature | Verification and limit |
+|---|---|
+| Strict generic/vehicle applicability | Contradictory generic make/year tags now rejected. Missing required model/engine/year, wrong make and unknown scope cannot qualify vehicle-specific material. Regression tests reproduced the original leakage first. |
+| Engine-option metadata | Multiple engines such as `K20_K24`, scalar engine descriptions and `affected_engines` lists normalise into Chroma-compatible JSON options with exact applicability checks. Honda K20 VTC and exact BMW N52B30 probes now find their expected notes. |
+| Similarity gate and visible scores | Raw cosine threshold precedes folder/fault bonuses; source payloads show similarity and individual score components. Development cutoff defaults to 0.65; it is uncalibrated and bounded candidate pools may miss relevant material. Four unsupported/unrelated probes abstained; this is not a precision benchmark. |
+| Schema-3 release provenance | Metadata and sidecar hashes enter the corpus manifest; release policy is snapshotted/checksummed; collection identity/name checked. Old schema-2 and legacy releases are preserved and rejected by new code until a fresh build is selected. Actual repair rebuild: 138 chunks/14 English notes/zero PDF pages at private `runtime/releases/audit-20261009`. |
+| Citation-ID enforcement | Text/image answers require known passage IDs; no passages skips generation. Wrong/absent citations raise a sanitised failure. Prompt no longer labels sources by ordinal numbers after a live Japanese ordinal-citation failure. All six final live answer checks passed; earlier failure report retained. This checks IDs, not sentence-level entailment or factual repair correctness. |
+| Safe evidence policy | Replaced mutable default workshop assumptions with `workshop_policy.md`, clearly marked application policy rather than company approval. Unsupported diagnostic percentages prohibited in generation. Old notes still contain questionable details and require original-source/mechanic review. |
+| Evaluator input validation | Passage-ID arrays, query identity, reviewer, language and review date required; malformed string IDs cannot generate meaningless precision. No independent labels or 90% result supplied. |
+| Reviewable feedback records | Private query records include question/answer/source/model/release evidence for later review; synthetic test feedback cannot count as workshop feedback. Authentication, retention and distinct identities pending. |
+| Public industry demo | 12 authored EN/CN/JP summaries with primary source URLs, provenance and placeholder labels. Separate `public_reference_demo` collection and checked `public-reference-demo-20261009-v2` release: 12 chunks, zero PDF pages. Three live answers and inventory regression passed; no vehicle repair procedures or company statistics supplied. |
+| Source provenance display | Text/image source payloads now include URL, language and corpus kind; escaped UI shows provenance and a prototype/review banner. Source payload regression passed. |
+| Supported recall lookup | Replaced the failing vPIC VIN-recall URL with make/model/year campaigns; failures return 502/unknown. Scope and missing VIN-completion check are explicit. Live fresh VIN decode returned 200 with 24 model-year campaigns; this is US data, not Singapore recall clearance. |
+| Idempotent specifications refresh | Fresh decode updates vehicle identity and replaces engine/transmission/safety/vehicle-info groups in one transaction, preserving unrelated groups. Regression confirms repeated refresh does not duplicate fields and safety remains cached. |
+| Eligible offer pricing and provider-aware cache | Parts price range excludes known non-Singapore-shipping offers. Cache identity includes enabled Google/eBay choices. Both regressions pass. |
+| Search migration research | Brave recommended for direct URL/snippet replacement; Tavily and Gemini grounding documented alternatives. No new adapter/account added without provider choice/access; provider storage rights need checking before persistence. |
+
+Current final checks: **73 passed** with the actual PostgreSQL integration enabled; all seven live API routes returned 200; fresh/older-schema migrations and Alembic alignment passed; dependency consistency and Linux-target resolution passed; 11 live retrieval development probes, six Gemini answer checks, three public-demo answers and live web query/feedback checks completed. Warnings remain from dependencies/deprecated APIs. Docker/Compose execution and live search/marketplace providers remain unchecked.
+
+The résumé is still unverified for employment/first AI/production, 24 mechanics, 500 pages, 90% precision, real month of feedback and historical six-month use. No statistics or deployment evidence were fabricated. The current corpus is not an expert-approved repair library; known problematic note content is documented in the verification report.
+
+Observed platform limit: macOS Gunicorn HUP reload caused an Objective-C fork-initialisation worker crash. The operator guide now uses full stop/start on this host; a fresh process passed the final web query/feedback check. No unsafe fork override was introduced. Linux/container reload and concurrency remain unchecked.

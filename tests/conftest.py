@@ -32,6 +32,7 @@ def client(test_db, monkeypatch):
         return []
     monkeypatch.setattr(NHTSAService, "decode_vin", empty)
     monkeypatch.setattr(NHTSAService, "get_recalls", no_recalls)
+    monkeypatch.setattr(NHTSAService, "get_recalls_by_make_model_year", no_recalls)
     app.dependency_overrides[get_db] = lambda: test_db
     try:
         with TestClient(app) as client:

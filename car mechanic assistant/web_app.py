@@ -59,7 +59,8 @@ def create_app(assistant=None, feedback_path=None):
             identifier = uuid4().hex
             with sqlite3.connect(evidence) as db:
                 db.execute("INSERT INTO queries(id, sources) VALUES (?, ?)",
-                           (identifier, json.dumps({"sources": result.get("sources", []), "metadata": result.get("metadata", {})}, ensure_ascii=False)))
+                           (identifier, json.dumps({"query": user_query, "response": result.get("response"),
+                             "sources": result.get("sources", []), "metadata": result.get("metadata", {})}, ensure_ascii=False)))
             return jsonify(**result, query_id=identifier)
         except Exception as exc:
             logger.error("query_failed: %s", type(exc).__name__)

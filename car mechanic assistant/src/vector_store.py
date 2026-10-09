@@ -19,13 +19,15 @@ class VectorStore:
         self.persist_directory = Path(persist_directory or Config.CHROMA_PERSIST_DIR)
         self.collection_name = collection_name or Config.COLLECTION_NAME
         self.embeddings = embeddings or GeminiEmbeddings()
-        self.identity = {"schema": 2, "embedding_model": self.embeddings.model,
+        self.identity = {"schema": 3, "embedding_model": self.embeddings.model,
                          "dimensions": self.embeddings.dimensions, "distance": "cosine"}
         release = self.persist_directory / "release.json"
         if release.exists():
             saved = json.loads(release.read_text())
             if any(saved.get(key) != value for key, value in self.identity.items()):
                 raise ValueError("Index/model schema mismatch; build a fresh index directory")
+            if saved.get("collection", self.collection_name) != self.collection_name:
+                raise ValueError("Release collection name mismatch")
         elif (self.persist_directory / "chroma.sqlite3").exists():
             raise ValueError("Legacy index left intact; build a fresh versioned index directory")
         self.persist_directory.mkdir(parents=True, exist_ok=True)
@@ -33,6 +35,13 @@ class VectorStore:
             settings=Settings(anonymized_telemetry=False))
         self.collection = self.client.get_or_create_collection(name=self.collection_name,
             configuration={"hnsw": {"space": "cosine"}}, metadata=self.identity)
+        if any((self.collection.metadata or {}).get(key) != value for key, value in self.identity.items()):
+            raise ValueError("Chroma collection identity differs from release")
+        self.identity = json.loads(release.read_text()) if release.exists() else self.identity
+        policy_path = self.persist_directory / "policy.md"
+        if self.identity.get("policy_hash") and (not policy_path.exists() or
+                hashlib.sha256(policy_path.read_bytes()).hexdigest() != self.identity["policy_hash"]):
+            raise ValueError("Release policy checksum mismatch")
         if not release.exists():
             release.write_text(json.dumps(self.identity, indent=2))
 
@@ -70,20 +79,20 @@ class VectorStore:
         limit = n_results or Config.TOP_K_DOCUMENTS
         vehicle_info = vehicle_info or {}
         vector = self.embeddings.embed_query(query_text)
-        conditions = [{key: canonical_vehicle_value(value)} for key, value in vehicle_info.items()
-                      if key in {"make", "model", "engine"} and value]
+        conditions = [{"make": canonical_vehicle_value(vehicle_info["make"])}] if vehicle_info.get("make") else []
         if vehicle_info.get("year"):
             year = int(vehicle_info["year"])
             conditions += [{"year_start": {"$lte": year}}, {"year_end": {"$gte": year}}]
         where = conditions[0] if len(conditions) == 1 else {"$and": conditions} if conditions else None
-        pools = [self.query(query_text, limit * 3, where=where, query_embedding=vector)]
-        if where:
-            pools.append(self.query(query_text, limit * 3, where={"scope": "generic"}, query_embedding=vector))
+        pools = [self.query(query_text, limit * 6, where=where, query_embedding=vector)] if vehicle_info.get("make") else []
+        pools.append(self.query(query_text, limit * 3, where={"scope": "generic"}, query_embedding=vector))
         found = {}
         for pool in pools:
             for index, identifier in enumerate(pool["ids"][0]):
                 tags = pool["metadatas"][0][index]
                 if tags.get("folder") == "09_workshop_rules":
+                    continue
+                if not self._applicable(tags, vehicle_info) or 1 - pool["distances"][0][index] < Config.MIN_RETRIEVAL_SIMILARITY:
                     continue
                 doc = {"id": identifier, "content": pool["documents"][0][index],
                        "metadata": tags, "distance": pool["distances"][0][index]}
@@ -101,17 +110,40 @@ class VectorStore:
         return selected
 
     def _calculate_relevance_score(self, doc, query_text, vehicle_info=None):
-        score = max(0, 1 - doc["distance"]) * 100
-        score += Config.FOLDER_PRIORITIES.get(doc["metadata"].get("folder"), 0)
+        components = {"similarity": max(0, 1 - doc["distance"]) * 100,
+                      "folder_priority": Config.FOLDER_PRIORITIES.get(doc["metadata"].get("folder"), 0)}
         codes = re.findall(r"\b[PCBU][0-9A-F]{4}\b", query_text.upper())
-        score += 20 * sum(bool(re.search(r"\b" + code + r"\b", doc["content"], re.IGNORECASE)) for code in set(codes))
+        components["fault_code"] = 20 * sum(bool(re.search(r"\b" + code + r"\b", doc["content"], re.IGNORECASE)) for code in set(codes))
+        components["vehicle_match"] = 0
         for key, value in (vehicle_info or {}).items():
             if key in {"make", "model", "engine"} and doc["metadata"].get(key) == canonical_vehicle_value(value):
-                score += 15
-        return score
+                components["vehicle_match"] += 15
+        doc["score_components"] = components
+        return sum(components.values())
+
+    @staticmethod
+    def _applicable(tags, vehicle):
+        restricted = any(tags.get(key) for key in ("make", "model", "engine", "engine_options"))
+        restricted = restricted or tags.get("year_start", 0) != 0 or tags.get("year_end", 9999) != 9999
+        if tags.get("scope") == "generic":
+            return not restricted
+        if tags.get("scope") != "vehicle" or not tags.get("make") or not vehicle.get("make"):
+            return False
+        for key in ("make", "model", "engine"):
+            if tags.get(key) and canonical_vehicle_value(tags[key]) != canonical_vehicle_value(vehicle.get(key, "")):
+                return False
+        options = json.loads(tags.get("engine_options", "[]"))
+        if options and canonical_vehicle_value(vehicle.get("engine", "")) not in options:
+            return False
+        start, end = tags.get("year_start", 0), tags.get("year_end", 9999)
+        year = vehicle.get("year")
+        return (start == 0 and end == 9999) or (year is not None and start <= int(year) <= end)
 
     def get_workshop_rules(self):
-        return Config.WORKSHOP_RULES_PATH.read_text(encoding="utf-8") if Config.WORKSHOP_RULES_PATH.exists() else ""
+        path = self.persist_directory / "policy.md"
+        if not path.exists():
+            path = Config.WORKSHOP_RULES_PATH
+        return path.read_text(encoding="utf-8") if path.exists() else ""
 
     def get_stats(self):
         docs = self.collection.get(include=["metadatas"])
@@ -141,7 +173,10 @@ def main():
             raise ValueError("Index count differs from processed corpus")
         manifest = {**processor.manifest, "chunk_size": Config.CHUNK_SIZE, "overlap": Config.CHUNK_OVERLAP}
         (staging / "corpus.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2))
-        release = {**store.identity, "corpus_hash": hashlib.sha256(json.dumps(manifest, sort_keys=True).encode()).hexdigest()}
+        policy = store.get_workshop_rules()
+        (staging / "policy.md").write_text(policy, encoding="utf-8")
+        release = {**store.identity, "corpus_hash": hashlib.sha256(json.dumps(manifest, sort_keys=True).encode()).hexdigest(),
+                   "policy_hash": hashlib.sha256(policy.encode()).hexdigest(), "collection": store.collection_name}
         (staging / "release.json").write_text(json.dumps(release, indent=2))
         os.rename(staging, args.output)
         print(f"Built {len(chunks)} chunks in {args.output}; restart the app with CHROMA_PERSIST_DIRECTORY set to this release")

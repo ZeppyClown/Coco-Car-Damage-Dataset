@@ -76,7 +76,8 @@ def identify_part(
         for result in search_results.get("results", []):
             # Get price information
             price_data = db.query(PartPrice).filter(
-                PartPrice.part_id == result["id"]
+                PartPrice.part_id == result["id"],
+                PartPrice.ships_to_singapore.is_(True)
             ).all()
 
             # Calculate price range

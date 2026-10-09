@@ -4,6 +4,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY src ./src
 COPY web_app.py .
+COPY workshop_policy.md .
 COPY templates ./templates
 COPY static ./static
 COPY knowledge_base ./knowledge_base

@@ -45,6 +45,10 @@ class NHTSAService:
                 # Parse the results into a cleaner format
                 results = data.get("Results", [])
                 parsed_data = self._parse_vin_data(results)
+                error_codes = next((row.get("Value") for row in results if row.get("Variable") == "Error Code"), "0")
+                if error_codes != "0" or not all(parsed_data.get(key) for key in ("make", "model", "year")):
+                    logger.warning("nhtsa_incomplete_decode", vin=vin)
+                    return None
 
                 logger.info("nhtsa_decode_success", vin=vin, fields_count=len(parsed_data))
                 return parsed_data
@@ -57,36 +61,11 @@ class NHTSAService:
             return None
 
     async def get_recalls(self, vin: str) -> List[Dict[str, Any]]:
-        """
-        Get recall information for a VIN
-
-        Args:
-            vin: 17-character Vehicle Identification Number
-
-        Returns:
-            List of recall dictionaries
-        """
-        logger.info("nhtsa_get_recalls", vin=vin)
-
-        try:
-            async with httpx.AsyncClient(timeout=self.TIMEOUT) as client:
-                response = await client.get(
-                    f"{self.BASE_URL}/Recalls/GetRecallsByVIN/{vin}?format=json"
-                )
-                response.raise_for_status()
-
-                data = response.json()
-                recalls = data.get("Results", [])
-
-                logger.info("nhtsa_recalls_found", vin=vin, count=len(recalls))
-                return recalls
-
-        except httpx.HTTPError as e:
-            logger.error("nhtsa_recalls_http_error", vin=vin, error=str(e))
-            return []
-        except Exception as e:
-            logger.error("nhtsa_recalls_error", vin=vin, error=str(e), exc_info=True)
-            return []
+        """Decode VIN then list model-year campaigns; not a VIN completion check."""
+        vehicle = await self.decode_vin(vin)
+        if not vehicle:
+            raise ValueError("VIN could not be decoded for recall lookup")
+        return await self.get_recalls_by_make_model_year(vehicle["make"], vehicle["model"], int(vehicle["year"]))
 
     async def get_recalls_by_make_model_year(
         self, make: str, model: str, year: int
@@ -104,25 +83,11 @@ class NHTSAService:
         """
         logger.info("nhtsa_get_recalls_by_mmy", make=make, model=model, year=year)
 
-        try:
-            async with httpx.AsyncClient(timeout=self.TIMEOUT) as client:
-                response = await client.get(
-                    f"{self.BASE_URL}/Recalls/GetRecallsByMakeModelYear/{make}/{model}/{year}?format=json"
-                )
-                response.raise_for_status()
-
-                data = response.json()
-                recalls = data.get("Results", [])
-
-                logger.info("nhtsa_recalls_mmy_found", make=make, model=model, year=year, count=len(recalls))
-                return recalls
-
-        except httpx.HTTPError as e:
-            logger.error("nhtsa_recalls_mmy_http_error", error=str(e))
-            return []
-        except Exception as e:
-            logger.error("nhtsa_recalls_mmy_error", error=str(e), exc_info=True)
-            return []
+        async with httpx.AsyncClient(timeout=self.TIMEOUT) as client:
+            response = await client.get("https://api.nhtsa.gov/recalls/recallsByVehicle",
+                params={"make": make, "model": model, "modelYear": year})
+            response.raise_for_status()
+            return response.json()["results"]
 
     def _parse_vin_data(self, results: List[Dict]) -> Dict[str, Any]:
         """

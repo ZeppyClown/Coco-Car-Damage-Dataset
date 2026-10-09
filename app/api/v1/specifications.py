@@ -63,7 +63,7 @@ async def get_specifications(vin: str, db: Session = Depends(get_db), use_cache:
             specifications_dict[spec.spec_type][spec.spec_key] = spec.spec_value
 
         # Get recalls
-        recalls_data = await nhtsa.get_recalls(vin)
+        recalls_data = await _get_model_recalls(nhtsa, vehicle.make, vehicle.model, vehicle.year)
         recalls = _format_recalls(recalls_data)
 
         return SpecificationsResponse(
@@ -80,6 +80,8 @@ async def get_specifications(vin: str, db: Session = Depends(get_db), use_cache:
             recalls=recalls,
             metadata={
                 "source": "cache",
+                "recalls_scope": "make_model_year",
+                "vin_recall_completion_status": "not_checked",
                 "specs_count": len(specs),
                 "recalls_count": len(recalls)
             }
@@ -96,24 +98,17 @@ async def get_specifications(vin: str, db: Session = Depends(get_db), use_cache:
         )
 
     # Get recalls
-    recalls_data = await nhtsa.get_recalls(vin)
+    recalls_data = await _get_model_recalls(nhtsa, nhtsa_data["make"], nhtsa_data["model"], int(nhtsa_data["year"]))
     recalls = _format_recalls(recalls_data)
 
-    # Cache the vehicle data in database
+    # Replace the NHTSA cache as one transaction when a fresh decode is requested.
     if not vehicle:
-        vehicle = Vehicle(
-            vin=vin,
-            make=nhtsa_data.get("make", "Unknown"),
-            model=nhtsa_data.get("model", "Unknown"),
-            year=int(nhtsa_data.get("year", 0)) if nhtsa_data.get("year") else None,
-            trim=nhtsa_data.get("trim")
-        )
+        vehicle = Vehicle(vin=vin)
         db.add(vehicle)
-        db.commit()
-        db.refresh(vehicle)
-        logger.info("cached_vehicle", vin=vin, vehicle_id=vehicle.id)
-
-    # Cache specifications
+    for key in ("make", "model", "year", "trim"):
+        value = nhtsa_data.get(key)
+        setattr(vehicle, key, int(value) if key == "year" else value)
+    db.flush()
     _cache_specifications(db, vehicle.id, nhtsa_data)
 
     # Format specifications for response
@@ -135,10 +130,19 @@ async def get_specifications(vin: str, db: Session = Depends(get_db), use_cache:
         recalls=recalls,
         metadata={
             "source": "nhtsa_api",
+            "recalls_scope": "make_model_year",
+            "vin_recall_completion_status": "not_checked",
             "cached": True,
             "recalls_count": len(recalls)
         }
     )
+
+
+async def _get_model_recalls(service, make, model, year):
+    try:
+        return await service.get_recalls_by_make_model_year(make, model, year)
+    except Exception:
+        raise HTTPException(status_code=502, detail="Recall provider unavailable; recall status is unknown") from None
 
 
 def _format_nhtsa_specs(nhtsa_data: dict) -> dict:
@@ -176,41 +180,12 @@ def _format_nhtsa_specs(nhtsa_data: dict) -> dict:
 
 def _cache_specifications(db: Session, vehicle_id: int, nhtsa_data: dict):
     """Cache NHTSA specifications in database"""
-    # Cache engine specs
-    if nhtsa_data.get("engine"):
-        for key, value in nhtsa_data["engine"].items():
-            if value:
-                spec = Specification(
-                    vehicle_id=vehicle_id,
-                    spec_type="engine",
-                    spec_key=key,
-                    spec_value=str(value)
-                )
-                db.add(spec)
-
-    # Cache transmission specs
-    if nhtsa_data.get("transmission"):
-        for key, value in nhtsa_data["transmission"].items():
-            if value:
-                spec = Specification(
-                    vehicle_id=vehicle_id,
-                    spec_type="transmission",
-                    spec_key=key,
-                    spec_value=str(value)
-                )
-                db.add(spec)
-
-    # Cache basic vehicle info
-    for key in ["body_class", "vehicle_type", "drive_type", "doors", "manufacturer"]:
-        if nhtsa_data.get(key):
-            spec = Specification(
-                vehicle_id=vehicle_id,
-                spec_type="vehicle_info",
-                spec_key=key,
-                spec_value=str(nhtsa_data[key])
-            )
-            db.add(spec)
-
+    types = ("engine", "transmission", "safety", "vehicle_info")
+    db.query(Specification).filter(Specification.vehicle_id == vehicle_id,
+        Specification.spec_type.in_(types)).delete(synchronize_session=False)
+    for spec_type, fields in _format_nhtsa_specs(nhtsa_data).items():
+        for key, value in fields.items():
+            db.add(Specification(vehicle_id=vehicle_id, spec_type=spec_type, spec_key=key, spec_value=str(value)))
     db.commit()
 
 

@@ -25,11 +25,13 @@ curl -X POST http://127.0.0.1:8000/api/v1/query -F 'text=How much is my 2018 Toy
 
 Parts retrieval uses PostgreSQL full-text search, eligible-result filtering, optional independent provider fallback, and cache keys covering all result-affecting inputs. Catalogue fit does not verify physical installation. Unknown prices are null. Valuation is a rule-based estimate with no verified comparable listings. Diagnostic and paint knowledge remain small static libraries.
 
-Google Custom Search needs eligible existing account credentials; it is closed to new customers and ends January 1, 2027 ([Google documentation](https://developers.google.com/custom-search/v1/overview)). eBay uses Browse OAuth: set `EBAY_APP_ID`, `EBAY_CLIENT_SECRET`, `EBAY_MARKETPLACE` and `USE_EBAY_API=true`. Neither provider is required for startup. A supplier URL does not prove shipping or fit.
+Google Custom Search needs eligible existing account credentials; it is closed to new customers and ends January 1, 2027 ([Google documentation](https://developers.google.com/custom-search/v1/overview)). eBay uses Browse OAuth: set `EBAY_APP_ID`, `EBAY_CLIENT_SECRET`, `EBAY_MARKETPLACE` and `USE_EBAY_API=true`. Neither provider is required for startup. A supplier URL does not prove shipping or fit. [Search replacement research](car%20mechanic%20assistant/PUBLIC_REFERENCE_RESEARCH.md) recommends Brave for a direct web-search adapter replacement; accounts and live integration remain pending.
 
 ## Manual assistant and implementation record
 
 See [assistant quickstart](car%20mechanic%20assistant/QUICKSTART.md), [build status](car%20mechanic%20assistant/BUILD_STATUS.md), and [full implementation/evidence plan](car%20mechanic%20assistant/RESUME_DELIVERY_PLAN.md).
+
+The [résumé verification report](car%20mechanic%20assistant/RESUME_VERIFICATION.md) distinguishes working code from unverified business claims. [Company questions](car%20mechanic%20assistant/COMPANY_QUESTIONS.md) retain all missing evidence requests. A separate [public EN/CN/JP reference demo](car%20mechanic%20assistant/public_reference_corpus/README.md) uses attributed company summaries while authorised manuals are pending. It is not a repair corpus or evidence of Yap Motor adoption.
 
 ## Tests
 

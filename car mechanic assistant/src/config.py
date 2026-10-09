@@ -32,13 +32,14 @@ class Config:
     TOP_K_DOCUMENTS = int(os.getenv("TOP_K_DOCUMENTS", "5"))
     CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "1000"))
     CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "200"))
+    MIN_RETRIEVAL_SIMILARITY = float(os.getenv("MIN_RETRIEVAL_SIMILARITY", "0.65"))
 
     # Generation Settings
     MAX_TOKENS = int(os.getenv("MAX_TOKENS", "8192"))
     TEMPERATURE = float(os.getenv("TEMPERATURE", "0.3"))
 
     # Workshop Rules (always loaded)
-    WORKSHOP_RULES_PATH = KNOWLEDGE_BASE_DIR / "09_workshop_rules" / "default_assumptions" / "workshop_standards.md"
+    WORKSHOP_RULES_PATH = BASE_DIR / "workshop_policy.md"
 
     # Folder priorities (for re-ranking)
     FOLDER_PRIORITIES = {

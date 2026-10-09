@@ -248,13 +248,17 @@ def test_generation_retry_and_source_payload(monkeypatch):
     with pytest.raises(ValueError, match="no answer"):
         assistant._generate("question")
     passage = {"id": "passage-1", "content": "Check voltage", "relevance_score": 1,
-               "metadata": {"folder": "manuals", "filename": "battery.pdf", "location": "page 2"}}
+               "metadata": {"folder": "manuals", "filename": "battery.pdf", "location": "page 2",
+                            "source_url": "https://example.com/manual", "corpus_kind": "public_reference_placeholder", "language": "en"}}
     assistant.vector_store = SimpleNamespace(embeddings=FakeEmbeddings(), identity={"schema": 2},
                                            get_workshop_rules=lambda: "Policy")
     assistant.retrieve_context = lambda *args, **kwargs: [passage]
-    assistant.generate_response = lambda *args: "Answer"
+    assistant.generate_response = lambda *args: "Answer [source:passage-1]"
     result = assistant.query("question")
     assert result["sources"][0]["id"] == "passage-1"
     assert result["sources"][0]["location"] == "page 2"
     assert result["sources"][0]["excerpt"] == "Check voltage"
+    assert result["sources"][0]["source_url"] == "https://example.com/manual"
+    assert result["sources"][0]["corpus_kind"] == "public_reference_placeholder"
+    assert result["sources"][0]["language"] == "en"
     assert result["metadata"]["index_identity"] == {"schema": 2}

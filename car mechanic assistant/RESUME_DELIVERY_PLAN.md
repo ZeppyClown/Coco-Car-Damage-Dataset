@@ -434,3 +434,12 @@ Completed in this batch:
 - [x] Automated suite (53 passing tests), actual PostgreSQL/HTTP migration and seven-route API checks recorded in BUILD_STATUS.md. Live Gemini/Chroma generation succeeded with five cited passages using `gemini-3.1-flash-lite`; earlier provider errors are retained in the record and are not treated as successes.
 
 Still pending: Docker runtime checks; live marketplace checks; OCR; authorised manual corpus; mechanic labels and measured precision; authenticated workshop deployment and distinct participant accounting; real 30-day feedback; historical confirmation and six-month adoption. No company participation or elapsed time is simulated, and no October work is backdated into the internship.
+
+
+## 13. Verification follow-up and placeholder data — 9 October 2026
+
+The requested double-check reproduced retrieval/applicability, provenance, evaluator-input, recall-endpoint, specification-cache and pricing/cache defects. Corrections and regressions are recorded per feature in [BUILD_STATUS.md](BUILD_STATUS.md). The latest suite has 73 passing tests with real PostgreSQL enabled; seven-route HTTP checks and live Gemini/Chroma/public-demo checks passed within the scopes in [RESUME_VERIFICATION.md](RESUME_VERIFICATION.md).
+
+Per the user’s instruction, all company questions are now in [COMPANY_QUESTIONS.md](COMPANY_QUESTIONS.md), allowing independent work to continue while they ask Yap Motor. Public examples from BMW, TEXA, Toyota and Bosch inform the direction and a separate 12-summary EN/CN/JP placeholder corpus. They do not establish repair accuracy or company adoption. Provider replacements and later document replacement are documented in [PUBLIC_REFERENCE_RESEARCH.md](PUBLIC_REFERENCE_RESEARCH.md).
+
+The local repaired prototype is not a verified production repair assistant. Existing notes include unsupported/inconsistent repair details, and citation IDs do not certify their truth. Authorised originals, expert review, independent labels and actual usage records remain the acceptance gates. Current engineering results belong to the October follow-up; historical résumé attribution still needs evidence.

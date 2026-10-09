@@ -19,7 +19,7 @@ class QueryService:
 
     def __init__(self):
         """Initialize query service with trained models"""
-        self.model_dir = Path("data/models")
+        self.model_dir = Path(__file__).resolve().parents[2] / "data/models"
 
         # Load intent classifier
         try:
@@ -47,7 +47,7 @@ class QueryService:
             - entities: Extracted entities
             - suggested_action: What endpoint to call
         """
-        logger.info("process_query", text=text)
+        logger.info("process_query", query_length=len(text))
 
         result = {
             "text": text,
@@ -112,7 +112,7 @@ class QueryService:
             "parts_identification": {
                 "endpoint": "/api/v1/parts/identify",
                 "method": "POST",
-                "required_entities": ["part"],
+                "required_entities": ["part_name"],
                 "optional_entities": ["make", "model", "year"]
             },
             "vehicle_valuation": {

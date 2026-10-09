@@ -1,4 +1,8 @@
-from fastapi import APIRouter, UploadFile, File, Form
+from fastapi import APIRouter, UploadFile, File, Form, Depends
+from starlette.concurrency import run_in_threadpool
+from sqlalchemy.orm import Session
+from app.db.session import get_db
+from app.api.v1.specifications import get_specifications
 from typing import Optional, Dict, Any, List
 from app.schemas.query import QueryRequest, QueryResponse
 from app.services.query_service import get_query_service
@@ -15,9 +19,10 @@ logger = get_logger(__name__)
 
 @router.post("/query", response_model=QueryResponse)
 async def process_query(
-    text: str = Form(...),
+    text: str = Form(..., min_length=1, max_length=4000),
     image: Optional[UploadFile] = File(None),
-    context: Optional[Dict[str, Any]] = Form(None)
+    context: Optional[Dict[str, Any]] = Form(None),
+    db: Session = Depends(get_db)
 ):
     """
     🤖 Multi-Modal Automotive Intelligence System
@@ -48,7 +53,7 @@ async def process_query(
     """
     start_time = time.time()
 
-    logger.info("query_received", text=text, has_image=image is not None)
+    logger.info("query_received", query_length=len(text), has_image=image is not None)
 
     try:
         # Get query service instance
@@ -61,10 +66,10 @@ async def process_query(
         confidence = query_result["confidence"]
         entities = query_result["entities"]
 
-        logger.info("intent_classified", intent=intent, confidence=f"{confidence:.3f}", entities=entities)
+        logger.info("intent_classified", intent=intent, confidence=f"{confidence:.3f}", entity_fields=list(entities))
 
         # Step 2: Route to appropriate module and EXECUTE it
-        result = await _execute_module(intent, entities, text, image, context)
+        result = await _execute_module(intent, entities, text, image, context, db)
 
         # Step 3: Generate follow-up questions based on actual result
         follow_up_questions = _generate_follow_up_questions(intent, entities, result)
@@ -85,6 +90,7 @@ async def process_query(
             result=result,
             metadata={
                 "processing_time_ms": processing_time_ms,
+                "entities": entities,
                 "models_used": ["intent_classifier_simple", "entity_extractor", result.get("module_executed")],
                 "sources": ["ml_model", "intelligent_module_execution"]
             },
@@ -93,7 +99,7 @@ async def process_query(
         )
 
     except Exception as e:
-        logger.error("query_processing_error", error=str(e), exc_info=True)
+        logger.error("query_processing_error", error_type=type(e).__name__)
         processing_time_ms = int((time.time() - start_time) * 1000)
 
         return QueryResponse(
@@ -101,7 +107,7 @@ async def process_query(
             intent="error",
             confidence=0.0,
             result={
-                "error": str(e),
+                "error": "Query processing failed",
                 "explanation": "An error occurred while processing your query. Please try rephrasing or providing more details."
             },
             metadata={
@@ -119,7 +125,8 @@ async def _execute_module(
     entities: Dict[str, Any],
     query_text: str,
     image: Optional[UploadFile],
-    context: Optional[Dict[str, Any]]
+    context: Optional[Dict[str, Any]],
+    db: Session
 ) -> Dict[str, Any]:
     """
     Execute the appropriate intelligent module based on intent
@@ -137,10 +144,10 @@ async def _execute_module(
         return await _execute_paint_code(entities, query_text)
 
     elif intent == "parts_identification":
-        return await _execute_parts_search(entities, query_text)
+        return await _execute_parts_search(entities, query_text, db)
 
     elif intent == "specifications":
-        return await _execute_specifications(entities, query_text)
+        return await _execute_specifications(entities, query_text, db)
 
     elif intent == "general_question":
         return _execute_general_question(entities, query_text)
@@ -227,7 +234,7 @@ async def _execute_valuation(entities: Dict[str, Any], query_text: str) -> Dict[
         required_fields.append("vehicle year (e.g., 2018)")
 
     mileage = entities.get("mileage")
-    if not mileage:
+    if mileage is None:
         required_fields.append("current mileage (e.g., 75000 km)")
 
     if required_fields:
@@ -283,82 +290,23 @@ async def _execute_paint_code(entities: Dict[str, Any], query_text: str) -> Dict
     }
 
 
-async def _execute_parts_search(entities: Dict[str, Any], query_text: str) -> Dict[str, Any]:
-    """Execute parts search"""
-    # For now, return a structured response indicating parts search
-    # The parts search service already exists, we just need to integrate it properly
-
+async def _execute_parts_search(entities, query_text, db):
     part_name = entities.get("part_name")
     if not part_name:
-        return {
-            "module_executed": "parts_search_missing_data",
-            "message": "I understand you need a part, but I need to know which part",
-            "explanation": "Please specify the part you're looking for (e.g., brake pads, air filter, spark plugs)",
-            "example": "Try: 'Find brake pads for my 2017 Mazda CX-5'",
-            "next_steps": ["Specify which part you need"]
-        }
-
-    vehicle = {}
-    if entities.get("make"):
-        vehicle["make"] = entities["make"]
-    if entities.get("model"):
-        vehicle["model"] = entities["model"]
-    if entities.get("year"):
-        vehicle["year"] = entities["year"]
-
-    # Note: This would integrate with the actual parts search service
-    return {
-        "module_executed": "parts_search_service",
-        "intent_understood": f"User is looking for {part_name} for their vehicle",
-        "search_query": part_name,
-        "vehicle_context": vehicle if vehicle else None,
-        "message": "Parts search functionality ready - would search hybrid sources (synthetic + Google CSE + eBay)",
-        "next_steps": [
-            "Verify part compatibility with your specific vehicle",
-            "Compare prices across sources",
-            "Check seller ratings and shipping to Singapore"
-        ],
-        "reasoning": f"Identified part request for {part_name}. In production, this would search across data sources and return compatible parts with pricing."
-    }
+        return {"module_executed": "parts_search_missing_data", "missing_fields": ["part name"],
+                "message": "Specify the part you need"}
+    vehicle = {key: entities[key] for key in ("make", "model", "year") if key in entities}
+    result = await run_in_threadpool(get_search_engine().search, db=db, query=part_name,
+                                    vehicle=vehicle or None, limit=20, singapore_only=True)
+    return {"module_executed": "parts_search_service", "success": True, **result}
 
 
-async def _execute_specifications(entities: Dict[str, Any], query_text: str) -> Dict[str, Any]:
-    """Execute specifications lookup"""
-    vehicle = {}
-    required = []
-
-    if entities.get("make"):
-        vehicle["make"] = entities["make"]
-    else:
-        required.append("vehicle make")
-
-    if entities.get("model"):
-        vehicle["model"] = entities["model"]
-    else:
-        required.append("vehicle model")
-
-    if entities.get("year"):
-        vehicle["year"] = entities["year"]
-    else:
-        required.append("vehicle year")
-
-    if required:
-        return {
-            "module_executed": "specifications_missing_data",
-            "message": "I understand you want specifications, but I need vehicle details",
-            "missing_fields": required,
-            "example": "Try: 'What are the specs for a 2018 Toyota Camry?'",
-            "next_steps": [f"Provide your vehicle's {field}" for field in required]
-        }
-
-    return {
-        "module_executed": "specifications_service",
-        "intent_understood": f"User wants specifications for {vehicle.get('year')} {vehicle.get('make')} {vehicle.get('model')}",
-        "vehicle": vehicle,
-        "message": "Specifications module would provide detailed vehicle specs",
-        "reasoning": "In production, this would decode VIN or lookup specifications database",
-        "next_steps": ["Specification lookup would provide engine, transmission, dimensions, etc."]
-    }
+async def _execute_specifications(entities, query_text, db):
+    if not entities.get("vin"):
+        return {"module_executed": "specifications_missing_data", "missing_fields": ["VIN"],
+                "message": "Provide a 17-character VIN for the specification lookup"}
+    result = await get_specifications(entities["vin"], db=db, use_cache=True)
+    return {"module_executed": "specifications_service", **result.model_dump()}
 
 
 def _execute_general_question(entities: Dict[str, Any], query_text: str) -> Dict[str, Any]:

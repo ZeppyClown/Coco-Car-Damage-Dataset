@@ -429,6 +429,7 @@ def generate_general_queries() -> List[Dict]:
 
 
 def main():
+    random.seed(42)
     """Generate complete training dataset"""
     print("=" * 60)
     print("Generating Synthetic Training Dataset")

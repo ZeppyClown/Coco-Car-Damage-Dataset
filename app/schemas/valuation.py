@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Dict, List, Optional, Any
 from app.schemas.common import BaseResponse, VehicleInfo, PriceRange
 
@@ -54,7 +54,7 @@ class ValuationRequest(BaseModel):
     - Market trend analysis
     """
     vehicle: VehicleInfo
-    mileage: int
+    mileage: int = Field(ge=0)
     condition: str  # excellent, good, fair, poor
     location: Optional[str] = "Singapore"  # Location for market analysis
     modifications: Optional[List[str]] = None  # Any modifications

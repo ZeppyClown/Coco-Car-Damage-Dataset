@@ -5,6 +5,8 @@ Searches Singapore marketplaces: Lazada.sg, Shopee.sg, Carousell.sg
 HYBRID SYSTEM: Active data source for real-time pricing
 """
 import logging
+import hashlib
+from urllib.parse import urlparse
 from typing import List, Dict, Optional
 import httpx
 from datetime import datetime
@@ -29,10 +31,7 @@ class GoogleCSEAdapter(BasePartsAdapter):
     """
 
     def __init__(self):
-        super().__init__(
-            name="Google CSE",
-            rate_limit=settings.GOOGLE_CSE_RATE_LIMIT
-        )
+        super().__init__({"name": "Google CSE", "rate_limit": settings.GOOGLE_CSE_RATE_LIMIT})
         self.api_key = settings.GOOGLE_API_KEY
         self.cse_id = settings.GOOGLE_CSE_ID
         self.base_url = "https://www.googleapis.com/customsearch/v1"
@@ -48,7 +47,8 @@ class GoogleCSEAdapter(BasePartsAdapter):
     def search_parts(
         self,
         query: str,
-        vehicle_context: Optional[Dict] = None,
+        vehicle: Optional[Dict] = None,
+        limit: int = 20,
         filters: Optional[Dict] = None
     ) -> List[Dict]:
         """
@@ -72,25 +72,25 @@ class GoogleCSEAdapter(BasePartsAdapter):
             return []
 
         # Build search query
-        search_query = self._build_search_query(query, vehicle_context)
+        search_query = self._build_search_query(query, vehicle)
 
         # Execute search
         try:
-            results = self._execute_search(search_query, num_results=10)
+            results = self._execute_search(search_query, num_results=min(limit, 10))
 
             # Normalize results
             normalized = []
             for result in results:
                 normalized_part = self._normalize_result(result)
-                if normalized_part and self._filter_singapore(normalized_part):
+                if normalized_part:
                     normalized.append(normalized_part)
 
-            logger.info(f"Google CSE found {len(normalized)} parts for: {search_query}")
+            logger.info("Google CSE found %s listing candidates", len(normalized))
             return normalized
 
         except Exception as e:
-            logger.error(f"Google CSE search failed: {e}")
-            return []
+            logger.error("Google CSE request failed (%s)", type(e).__name__)
+            raise
 
     def get_part_details(self, part_id: str) -> Optional[Dict]:
         """
@@ -146,10 +146,10 @@ class GoogleCSEAdapter(BasePartsAdapter):
                 return data.get("items", [])
 
         except httpx.HTTPError as e:
-            logger.error(f"Google CSE HTTP error: {e}")
+            logger.error("Google CSE HTTP failure (%s)", type(e).__name__)
             raise
         except Exception as e:
-            logger.error(f"Google CSE request failed: {e}")
+            logger.error("Google CSE request failure (%s)", type(e).__name__)
             raise
 
     def _normalize_result(self, result: Dict) -> Optional[Dict]:
@@ -185,23 +185,26 @@ class GoogleCSEAdapter(BasePartsAdapter):
             # Extract seller info
             seller_info = self._extract_seller(source, url)
 
-            # Generate part number (use URL hash as pseudo part number)
-            part_number = f"{source.upper()}-{hash(url) % 1000000:06d}"
+            # Keep stable listing identity separate from manufacturer part numbers.
+            source_id = hashlib.sha256(url.encode()).hexdigest()
+            part_number = ""  # A listing ID is not a manufacturer's part number.
 
             return {
                 "part_number": part_number,
                 "name": title,
                 "description": description,
-                "source": source,
+                "source": "google_cse",
+                "source_id": source_id,
+                "marketplace": source,
                 "source_url": url,
                 "price_sgd": price_sgd,
                 "currency": "SGD",
                 "image_url": image_url,
                 "seller_name": seller_info.get("name"),
                 "seller_rating": seller_info.get("rating"),
-                "ships_to_singapore": True,
+                "ships_to_singapore": None,
                 "availability": "unknown",  # Google CSE doesn't provide stock info
-                "condition": "new",  # Assume new unless specified
+                "condition": "unknown",
                 "brand": self._extract_brand(title),
                 "retrieved_at": datetime.utcnow().isoformat(),
                 "data_source": "google_cse"  # HYBRID SYSTEM: Mark as Google CSE data
@@ -213,49 +216,28 @@ class GoogleCSEAdapter(BasePartsAdapter):
 
     def _detect_marketplace(self, url: str) -> Optional[str]:
         """Detect which marketplace the result is from"""
-        url_lower = url.lower()
-
-        if "lazada.sg" in url_lower:
-            return "lazada"
-        elif "shopee.sg" in url_lower:
-            return "shopee"
-        elif "carousell.sg" in url_lower:
-            return "carousell"
-        elif "amazon.sg" in url_lower:
-            return "amazon"
-        else:
-            return None  # Not a target marketplace
+        hostname = (urlparse(url).hostname or "").lower()
+        for host in self.target_sites:
+            if hostname == host or hostname.endswith("." + host):
+                return host.split(".")[0]
+        return None
 
     def _extract_price(self, pagemap: Dict, description: str) -> Optional[float]:
         """Extract price from pagemap or description"""
-        # Try pagemap first (structured data)
-        if "offer" in pagemap and pagemap["offer"]:
-            offer = pagemap["offer"][0]
-            if "price" in offer:
-                try:
-                    return float(offer["price"])
-                except (ValueError, TypeError):
-                    pass
-
-        if "product" in pagemap and pagemap["product"]:
-            product = pagemap["product"][0]
-            if "price" in product:
-                try:
-                    return float(product["price"])
-                except (ValueError, TypeError):
-                    pass
-
-        # Try to extract from description (fallback)
+        import math
         import re
-        price_pattern = r'\$\s*(\d+(?:\.\d{2})?)'
-        match = re.search(price_pattern, description)
-        if match:
-            try:
-                return float(match.group(1))
-            except ValueError:
-                pass
-
-        return None
+        for kind in ("offer", "product"):
+            for item in pagemap.get(kind, []):
+                if str(item.get("pricecurrency", item.get("priceCurrency", ""))).upper() != "SGD":
+                    continue
+                try:
+                    price = float(item["price"])
+                    if math.isfinite(price) and price >= 0:
+                        return price
+                except (KeyError, ValueError, TypeError):
+                    pass
+        match = re.search(r'(?:SGD\s*\$?|S\$)\s*(\d+(?:,\d{3})*(?:\.\d{1,2})?)(?![\d.])', description, re.I)
+        return float(match.group(1).replace(",", "")) if match else None
 
     def _extract_image(self, pagemap: Dict) -> Optional[str]:
         """Extract product image URL"""

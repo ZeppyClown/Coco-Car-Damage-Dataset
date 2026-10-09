@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Car Mechanic Assistant - AI-Powered Diagnostics</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>🔧 Car Mechanic Assistant</h1>
+            <p class="subtitle">AI-Powered Diagnostic & Repair Guidance</p>
+        </header>
+
+        <!-- <div class="info-box">
+            <h3>What can I help you with?</h3>
+            <div class="topics">
+                <span class="topic">Diagnostic Codes</span>
+                <span class="topic">Troubleshooting</span>
+                <span class="topic">Repair Procedures</span>
+                <span class="topic">Parts Info</span>
+                <span class="topic">Paint Codes</span>
+                <span class="topic">Labor Estimates</span>
+                <span class="topic">📸 Image Analysis</span>
+            </div>
+        </div> -->
+
+        <div class="query-section">
+            <div class="input-group">
+                <textarea id="queryInput"
+                    placeholder="Example: 2008 BMW 335i hard to start when hot, loses power under boost&#10;Or upload an image and ask: 'What part is this?' or 'How bad is this damage?'"
+                    rows="3"></textarea>
+                <button id="askButton" onclick="submitQuery()">
+                    <span id="buttonText">Ask Question</span>
+                    <span id="buttonLoading" style="display: none;">Processing...</span>
+                </button>
+            </div>
+
+            <div class="image-upload-section">
+                <div class="upload-area" onclick="document.getElementById('imageInput').click()">
+                    <input type="file" id="imageInput" accept="image/*" style="display: none"
+                        onchange="handleImageSelect(event)">
+                    <div id="uploadPrompt">
+                        <span class="upload-icon">📷</span>
+                        <p><strong>Click to upload an image</strong></p>
+                        <p class="upload-hint">Supports: Parts, Damage, VIN plates, Engine bay, Paint samples</p>
+                    </div>
+                    <div id="imagePreview" style="display: none;">
+                        <img id="previewImg" src="" alt="Preview">
+                        <button type="button" class="remove-image" onclick="removeImage(event)">✕ Remove</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="examples">
+                <p><strong>Try asking:</strong></p>
+                <div class="example-queries">
+                    <button class="example-btn" onclick="setQuery('P0300 code on Honda Accord, what does it mean?')">
+                        What does P0300 mean?
+                    </button>
+                    <button class="example-btn" onclick="setQuery('Engine shakes at idle, what to check?')">
+                        Engine shakes at idle
+                    </button>
+                    <button class="example-btn" onclick="setQuery('What oil should I use in a turbocharged engine?')">
+                        Oil for turbo engine
+                    </button>
+                    <button class="example-btn" onclick="setQuery('BMW paint code 300, what color is this?')">
+                        BMW paint code lookup
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="responseSection" class="response-section" style="display: none;">
+            <h2>Response</h2>
+            <div class="query-display">
+                <strong>Your Question:</strong>
+                <p id="displayQuery"></p>
+            </div>
+
+            <div class="response-content" id="responseContent"></div>
+
+            <div class="sources-section" id="sourcesSection" style="display: none;">
+                <h3>📚 Knowledge Base Sources Used</h3>
+                <div id="sourcesList"></div>
+            </div>
+        </div>
+
+        <div id="errorSection" class="error-section" style="display: none;">
+            <h3>⚠️ Error</h3>
+            <p id="errorMessage"></p>
+        </div>
+
+        <footer>
+            <p>Powered by Google Gemini & RAG Technology</p>
+        </footer>
+    </div>
+
+    <section id="feedbackControls" hidden aria-label="Answer feedback">
+        <label for="feedbackComment">What was useful or missing?</label>
+        <input id="feedbackComment" maxlength="1000" autocomplete="off">
+        <button type="button" onclick="submitFeedback('useful')">Useful</button>
+        <button type="button" onclick="submitFeedback('partly_useful')">Partly useful</button>
+        <button type="button" onclick="submitFeedback('not_useful')">Not useful</button>
+        <p id="feedbackStatus" role="status"></p>
+    </section>
+    <script>
+        let selectedImage = null;
+
+        function setQuery(query) {
+            document.getElementById('queryInput').value = query;
+        }
+
+        function handleImageSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                selectedImage = file;
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    document.getElementById('previewImg').src = e.target.result;
+                    document.getElementById('uploadPrompt').style.display = 'none';
+                    document.getElementById('imagePreview').style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function removeImage(event) {
+            event.stopPropagation();
+            selectedImage = null;
+            document.getElementById('imageInput').value = '';
+            document.getElementById('uploadPrompt').style.display = 'block';
+            document.getElementById('imagePreview').style.display = 'none';
+        }
+
+        async function submitQuery() {
+            const query = document.getElementById('queryInput').value.trim();
+
+            if (!query && !selectedImage) {
+                alert('Please enter a question or upload an image');
+                return;
+            }
+
+            // Show loading state
+            const button = document.getElementById('askButton');
+            const buttonText = document.getElementById('buttonText');
+            const buttonLoading = document.getElementById('buttonLoading');
+            button.disabled = true;
+            buttonText.style.display = 'none';
+            buttonLoading.style.display = 'inline';
+
+            // Hide previous results and errors
+            document.getElementById('responseSection').style.display = 'none';
+            document.getElementById('errorSection').style.display = 'none';
+
+            try {
+                let response;
+
+                if (selectedImage) {
+                    // Send as FormData with image
+                    const formData = new FormData();
+                    formData.append('query', query || 'Please analyze this image.');
+                    formData.append('image', selectedImage);
+
+                    response = await fetch('/query', {
+                        method: 'POST',
+                        body: formData
+                    });
+                } else {
+                    // Send as JSON (text only)
+                    response = await fetch('/query', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ query: query })
+                    });
+                }
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'An error occurred');
+                }
+
+                window.lastQueryId = data.query_id;
+                document.getElementById("feedbackControls").hidden = false;
+                // Display query
+                document.getElementById('displayQuery').textContent = data.query;
+
+                // Display response (convert markdown-like formatting to HTML)
+                const formattedResponse = formatResponse(data.response);
+                document.getElementById('responseContent').innerHTML = formattedResponse;
+
+                // Display sources
+                if (data.sources && data.sources.length > 0) {
+                    displaySources(data.sources);
+                    document.getElementById('sourcesSection').style.display = 'block';
+                } else {
+                    document.getElementById('sourcesSection').style.display = 'none';
+                }
+
+                // Show response section
+                document.getElementById('responseSection').style.display = 'block';
+
+                // Scroll to response
+                document.getElementById('responseSection').scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+
+            } catch (error) {
+                // Show error
+                document.getElementById('errorMessage').textContent = error.message;
+                document.getElementById('errorSection').style.display = 'block';
+                document.getElementById('errorSection').scrollIntoView({
+                    behavior: 'smooth'
+                });
+            } finally {
+                // Reset button state
+                button.disabled = false;
+                buttonText.style.display = 'inline';
+                buttonLoading.style.display = 'none';
+            }
+        }
+
+        async function submitFeedback(rating) {
+            const response = await fetch('/feedback', {method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({query_id: window.lastQueryId, rating: rating,
+                    comment: document.getElementById('feedbackComment').value})});
+            document.getElementById('feedbackStatus').textContent = response.ok ? 'Feedback saved.' : 'Could not save feedback.';
+        }
+
+        function escapeHTML(text) {
+            const element = document.createElement('span');
+            element.textContent = String(text);
+            return element.innerHTML;
+        }
+
+        function formatResponse(text) {
+            // Simple markdown-like formatting
+            let formatted = escapeHTML(text);
+
+            // Convert **bold** to <strong>
+            formatted = formatted.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+            // Convert *italic* to <em>
+            formatted = formatted.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+            // Convert headers
+            formatted = formatted.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+            formatted = formatted.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+
+            // Convert line breaks to <br> but preserve paragraph structure
+            formatted = formatted.replace(/\n\n/g, '</p><p>');
+            formatted = '<p>' + formatted + '</p>';
+
+            // Convert bullet points
+            formatted = formatted.replace(/^[\*\-]\s+(.+)$/gm, '<li>$1</li>');
+            formatted = formatted.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+
+            return formatted;
+        }
+
+        function displaySources(sources) {
+            const sourcesList = document.getElementById('sourcesList');
+            sourcesList.innerHTML = '';
+
+            sources.forEach((source, index) => {
+                const sourceItem = document.createElement('div');
+                sourceItem.className = 'source-item';
+
+                const folderName = escapeHTML(source.folder || 'Unknown');
+                const fileName = escapeHTML(source.file || 'Unknown');
+                const score = Number(source.score) || 0;
+
+                sourceItem.innerHTML = `
+                    <div class="source-number">${index + 1}</div>
+                    <div class="source-details">
+                        <div class="source-folder">${folderName}</div>
+                        <div class="source-file">${fileName} · ${escapeHTML(source.location || "")}</div>
+                        <div class="source-id">${escapeHTML(source.id || "")}</div>
+                        <div>${escapeHTML(source.excerpt || "")}</div>
+                    </div>
+                    <div class="source-score">Score: ${score}</div>
+                `;
+
+                sourcesList.appendChild(sourceItem);
+            });
+        }
+
+        // Allow Enter key to submit (with Shift+Enter for new line)
+        document.getElementById('queryInput').addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                submitQuery();
+            }
+        });
+    </script>
+</body>
+
+</html>

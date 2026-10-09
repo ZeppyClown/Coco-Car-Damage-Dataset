@@ -1,10 +1,11 @@
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
 from typing import Optional
 from sqlalchemy.orm import Session
-from app.schemas.parts import PartsIdentifyRequest, PartsIdentifyResponse, PartMatch
+from app.schemas.parts import PartsIdentifyRequest, PartsIdentifyResponse, PartMatch, CompatibilityRequest
 from app.schemas.common import PriceRange
 from app.db.session import get_db
-from app.db.models import PartPrice
+from app.db.models import PartPrice, PartsCatalog
+from app.services.compatibility_checker import get_compatibility_checker
 from app.services.parts_search import get_search_engine
 from app.core.logging import get_logger
 
@@ -13,12 +14,12 @@ logger = get_logger(__name__)
 
 
 @router.post("/parts/identify", response_model=PartsIdentifyResponse)
-async def identify_part(
-    description: Optional[str] = Form(None),
+def identify_part(
+    description: Optional[str] = Form(None, min_length=1, max_length=1000),
     image: Optional[UploadFile] = File(None),
     vehicle_make: Optional[str] = Form(None),
     vehicle_model: Optional[str] = Form(None),
-    vehicle_year: Optional[int] = Form(None),
+    vehicle_year: Optional[int] = Form(None, ge=1900, le=2100),
     db: Session = Depends(get_db)
 ):
     """
@@ -34,7 +35,7 @@ async def identify_part(
     - Supplier information
     """
     logger.info("parts_identify_request",
-               description=description,
+               description_length=len(description or ""),
                vehicle_make=vehicle_make,
                vehicle_model=vehicle_model,
                vehicle_year=vehicle_year,
@@ -80,7 +81,7 @@ async def identify_part(
 
             # Calculate price range
             if price_data:
-                prices_sgd = [float(p.price_sgd) for p in price_data if p.price_sgd]
+                prices_sgd = [float(p.price_sgd) for p in price_data if p.price_sgd is not None]
                 if prices_sgd:
                     price_range = PriceRange(
                         min=min(prices_sgd),
@@ -88,12 +89,12 @@ async def identify_part(
                         currency="SGD"
                     )
                 else:
-                    price_range = PriceRange(min=0, max=0, currency="SGD")
+                    price_range = None
 
                 # Get unique suppliers
                 suppliers = list(set([p.seller_name for p in price_data if p.seller_name]))
             else:
-                price_range = PriceRange(min=0, max=0, currency="SGD")
+                price_range = None
                 suppliers = []
 
             # Build compatibility string
@@ -101,7 +102,7 @@ async def identify_part(
             if result.get("compatible"):
                 confidence = result.get("compatibility_confidence", 1.0)
                 if confidence >= 0.9:
-                    compatibility = "Guaranteed fit"
+                    compatibility = "Catalogue fit; verify engine and trim"
                 elif confidence >= 0.7:
                     compatibility = "Likely compatible"
                 else:
@@ -111,20 +112,20 @@ async def identify_part(
 
             # Create match
             match = PartMatch(
-                part_number=result.get("part_number", ""),
+                part_number=result.get("part_number") or "",
                 name=result.get("name", ""),
-                description=result.get("description", ""),
+                description=result.get("description") or "",
                 compatibility=compatibility,
                 price_range=price_range,
                 suppliers=suppliers,
                 confidence=result.get("final_score", result.get("relevance_score", 0.0)),
-                oem=result.get("oem_or_aftermarket", "").lower() == "oem",
-                image_url=None  # TODO: Get from database when available
+                oem=(result.get("oem_or_aftermarket") or "").lower() == "oem",
+                image_url=result.get("image_url"),
+                source_url=result.get("source_url")
             )
             matches.append(match)
 
         logger.info("parts_identify_success",
-                   query=description,
                    matches_count=len(matches),
                    sources=search_results.get("sources_queried", []))
 
@@ -141,6 +142,18 @@ async def identify_part(
             }
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error("parts_identify_error", error=str(e))
-        raise HTTPException(status_code=500, detail=f"Parts identification failed: {str(e)}")
+        logger.error("parts_identify_error", error_type=type(e).__name__)
+        raise HTTPException(status_code=500, detail="Parts identification failed")
+
+
+@router.post("/parts/compatibility")
+def check_part_compatibility(request: CompatibilityRequest, db: Session = Depends(get_db)):
+    if db.get(PartsCatalog, request.part_id) is None:
+        raise HTTPException(status_code=404, detail="Part not found")
+    result = get_compatibility_checker().check_compatibility(
+        db, request.part_id, request.model_dump(), strict=True
+    )
+    return {"success": True, "part_id": request.part_id, "result": result}

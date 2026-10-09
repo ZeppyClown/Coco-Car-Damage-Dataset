@@ -6,7 +6,7 @@ Checks if a part is compatible with a specific vehicle using moderate rules
 
 from typing import Dict, Any, List, Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, func
 
 from app.db.models import PartsCatalog, PartCompatibilityEnhanced
 from app.core.logging import get_logger
@@ -72,17 +72,22 @@ class CompatibilityChecker:
                 "compatible": True,
                 "confidence": CompatibilityLevel.UNIVERSAL,
                 "level": "universal",
-                "message": "Universal part - fits all vehicles",
+                "message": "Catalogue marks this part universal; verify installation requirements",
                 "warnings": [],
                 "requirements": []
             }
+
+        if not make or not model or year is None:
+            return {"compatible": False, "confidence": 0.0, "level": "unknown",
+                    "message": "Make, model and year are needed to verify fit",
+                    "warnings": [], "requirements": ["Provide complete vehicle details"]}
 
         # Check exact match
         exact_match = db.query(PartCompatibilityEnhanced).filter(
             and_(
                 PartCompatibilityEnhanced.part_id == part_id,
-                PartCompatibilityEnhanced.make == make,
-                PartCompatibilityEnhanced.model == model,
+                func.lower(PartCompatibilityEnhanced.make) == make.lower(),
+                func.lower(PartCompatibilityEnhanced.model) == model.lower(),
                 PartCompatibilityEnhanced.year_start <= year,
                 PartCompatibilityEnhanced.year_end >= year
             )
@@ -92,18 +97,18 @@ class CompatibilityChecker:
             # Find best match considering trim and engine
             best_match = self._find_best_match(exact_match, trim, engine)
 
-            confidence = float(best_match.confidence) if best_match.confidence else CompatibilityLevel.GUARANTEED
+            confidence = float(best_match.confidence) if best_match.confidence is not None else CompatibilityLevel.MODERATE
             warnings = []
             requirements = []
 
             # Add warnings based on specificity
-            if best_match.trim and trim and best_match.trim != trim:
-                warnings.append(f"Specified for {best_match.trim} trim, you have {trim}")
-                confidence *= 0.9
-
-            if best_match.engine and engine and best_match.engine != engine:
-                warnings.append(f"Specified for {best_match.engine} engine")
-                confidence *= 0.9
+            for field in ("trim", "engine"):
+                specified, supplied = getattr(best_match, field), vehicle.get(field)
+                if specified and (not supplied or specified.casefold() != supplied.casefold()):
+                    return {"compatible": False, "confidence": 0.0, "level": "unknown",
+                            "message": "Engine or trim fit has not been confirmed",
+                            "warnings": [f"Catalogue specifies {field}: {specified}"],
+                            "requirements": [f"Verify {field} before purchase"]}
 
             if best_match.position:
                 requirements.append(f"Position: {best_match.position}")
@@ -123,7 +128,7 @@ class CompatibilityChecker:
             make_match = db.query(PartCompatibilityEnhanced).filter(
                 and_(
                     PartCompatibilityEnhanced.part_id == part_id,
-                    PartCompatibilityEnhanced.make == make,
+                    func.lower(PartCompatibilityEnhanced.make) == make.lower(),
                     PartCompatibilityEnhanced.year_start <= year,
                     PartCompatibilityEnhanced.year_end >= year
                 )
@@ -198,14 +203,14 @@ class CompatibilityChecker:
 
             # Prefer matches with trim data
             if match.trim:
-                if trim and match.trim == trim:
+                if trim and match.trim.casefold() == trim.casefold():
                     score += 10
                 elif trim:
                     score -= 5
 
             # Prefer matches with engine data
             if match.engine:
-                if engine and match.engine == engine:
+                if engine and match.engine.casefold() == engine.casefold():
                     score += 10
                 elif engine:
                     score -= 5

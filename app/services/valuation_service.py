@@ -170,7 +170,7 @@ class ValuationService:
         trade_in_value = private_party_value * 0.75  # Dealers offer 70-80% of market value
 
         # Generate comparable listings
-        comparables = self._generate_comparable_listings(make, model, year, mileage, condition)
+        comparables = []  # No verified market listings are available.
 
         # Market analysis
         market_analysis = self._analyze_market(make, model, vehicle_age)

@@ -23,10 +23,10 @@ class EntityExtractor:
 
         # Compile regex patterns
         self.patterns = {
-            "VIN": re.compile(r'\b[A-HJ-NPR-Z0-9]{17}\b'),
-            "FAULT_CODE": re.compile(r'\b[PCBU][0-9]{4}\b'),
+            "VIN": re.compile(r'\b[A-HJ-NPR-Z0-9]{17}\b', re.IGNORECASE),
+            "FAULT_CODE": re.compile(r'\b[PCBU][0-9A-F]{4}\b', re.IGNORECASE),
             "YEAR": re.compile(r'\b(?:19|20)\d{2}\b'),
-            "MILEAGE": re.compile(r'\b(\d{1,3}[,]?\d{3})\s*(miles?|k|km)\b', re.IGNORECASE),
+            "MILEAGE": re.compile(r'(?<![\w.,-])(\d+(?:,\d{3})*(?:\.\d+)?)\s*(k)?\s*(km|kilometres?|kilometers?|miles?|mi)\b', re.IGNORECASE),
         }
 
     def _load_makes(self) -> List[str]:
@@ -94,19 +94,23 @@ class EntityExtractor:
                 # Extract ALL fault codes (can be multiple)
                 matches = pattern.findall(text)
                 if matches:
-                    entities["fault_codes"] = matches  # Store as list with plural key
+                    entities["fault_codes"] = list(dict.fromkeys(code.upper() for code in matches))
             else:
                 match = pattern.search(text)
                 if match:
                     if entity_type == "MILEAGE":
                         # Extract just the number part and convert to int
-                        mileage_str = match.group(1).replace(",", "")
-                        try:
-                            entities[entity_type.lower()] = int(mileage_str)
-                        except:
-                            entities[entity_type.lower()] = mileage_str
+                        distance = float(match.group(1).replace(",", ""))
+                        if match.group(2):
+                            distance *= 1000
+                        if match.group(3).lower() in {"mile", "miles", "mi"}:
+                            distance *= 1.609344
+                        entities["mileage"] = round(distance)
+                        entities["mileage_unit"] = "km"
+                    elif entity_type == "YEAR":
+                        entities["year"] = int(match.group(0))
                     else:
-                        entities[entity_type.lower()] = match.group(0)
+                        entities[entity_type.lower()] = match.group(0).upper()
 
         # Extract make (check before model to avoid conflicts)
         for make in self.makes:

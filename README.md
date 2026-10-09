@@ -1,319 +1,38 @@
-# Automotive Assistant System
+# Yap Motor automotive assistant
 
-An AI-powered automotive knowledge and assistant system designed for workshop and real-world automotive use.
+Two applications share this repository: a structured FastAPI/PostgreSQL service and a Gemini/ChromaDB manual assistant. The current rebuild is dated October 2026; internship history and business-use claims require separate evidence.
 
-## Features
+## Run the automotive API
 
-- **Intent Detection**: Automatically classifies user queries (parts, valuation, paint codes, specs, diagnostics)
-- **Parts Identification**: Text and image-based parts lookup with compatibility checking
-- **Vehicle Valuation**: Market-based pricing with comparable listings
-- **Paint Code Lookup**: VIN-based and image-based paint color identification
-- **Specifications**: Complete vehicle specs from VIN or make/model/year
-- **Diagnostics**: Fault code lookup and troubleshooting assistance
+Use Python 3.12. Install `requirements.txt`, supply `DATABASE_URL`, and run:
 
-## Architecture
-
-See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed system design and module specifications.
-
-## Implementation Plan
-
-See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for the phased development roadmap.
-
-## Quick Start
-
-### Prerequisites
-
-- Python 3.10 or higher
-- Docker and Docker Compose
-- 8GB RAM minimum (16GB recommended)
-- GPU recommended for ML training (optional for inference)
-
-### Setup
-
-1. Clone the repository:
-```bash
-git clone <repo-url>
-cd Coco\ Car\ Damage\ Dataset
+```sh
+python -m alembic upgrade head
+python scripts/generate_training_data.py
+python scripts/train_intent_simple.py
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-2. Create a virtual environment:
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+Training uses template-generated questions; its accuracy is not a workshop-quality result. The model is rebuilt inside the Docker image. Keep an existing model/data backup before deliberately regenerating it locally.
+
+With Docker available, `docker compose up --build` starts PostgreSQL, runs migrations once, then starts the API on localhost. Use a dedicated Compose project when testing; do not remove existing database volumes. The Compose recipe is not a production access-control setup.
+
+The seven automotive routes are query routing, parts identification, diagnostics, valuation, paint guidance, VIN specifications, and parts compatibility. `/docs` contains their actual schemas. Query and parts requests use form data; the remaining POST routes use JSON.
+
+```sh
+curl -X POST http://127.0.0.1:8000/api/v1/query -F 'text=How much is my 2018 Toyota Camry with 75k km worth?'
 ```
 
-3. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
+Parts retrieval uses PostgreSQL full-text search, eligible-result filtering, optional independent provider fallback, and cache keys covering all result-affecting inputs. Catalogue fit does not verify physical installation. Unknown prices are null. Valuation is a rule-based estimate with no verified comparable listings. Diagnostic and paint knowledge remain small static libraries.
 
-4. Set up environment variables:
-```bash
-cp .env.example .env
-# Edit .env with your configuration
-```
+Google Custom Search needs eligible existing account credentials; it is closed to new customers and ends January 1, 2027 ([Google documentation](https://developers.google.com/custom-search/v1/overview)). eBay uses Browse OAuth: set `EBAY_APP_ID`, `EBAY_CLIENT_SECRET`, `EBAY_MARKETPLACE` and `USE_EBAY_API=true`. Neither provider is required for startup. A supplier URL does not prove shipping or fit.
 
-5. Start the services with Docker Compose:
-```bash
-docker-compose up -d
-```
+## Manual assistant and implementation record
 
-6. Run database migrations:
-```bash
-python scripts/init_db.py
-```
+See [assistant quickstart](car%20mechanic%20assistant/QUICKSTART.md), [build status](car%20mechanic%20assistant/BUILD_STATUS.md), and [full implementation/evidence plan](car%20mechanic%20assistant/RESUME_DELIVERY_PLAN.md).
 
-7. Start the API server:
-```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
+## Tests
 
-8. Access the API documentation:
-```
-http://localhost:8000/docs
-```
+Install both applications' requirements and `requirements-dev.txt`, then run `python -m pytest -q`. Unit fixtures use isolated databases, mocked providers, temporary Chroma directories and test embeddings. Tests do not use the workshop database or assert 90% retrieval precision. For the PostgreSQL integration test, create a disposable local database whose name starts with `yap_test`, then set `YAP_TEST_POSTGRES_URL` to its connection URL. Without that variable, this integration check is skipped.
 
-## Development
-
-### Project Structure
-
-```
-.
-├── app/
-│   ├── api/              # API endpoints
-│   │   ├── v1/
-│   │   │   ├── query.py
-│   │   │   ├── parts.py
-│   │   │   ├── valuation.py
-│   │   │   ├── paint_code.py
-│   │   │   ├── specifications.py
-│   │   │   └── diagnostics.py
-│   │   └── deps.py       # Dependencies
-│   ├── core/             # Core functionality
-│   │   ├── config.py
-│   │   ├── security.py
-│   │   └── logging.py
-│   ├── models/           # ML models
-│   │   ├── intent_classifier.py
-│   │   ├── entity_extractor.py
-│   │   ├── parts_classifier.py
-│   │   └── paint_matcher.py
-│   ├── services/         # Business logic
-│   │   ├── intent_service.py
-│   │   ├── parts_service.py
-│   │   ├── valuation_service.py
-│   │   ├── paint_service.py
-│   │   ├── specs_service.py
-│   │   └── diagnostics_service.py
-│   ├── db/               # Database
-│   │   ├── models.py     # SQLAlchemy models
-│   │   ├── session.py
-│   │   └── migrations/
-│   ├── schemas/          # Pydantic schemas
-│   │   ├── query.py
-│   │   ├── parts.py
-│   │   ├── valuation.py
-│   │   └── common.py
-│   └── main.py           # FastAPI app
-├── tests/
-│   ├── unit/
-│   └── integration/
-├── data/
-│   ├── raw/              # Raw datasets
-│   ├── processed/        # Processed datasets
-│   └── models/           # Trained models
-├── scripts/
-│   ├── init_db.py
-│   ├── train_intent_classifier.py
-│   ├── train_parts_classifier.py
-│   └── seed_data.py
-├── config/
-│   └── logging.yaml
-├── docs/
-├── docker-compose.yml
-├── Dockerfile
-├── requirements.txt
-├── .env.example
-└── README.md
-```
-
-### Running Tests
-
-```bash
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=app tests/
-
-# Run specific test file
-pytest tests/unit/test_intent_classifier.py
-```
-
-### Code Quality
-
-```bash
-# Format code
-black app tests
-
-# Lint
-ruff check app tests
-
-# Type checking
-mypy app
-```
-
-## API Usage
-
-### Query Endpoint (Main Entry Point)
-
-```bash
-curl -X POST "http://localhost:8000/api/v1/query" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "text": "I need a brake pad for my 2015 Honda Civic",
-    "context": {}
-  }'
-```
-
-Response:
-```json
-{
-  "success": true,
-  "intent": "parts_identification",
-  "confidence": 0.94,
-  "entities": {
-    "year": "2015",
-    "make": "Honda",
-    "model": "Civic",
-    "part_name": "brake pad"
-  },
-  "result": {
-    "matches": [
-      {
-        "part_number": "D1092",
-        "name": "Front Brake Pad Set",
-        "description": "Ceramic brake pads for 2015 Honda Civic",
-        "compatibility": "Compatible with 2015 Honda Civic LX/EX/Touring",
-        "price_range": {"min": 45.99, "max": 89.99},
-        "confidence": 0.92
-      }
-    ]
-  },
-  "follow_up_questions": [
-    "Do you need front or rear brake pads?"
-  ],
-  "next_steps": [
-    "Verify your trim level for exact compatibility",
-    "Check if rotors also need replacement"
-  ]
-}
-```
-
-### Parts Identification with Image
-
-```bash
-curl -X POST "http://localhost:8000/api/v1/parts/identify" \
-  -F "image=@part_photo.jpg" \
-  -F "description=brake part" \
-  -F "vehicle={\"year\":\"2015\",\"make\":\"Honda\",\"model\":\"Civic\"}"
-```
-
-### Vehicle Valuation
-
-```bash
-curl -X POST "http://localhost:8000/api/v1/valuation/estimate" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "vin": "1HGBH41JXMN109186",
-    "mileage": 75000,
-    "condition": "Good",
-    "location": "90210"
-  }'
-```
-
-### Paint Code Lookup
-
-```bash
-curl -X GET "http://localhost:8000/api/v1/paint-code/lookup?vin=1HGBH41JXMN109186"
-```
-
-### Diagnostics
-
-```bash
-curl -X POST "http://localhost:8000/api/v1/diagnostics/troubleshoot" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "vehicle": {"year": "2015", "make": "Honda", "model": "Civic"},
-    "system": "engine",
-    "fault_codes": ["P0171"],
-    "symptoms": "rough idle, check engine light on"
-  }'
-```
-
-## ML Model Training
-
-### Intent Classifier
-
-```bash
-python scripts/train_intent_classifier.py \
-  --data data/raw/intent_training_data.json \
-  --model distilbert-base-uncased \
-  --epochs 10 \
-  --output data/models/intent_classifier_v1
-```
-
-### Parts Image Classifier
-
-```bash
-python scripts/train_parts_classifier.py \
-  --data data/raw/parts_images/ \
-  --model resnet50 \
-  --epochs 20 \
-  --output data/models/parts_classifier_v1
-```
-
-## Configuration
-
-Key environment variables (see `.env.example`):
-
-- `DATABASE_URL`: PostgreSQL connection string
-- `REDIS_URL`: Redis connection string
-- `NEO4J_URI`: Neo4j connection string
-- `API_KEY`: API key for authentication
-- `VIN_DECODER_API_KEY`: VIN decoder service API key
-- `MARKET_DATA_API_KEY`: Market data API key (KBB, Edmunds)
-
-## Deployment
-
-### Docker
-
-```bash
-docker build -t automotive-assistant .
-docker run -p 8000:8000 automotive-assistant
-```
-
-### Docker Compose
-
-```bash
-docker-compose up -d
-```
-
-### Production
-
-See [docs/deployment.md](docs/deployment.md) for production deployment guide.
-
-## Contributing
-
-1. Create a feature branch
-2. Make changes with tests
-3. Run code quality checks
-4. Submit pull request
-
-## License
-
-MIT License - see LICENSE file
-
-## Support
-
-For issues and questions, please open a GitHub issue.
+Manual originals, keys, built vector indexes and feedback remain private and untracked. A real 500-page corpus, 24 mechanic users, independent precision labels and sustained adoption are pending evidence.

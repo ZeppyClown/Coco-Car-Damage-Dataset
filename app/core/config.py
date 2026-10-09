@@ -49,7 +49,8 @@ class Settings(BaseSettings):
     EBAY_DEV_ID: Optional[str] = None
     EBAY_CERT_ID: Optional[str] = None
     EBAY_ENVIRONMENT: str = "PRODUCTION"  # or SANDBOX
-    EBAY_MARKETPLACE: str = "EBAY_SG"  # Singapore marketplace
+    EBAY_MARKETPLACE: str = "EBAY_US"
+    EBAY_CLIENT_SECRET: Optional[str] = None
 
     # Lazada API Credentials
     LAZADA_APP_KEY: Optional[str] = None
@@ -96,6 +97,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "ignore"
 
 
 settings = Settings()

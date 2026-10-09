@@ -16,7 +16,6 @@ from app.core.middleware import (
     database_exception_handler,
 )
 from app.api.v1 import query, parts, valuation, paint_code, specifications, diagnostics
-from app.db.session import init_db
 
 logger = get_logger(__name__)
 
@@ -71,7 +70,8 @@ async def root():
                 "valuation": "/api/v1/valuation/estimate",
                 "paint_code": "/api/v1/paint-code/lookup",
                 "specifications": "/api/v1/specifications/{vin}",
-                "diagnostics": "/api/v1/diagnostics/troubleshoot"
+                "diagnostics": "/api/v1/diagnostics/troubleshoot",
+                "compatibility": "/api/v1/parts/compatibility"
             }
         }
 
@@ -98,18 +98,7 @@ async def startup_event():
     """Initialize services on startup"""
     logger.info("startup", message="Starting Automotive Assistant API")
 
-    try:
-        # Initialize database tables
-        logger.info("startup", message="Initializing database tables")
-        init_db()
-        logger.info("startup", message="Database initialized successfully")
-    except Exception as e:
-        logger.error("startup_error", error=str(e), exc_info=True)
-        raise
-
-    # TODO: Load ML models
-    # TODO: Initialize caches
-
+    # Schema changes run once through Alembic before application startup.
     logger.info("startup", message="API started successfully")
 
 

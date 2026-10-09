@@ -5,6 +5,9 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from sqlalchemy.exc import SQLAlchemyError
 from app.core.logging import get_logger
 import time
+import uuid
+import structlog
+from fastapi.encoders import jsonable_encoder
 
 logger = get_logger(__name__)
 
@@ -12,6 +15,8 @@ logger = get_logger(__name__)
 async def error_handling_middleware(request: Request, call_next):
     """Global error handling middleware"""
     start_time = time.time()
+    request_id = uuid.uuid4().hex
+    structlog.contextvars.bind_contextvars(request_id=request_id)
 
     try:
         response = await call_next(request)
@@ -26,6 +31,7 @@ async def error_handling_middleware(request: Request, call_next):
             process_time=f"{process_time:.3f}s",
         )
 
+        response.headers["X-Request-ID"] = request_id
         return response
 
     except Exception as exc:
@@ -35,20 +41,22 @@ async def error_handling_middleware(request: Request, call_next):
             "request_error",
             method=request.method,
             path=request.url.path,
-            error=str(exc),
             error_type=type(exc).__name__,
             process_time=f"{process_time:.3f}s",
-            exc_info=True,
         )
 
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            headers={"X-Request-ID": request_id},
             content={
                 "success": False,
                 "error": "Internal server error",
-                "detail": str(exc) if logger.level == "DEBUG" else "An unexpected error occurred",
+                "detail": "An unexpected error occurred",
             },
         )
+
+    finally:
+        structlog.contextvars.clear_contextvars()
 
 
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
@@ -57,7 +65,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         "validation_error",
         method=request.method,
         path=request.url.path,
-        errors=exc.errors(),
+        error_count=len(exc.errors()),
     )
 
     return JSONResponse(
@@ -65,7 +73,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={
             "success": False,
             "error": "Validation error",
-            "detail": exc.errors(),
+            "detail": jsonable_encoder(exc.errors()),
         },
     )
 
@@ -85,6 +93,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
         content={
             "success": False,
             "error": exc.detail,
+            "detail": exc.detail,
         },
     )
 
@@ -95,8 +104,7 @@ async def database_exception_handler(request: Request, exc: SQLAlchemyError):
         "database_error",
         method=request.method,
         path=request.url.path,
-        error=str(exc),
-        exc_info=True,
+        error_type=type(exc).__name__,
     )
 
     return JSONResponse(

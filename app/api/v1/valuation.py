@@ -155,5 +155,5 @@ async def estimate_value(request: ValuationRequest):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("valuation_error", error=str(e), exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Valuation analysis failed: {str(e)}")
+        logger.error("valuation_error", error_type=type(e).__name__)
+        raise HTTPException(status_code=500, detail="Valuation analysis failed")

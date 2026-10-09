@@ -65,3 +65,6 @@ test.db
 # Documentation
 *.md
 !README.md
+# Car mechanic assistant: knowledge base and guides are Markdown and must be tracked
+!car mechanic assistant/**/*.md
+!SYSTEM_DESIGN.md

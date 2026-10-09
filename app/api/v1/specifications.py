@@ -1,3 +1,4 @@
+import re
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from app.schemas.specifications import SpecificationsResponse, Recall
@@ -38,6 +39,10 @@ async def get_specifications(vin: str, db: Session = Depends(get_db), use_cache:
 
     if len(vin) != 17:
         raise HTTPException(status_code=400, detail="VIN must be 17 characters")
+
+    vin = vin.upper()
+    if not re.fullmatch(r"[A-HJ-NPR-Z0-9]{17}", vin):
+        raise HTTPException(status_code=400, detail="VIN contains invalid characters")
 
     # Initialize NHTSA service
     nhtsa = NHTSAService()

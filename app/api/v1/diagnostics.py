@@ -207,5 +207,5 @@ async def troubleshoot(request: DiagnosticsRequest):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("diagnostics_error", error=str(e), exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Diagnostic analysis failed: {str(e)}")
+        logger.error("diagnostics_error", error_type=type(e).__name__)
+        raise HTTPException(status_code=500, detail="Diagnostic analysis failed")

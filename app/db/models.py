@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, func, Numeric, JSON
+from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, func, Numeric, JSON, Index, UniqueConstraint, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -122,26 +122,36 @@ class FaultCode(Base):
 class PartsCatalog(Base):
     """Parts catalog from multiple sources (eBay, Lazada, Shopee, etc.)"""
     __tablename__ = "parts_catalog"
+    __table_args__ = (
+        Index('ix_parts_catalog_brand', 'brand'),
+        Index('ix_parts_catalog_category', 'category'),
+        Index('ix_parts_catalog_data_source', 'data_source'),
+        Index('ix_parts_catalog_part_number', 'part_number'),
+        Index("ix_parts_catalog_search", text("to_tsvector('english'::regconfig, (name::text || ' '::text) || COALESCE(description, ''::text))"), postgresql_using="gin").ddl_if(dialect="postgresql"),
+        Index('ix_parts_catalog_ships_to_singapore', 'ships_to_singapore'),
+        Index('ix_parts_catalog_source', 'source'),
+        Index('ix_parts_catalog_source_id', 'source_id'),
+    )
 
-    id = Column(Integer, primary_key=True, index=True)
-    part_number = Column(String(100), nullable=False, index=True)
-    source = Column(String(50), nullable=False, index=True)  # ebay, lazada, shopee, synthetic
-    source_id = Column(String(200), index=True)  # ID from source API
+    id = Column(Integer, primary_key=True)
+    part_number = Column(String(100), nullable=False)
+    source = Column(String(50), nullable=False)  # ebay, lazada, shopee, synthetic
+    source_id = Column(String(200))  # ID from source API
     name = Column(String(500), nullable=False)
     description = Column(Text)
-    category = Column(String(100), index=True)
+    category = Column(String(100))
     subcategory = Column(String(100))
-    brand = Column(String(100), index=True)
+    brand = Column(String(100))
     oem_or_aftermarket = Column(String(20))
     condition = Column(String(50))  # new, used, refurbished
     attributes = Column(JSON)  # flexible attributes
     image_url = Column(String(1000))  # primary image URL
     image_urls = Column(JSON)  # array of additional image URLs
-    ships_to_singapore = Column(Boolean, default=True, index=True)  # Singapore shipping
-    data_source = Column(String(50), index=True)  # 🏷️ HYBRID SYSTEM: synthetic, google_cse, ebay_api, etc.
+    ships_to_singapore = Column(Boolean)  # Singapore shipping
+    data_source = Column(String(50))  # 🏷️ HYBRID SYSTEM: synthetic, google_cse, ebay_api, etc.
     retrieved_at = Column(DateTime)  # when data was fetched
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, server_default=func.now(), nullable=False)
     last_sync = Column(DateTime)  # last API sync
 
     # Relationships
@@ -155,11 +165,18 @@ class PartsCatalog(Base):
 class PartPrice(Base):
     """Pricing information from different sources/sellers"""
     __tablename__ = "part_prices"
+    __table_args__ = (
+        Index('ix_part_prices_currency', 'currency'),
+        Index('ix_part_prices_part_id', 'part_id'),
+        Index('ix_part_prices_price', 'price'),
+        Index('ix_part_prices_price_sgd', 'price_sgd'),
+        Index('ix_part_prices_ships_to_singapore', 'ships_to_singapore'),
+    )
 
-    id = Column(Integer, primary_key=True, index=True)
-    part_id = Column(Integer, ForeignKey("parts_catalog.id", ondelete="CASCADE"), nullable=False, index=True)
-    currency = Column(String(10), nullable=False, index=True)  # SGD, USD, etc.
-    price_sgd = Column(Numeric(10, 2), nullable=False, index=True)  # Price in SGD
+    id = Column(Integer, primary_key=True)
+    part_id = Column(Integer, ForeignKey("parts_catalog.id", ondelete="CASCADE"), nullable=False)
+    currency = Column(String(10), nullable=False)  # SGD, USD, etc.
+    price_sgd = Column(Numeric(10, 2), nullable=True)  # Price in SGD
     price = Column(Numeric(10, 2))  # Original currency price (for reference)
     original_price = Column(Numeric(10, 2))  # for discounts
     shipping_cost = Column(Numeric(10, 2))
@@ -169,15 +186,15 @@ class PartPrice(Base):
     condition = Column(String(50))  # new, used, refurbished
     in_stock = Column(Boolean)  # deprecated, use availability
     stock_quantity = Column(Integer)
-    ships_to_singapore = Column(Boolean, index=True)
+    ships_to_singapore = Column(Boolean)
     delivery_days_min = Column(Integer)
     delivery_days_max = Column(Integer)
     source_url = Column(String(1000))  # Product URL
     url = Column(String(1000))  # deprecated, use source_url
     last_updated = Column(DateTime)  # when price was last updated
     valid_until = Column(DateTime)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, server_default=func.now(), nullable=False)
 
     # Relationships
     part = relationship("PartsCatalog", back_populates="prices")
@@ -189,13 +206,20 @@ class PartPrice(Base):
 class PartCompatibilityEnhanced(Base):
     """Enhanced compatibility data for parts"""
     __tablename__ = "part_compatibility_enhanced"
+    __table_args__ = (
+        Index('ix_part_compat_make', 'make'),
+        Index('ix_part_compat_model', 'model'),
+        Index('ix_part_compat_part_id', 'part_id'),
+        Index('ix_part_compat_universal', 'is_universal'),
+        Index('ix_part_compat_year', 'year_start', 'year_end'),
+    )
 
-    id = Column(Integer, primary_key=True, index=True)
-    part_id = Column(Integer, ForeignKey("parts_catalog.id", ondelete="CASCADE"), nullable=False, index=True)
-    make = Column(String(50), nullable=False, index=True)
-    model = Column(String(100), nullable=False, index=True)
-    year_start = Column(Integer, nullable=False, index=True)
-    year_end = Column(Integer, nullable=False, index=True)
+    id = Column(Integer, primary_key=True)
+    part_id = Column(Integer, ForeignKey("parts_catalog.id", ondelete="CASCADE"), nullable=False)
+    make = Column(String(50), nullable=False)
+    model = Column(String(100), nullable=False)
+    year_start = Column(Integer, nullable=False)
+    year_end = Column(Integer, nullable=False)
     trim = Column(String(100))
     engine = Column(String(100))
     transmission = Column(String(50))
@@ -203,9 +227,9 @@ class PartCompatibilityEnhanced(Base):
     position = Column(String(50))  # front, rear, left, right
     notes = Column(Text)
     confidence = Column(Numeric(3, 2))  # 0.00 - 1.00
-    is_universal = Column(Boolean, default=False, index=True)
+    is_universal = Column(Boolean, default=False)
     source = Column(String(50))  # where compatibility data came from
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow, server_default=func.now(), nullable=False)
 
     # Relationships
     part = relationship("PartsCatalog", back_populates="compatibility")
@@ -217,18 +241,24 @@ class PartCompatibilityEnhanced(Base):
 class SearchCache(Base):
     """Cache for parts search results"""
     __tablename__ = "search_cache"
+    __table_args__ = (
+        Index('ix_search_cache_expires', 'expires_at'),
+        Index('ix_search_cache_hash', 'query_hash'),
+        Index('ix_search_cache_query_text', 'query_text'),
+        UniqueConstraint("query_hash"),
+    )
 
-    id = Column(Integer, primary_key=True, index=True)
-    query_hash = Column(String(64), unique=True, nullable=False, index=True)
-    query_text = Column(String(500), nullable=False, index=True)
+    id = Column(Integer, primary_key=True)
+    query_hash = Column(String(64), nullable=False)
+    query_text = Column(String(500), nullable=False)
     vehicle_make = Column(String(50))
     vehicle_model = Column(String(100))
     vehicle_year = Column(Integer)
     results = Column(JSON, nullable=False)  # cached results
     result_count = Column(Integer, nullable=False)
     sources_queried = Column(JSON)  # which APIs were called
-    created_at = Column(DateTime, default=datetime.utcnow)
-    expires_at = Column(DateTime, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, server_default=func.now(), nullable=False)
+    expires_at = Column(DateTime, nullable=False)
     hit_count = Column(Integer, default=0)
 
     def __repr__(self):
@@ -238,15 +268,19 @@ class SearchCache(Base):
 class APIRateLimit(Base):
     """Track API usage and rate limits"""
     __tablename__ = "api_rate_limits"
+    __table_args__ = (
+        Index('ix_api_rate_reset', 'reset_at'),
+        Index('ix_api_rate_source', 'source'),
+    )
 
-    id = Column(Integer, primary_key=True, index=True)
-    source = Column(String(50), nullable=False, index=True)  # ebay, lazada, shopee
+    id = Column(Integer, primary_key=True)
+    source = Column(String(50), nullable=False)  # ebay, lazada, shopee
     endpoint = Column(String(200), nullable=False)
     call_count = Column(Integer, default=0)
-    reset_at = Column(DateTime, nullable=False, index=True)
+    reset_at = Column(DateTime, nullable=False)
     daily_limit = Column(Integer)
     remaining = Column(Integer)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, server_default=func.now(), nullable=False)
 
     def __repr__(self):
         return f"<APIRateLimit {self.source} {self.call_count}/{self.daily_limit}>"

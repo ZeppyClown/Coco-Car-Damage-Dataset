@@ -126,5 +126,5 @@ async def lookup_paint_code(request: PaintCodeRequest):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("paint_code_error", error=str(e), exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Paint code lookup failed: {str(e)}")
+        logger.error("paint_code_error", error_type=type(e).__name__)
+        raise HTTPException(status_code=500, detail="Paint code lookup failed")

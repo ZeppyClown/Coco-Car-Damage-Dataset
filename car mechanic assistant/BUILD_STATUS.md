@@ -108,3 +108,9 @@ Current final checks: **73 passed** with the actual PostgreSQL integration enabl
 The résumé is still unverified for employment/first AI/production, 24 mechanics, 500 pages, 90% precision, real month of feedback and historical six-month use. No statistics or deployment evidence were fabricated. The current corpus is not an expert-approved repair library; known problematic note content is documented in the verification report.
 
 Observed platform limit: macOS Gunicorn HUP reload caused an Objective-C fork-initialisation worker crash. The operator guide now uses full stop/start on this host; a fresh process passed the final web query/feedback check. No unsafe fork override was introduced. Linux/container reload and concurrency remain unchecked.
+
+## Workshop interview workbook — 10 October 2026
+
+Added [WORKSHOP_VISIT_WORKBOOK.md](WORKSHOP_VISIT_WORKBOOK.md), an extensive blank fill-in document for the company visit. It prioritises one real task, authorised manuals, one observed workflow, five real questions/source references and a mechanic reviewer. Detailed forms cover separate document/cloud/storage permissions, manual editions and extraction/page checks, vehicle vocabulary, operational data, synthetic-fixture provenance, independent evaluation, pilot feedback, supplier/hosting requirements, historical résumé claims and evidence/action handover. The company question ledger and repository README link to it.
+
+The workbook distinguishes initial build needs from pilot prerequisites and résumé evidence. It includes instructions for a private ignored copy; no company answers, approvals, records or outcome figures are prefilled. Verification for this documentation-only change: local links/contents anchors, five case forms, required section coverage, Markdown whitespace and staged-file scope checked. Application tests were not rerun because executable code is unchanged; the prior 73-test result remains the latest code verification.

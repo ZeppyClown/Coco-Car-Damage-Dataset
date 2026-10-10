@@ -2,6 +2,8 @@
 
 Prepared 9 October 2026. All answers below are pending. This file is the question queue requested by Victor; no company messages have been sent. The current implementation is an October rebuild. Public industry references are development placeholders, never proof of Yap Motor outcomes.
 
+For the company visit, use the detailed [WORKSHOP_VISIT_WORKBOOK.md](WORKSHOP_VISIT_WORKBOOK.md). It includes a five-question opening script, five real-case forms, workflow/document/data inventories and evidence handover tables. Fill a private copy; the blank template is public and company answers must not be committed here.
+
 ## First request: originals and permission
 
 Please ask the company for a private folder containing authorised repair manuals and any historical deployment, feedback and usage records. Share a local folder path or an approved access method with the developer; never put keys, customer records or mechanic identities into public GitHub.

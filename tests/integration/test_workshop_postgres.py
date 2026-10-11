@@ -3,6 +3,8 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 import os
 from pathlib import Path
+import shutil
+import subprocess
 from threading import Barrier
 from uuid import uuid4
 
@@ -22,6 +24,7 @@ from app.db.models import Base, Vehicle, WorkshopJob, WorkshopJobRevision
 from app.schemas.workshop import WorkshopDraft, WorkshopDraftUpdate, WorkshopConfirmRequest
 from app.services.workshop import create_job, get_job, update_job
 from app.services.workshop import attach_document, confirm_job, list_revisions
+from app.services.workshop import get_document, document_file, get_export
 from app.core.config import settings
 from app.db.models import WorkshopDocument
 from app.db.models import WorkshopExport
@@ -46,7 +49,7 @@ def workshop_postgres():
     finally:
         engine.dispose()
         with admin.begin() as connection:
-            connection.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
+            connection.execute(text(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE'))
         admin.dispose()
 
 
@@ -322,3 +325,79 @@ def test_postgres_latest_review_lookup_literal_json_and_pagination(workshop_post
         assert lookup_jobs(db, q="' OR 1=1 --").results == []
         day = first_review.reviewed_at.date()
         assert len(lookup_jobs(db, reviewed_from=day, reviewed_to=day).results) == 2
+
+
+def test_disposable_dump_restore_recovers_history_sources_outputs_and_guards(workshop_postgres, tmp_path, monkeypatch):
+    if not all(shutil.which(tool) for tool in ("pg_dump", "pg_restore")):
+        pytest.skip("PostgreSQL client tools are required for the disposable recovery drill")
+    engine = workshop_postgres
+    migrate(engine)
+    live = tmp_path / "live-private"
+    backup_files = tmp_path / "backup-private"
+    restored_files = tmp_path / "restored-private"
+    monkeypatch.setattr(settings, "WORKSHOP_STORAGE_DIR", live)
+    content = (Path(__file__).parents[1] / "fixtures/workshop/synthetic-sheet.png").read_bytes()
+    draft = reviewed_fixture()
+    with Session(engine) as db:
+        source = attach_document(db, content, "fictional.png", "image/png", "synthetic_demo")
+        draft.source_document_id = source.id
+        job_id = create_job(db, draft).id
+        first = confirm_job(db, job_id, WorkshopConfirmRequest(expected_version=1, reviewer="Fictional recovery reviewer", acknowledged=True))
+        first_output = generate_export(db, first.id)
+        draft.source_document_id = None
+        draft.job_reference = "DEMO-RECOVERY-CORRECTION"
+        update_job(db, job_id, WorkshopDraftUpdate(expected_version=1, draft=draft))
+        second = confirm_job(db, job_id, WorkshopConfirmRequest(expected_version=2, reviewer="Fictional recovery reviewer", acknowledged=True))
+        second_output = generate_export(db, second.id)
+        expected_job = get_job(db, job_id).draft
+        expected_history = [row.model_dump(mode="json") for row in list_revisions(db, job_id)]
+        schema = db.scalar(text("SELECT current_schema()"))
+    assert schema.startswith("workshop_")
+    url = engine.url
+    environment = {**os.environ, "PGHOST":url.host, "PGPORT":str(url.port or 5432), "PGDATABASE":url.database,
+                   "PGPASSWORD":url.password or "", "PGCONNECT_TIMEOUT":"5", "PGOPTIONS":"-csearch_path=pg_catalog"}
+    if url.username:
+        environment["PGUSER"] = url.username
+    else:
+        environment.pop("PGUSER", None)
+    dump = tmp_path / "workshop-recovery.dump"
+    dump.touch(mode=0o600)
+    subprocess.run(["pg_dump", "--format=custom", "--no-owner", "--no-acl", "--schema", schema, "--file", str(dump)],
+                   env=environment, check=True, capture_output=True, timeout=30)
+    shutil.copytree(live, backup_files)
+    engine.dispose()
+    archived = schema + "_before_restore"
+    admin = create_engine(os.environ["YAP_TEST_POSTGRES_URL"])
+    try:
+        with admin.begin() as connection:
+            connection.execute(text(f'ALTER SCHEMA "{schema}" RENAME TO "{archived}"'))
+        subprocess.run(["pg_restore", "--exit-on-error", "--no-owner", "--no-acl", "--dbname", url.database, str(dump)],
+                       env=environment, check=True, capture_output=True, timeout=30)
+        monkeypatch.setattr(settings, "WORKSHOP_STORAGE_DIR", restored_files)
+        with Session(engine) as db:
+            with pytest.raises(HTTPException) as missing:
+                document_file(get_document(db, source.id))
+            assert missing.value.status_code == 503, "A database dump alone is not a source backup"
+        shutil.copytree(backup_files, restored_files)
+        with Session(engine) as db:
+            assert get_job(db, job_id).draft == expected_job and get_job(db, job_id).draft_version == 2
+            assert [row.model_dump(mode="json") for row in list_revisions(db, job_id)] == expected_history
+            assert document_file(get_document(db, source.id)).read_bytes() == content
+            for expected in (first_output, second_output):
+                assert generate_export(db, expected.revision_id).model_dump() == expected.model_dump()
+                restored = export_file(get_export(db, expected.id))
+                assert restored.read_bytes() == (live / restored.name).read_bytes()
+            assert len(list(restored_files.iterdir())) == 3
+        with engine.connect() as connection:
+            assert compare_metadata(MigrationContext.configure(connection), Base.metadata) == []
+            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == ScriptDirectory.from_config(Config("alembic.ini")).get_current_head()
+        with pytest.raises(DBAPIError, match="Reviewed revisions cannot change"):
+            with engine.begin() as connection:
+                connection.execute(text("UPDATE workshop_job_revisions SET reviewer='tampered'"))
+        with pytest.raises(IntegrityError):
+            with engine.begin() as connection:
+                connection.execute(WorkshopDocument.__table__.delete().where(WorkshopDocument.id == source.id))
+    finally:
+        with admin.begin() as connection:
+            connection.execute(text(f'DROP SCHEMA IF EXISTS "{archived}" CASCADE'))
+        admin.dispose()

@@ -1,6 +1,6 @@
 # Workshop job-sheet project — master plan and implementation ledger
 
-**Last updated:** 11 October 2026. **Current phase:** manual F01–F06/F08/F10 and synthetic F07/F11 checks verified; real/provider/company prerequisites pending. Next independent part: F12 local operating guide and disposable recovery rehearsal.
+**Last updated:** 11 October 2026. **Current phase:** local manual workflow/lookup, mocked AI, synthetic evaluation and disposable recovery checks delivered. **Company-dependent project work remains incomplete:** live AI, real meanings/labels/mapping, authenticated permitted pilot and measured outcomes.
 
 This is the authoritative implementation/handoff document for the workshop administrative project. Every contributor, including Codex and Claude, must update it for **every feature or implementation part**, including partial work, fixes, migrations, tests, configuration and changed decisions. Do not rely on chat history to resume the work.
 
@@ -8,7 +8,7 @@ The first product is a small local application that turns a permitted paper shee
 
 ## 1. Start here: the actual next task
 
-**Next ready task: F12 local operating guide and disposable backup/restore rehearsal.** F01–F06, F10 and mocked/synthetic F07/F11 checks are verified. Live Gemini acceptance/accuracy still needs explicit model configuration and a synthetic smoke test; private-source processing remains blocked. The user explicitly selected job-sheet capture/review; public-reference RAG remains separate research.
+**Next task is conditional on missing inputs:** configure an authorised Gemini key/explicit model for a fictional smoke test (F07), or obtain Q01–Q10 company answers for real mapping/labels/pilot work. The independent local guide/recovery rehearsal is verified. F01–F06, F10 and mocked/synthetic/manual F07/F08/F11 checks are verified. Live Gemini acceptance/accuracy still needs explicit model configuration and a synthetic smoke test; private-source processing remains blocked. The user explicitly selected job-sheet capture/review; public-reference RAG remains separate research.
 
 Do not start by scanning an archive, training a model, building a vector database or integrating the accounting system. None is required to demonstrate the core review workflow.
 
@@ -24,8 +24,8 @@ This milestone is a local demonstration. It does not claim company deployment, r
 2. Run `git status --short` and identify unrelated user work. On 11 October, `PROJECT_SUMMARY.md` is modified and `SYSTEM_DESIGN.md` is untracked; preserve both unless the user explicitly includes them in the task.
 3. Read the existing schema/session/router/test fixtures listed in section 5. Confirm actual paths before adding code.
 4. Check whether the private visit files exist locally. Their absence does not block a synthetic/manual prototype. Do not obtain company files from public search as replacements for actual evidence.
-5. Mark the next ready feature (currently F12 local guide/rehearsal) `IN_PROGRESS` and state the exact scope in the ledger below.
-6. Rehearse PostgreSQL dump/restore and source/output recovery only in a disposable local test schema/storage. Document startup, review/correction/output, failed/conflicted requests, backup consistency and unresolved pilot access/retention/provider decisions. No public/live deployment is authorised.
+5. Mark the next ready feature (currently the input-dependent F07/F09/F12 branch) `IN_PROGRESS` and state the exact scope in the ledger below.
+6. Choose only a branch whose prerequisite is actually available. F07 live smoke needs a locally configured key/model; F09 needs one checked record chain/accepted destination schema; real F08/F11 need reviewer labels/baseline; F12 auth/operation needs owner/access/host/retention decisions. Do not build or claim guessed company rules. The operating guide/recovery test is delivered; no public/live deployment is authorised.
 7. Update the ledger, verification table, next task and work log **before** committing. Commit only the intended files, then push as previously authorised by the user.
 
 ## 2. Business problem and scope
@@ -306,6 +306,12 @@ Raw diagram/shorthand text is stored/displayed literally; no panel recognition, 
 
 An area-only mark without an active interpreted item cannot confirm as work. Cancelled rows retain raw text but unreviewed interpretations stay out of active CSV values. Reviewer identity/time and clarified/raw/context text survive history/output while the quote stays a quote. Older snapshots lacking context remain readable/exportable and get an explicit history notice; the stronger new-confirmation rule does not rewrite or invalidate immutable historical records. Repeat confirmation of an already-reviewed version still returns its original snapshot. Add context to a new draft/review to supersede it.
 
+### Implemented F12 local operation/recovery evidence (pilot pending)
+
+[WORKSHOP_OPERATING_GUIDE.md](WORKSHOP_OPERATING_GUIDE.md) documents API-only installation, explicit isolated DB migration, localhost startup, manual/AI review/correction/lookup/demo output, errors, tests and operating prerequisites. `test_disposable_dump_restore_recovers_history_sources_outputs_and_guards` performs actual custom-format `pg_dump`/`pg_restore` in a self-created random schema of a permitted local `yap_test` database. It copies the fictional source/two CSVs to backup/fresh restore storage and checks draft/history/time/identity, byte integrity, repeat export identity, migration/model alignment, restored immutability trigger and reviewed-source FK. A DB-only restore correctly fails source availability until files are restored. Only its own schemas are renamed/dropped; the public app/company schema is never restored over.
+
+The drill needs PostgreSQL client tools and its explicit disposable URL; absent tools/URL skip, not pass. Credentials pass in subprocess environment rather than command arguments; dumps/private fixtures use private temporary paths. Pytest may retain fictional temporary files under its normal policy. The fixture has no concurrent writers; this is not evidence of a consistent backup during arbitrary production writes or cross-host/offsite/encrypted recovery. Startup/migration/code versions and actual host test are documented. No app authentication, production backup scheduler, retention/deletion/orphan reconciliation or deployment has been implemented. Q06/Q07/Q09 must select a permitted operating path before real F12 work; broad existing CORS and local feature gate are not user identity/access controls.
+
 ### Suggested API boundaries
 
 The implementer may simplify route naming, but must document the final contract here. All are under `/api/v1/workshop`; the HTML page is `/workshop`.
@@ -343,7 +349,7 @@ Allowed statuses: `READY`, `IN_PROGRESS`, `IMPLEMENTED_UNVERIFIED`, `VERIFIED`, 
 | F09 | Actual destination mapping and export | WAITING_COMPANY | F06 | One destination schema plus checked record chain needed |
 | F10 | Basic lookup of confirmed records | VERIFIED | F05 | Latest reviewed per job, literal bounded filters/pagination/newer-draft status; SQLite/PG and Chrome checks passed |
 | F11 | Extraction and end-to-end evaluation | IMPLEMENTED_UNVERIFIED | F06/F07/F09 | Synthetic evaluator/CLI/protocol verified; real independent labels/provider metrics/workflow baseline pending Q08 |
-| F12 | Workshop pilot access, backup and operating guide | WAITING_COMPANY for deployment | Demonstrated useful flow | Authentication/storage/retention/host/operator decisions required |
+| F12 | Workshop pilot access, backup and operating guide | WAITING_COMPANY | Demonstrated useful flow | Local guide and actual disposable source/output/DB recovery verified; real authentication/operation/retention/reconciliation/pilot pending Q06/Q07/Q09 |
 
 If a feature takes several turns, add subrows such as `F03.a upload validation` and `F03.b preview route`. Each subrow needs its own status and verification notes. Do not wait until the parent feature is finished to record partial work.
 
@@ -671,6 +677,9 @@ If interrupted mid-feature, record what exists, what is broken/unverified, the l
 | 11 October 2026 | F08 manual annotation regression | Targeted schema/review/diagram checks, PG whole suite, clean API workshop suite | **248 passed/no skips/127 warnings**; clean **175 passed/46 warnings** |4 new area/context/cancelled/provenance/legacy cases; fictional semantics only |
 | 11 October 2026 | F08 browser confirmation boundary | Full isolated Chrome harness + missing diagram context, correction/save/rereview | Passed; input retained on422, explicit context allows new review | Does not verify actual workshop conventions or authorised repair meanings |
 
+| 11 October 2026 | F12 actual disposable recovery/full regression | Local PG URL + pg_dump/pg_restore fixture test/full pytest/clean workshop suite | Targeted1 passed/9 warnings; **249 full passed/no skips/129 warnings;176 clean passed/48 warnings** |14 workshop PG cases run; same local server/temporary namespace/private fictional file restore only |
+| 11 October 2026 | Final source/privacy/config check | Original SHA256/ignore check, root Settings presence flags, explicit Git scope/whitespace |18 originals unchanged/ignored; root Gemini key absent and workshop model absent; no real source/provider/deployment call | No secret values printed; live smoke and company decisions remain pending |
+
 Replace vague “tests pass” with the command, counts, skipped checks and test environment. PostgreSQL integration is skipped without its explicit disposable test URL; do not present a skipped test as passed.
 
 ### Commands to adapt during implementation
@@ -723,12 +732,12 @@ Record a question as resolved only when there is an actual answer. An elapsed wa
 ## 15. Current handoff snapshot
 
 - **Branch/repository:** `main`, remote `origin` is the user's existing GitHub repository. Verify actual remote before pushing on a different machine.
-- **Previous delivery before F08:** `709d08a`, synthetic evaluator. Read Git history for F08 delivery hash.
+- **Previous delivery before F12 local part:** `3f41e59`, manual clarification boundary. Read Git history for the final local guide/recovery commit hash.
 - **What exists:** current automotive API/RAG, visit review/planning material, F01 schemas/fictional fixtures and F02 workshop models/migration/draft service/API/tests.
-- **Latest implementation:** F08 new-confirmation diagram context guard/UI hint, legacy-history notice and4 fictional boundary/preservation cases. Full248/clean API175 passed; full Chrome flow plus missing-context correction passed.
-- **What does not exist:** live extraction evidence, independently labelled real benchmark, actual destination mapping or permitted company pilot.
-- **Next ready feature:** F12 local operating guide and disposable recovery rehearsal. F07 live smoke and real F08/F09/F11/F12 remain conditional.
-- **Independent work available:** safe source attach/preview, local manual UI, confirmation, demo output and later mocked extraction; lack of company access does not block these.
+- **Latest implementation:** F12 local operating guide and real disposable pg_dump/pg_restore/source/output recovery test. Full249 passed/no skips; clean API176 passed; last full Chrome workflow including F08 passed. All18 originals still unchanged/ignored.
+- **What does not exist:** live extraction evidence, independently labelled real benchmark, actual destination mapping, real authentication/pilot operating policy, production backup/reconciliation/retention or permitted company deployment.
+- **Next conditional work:** F07 fictional live smoke with configured key/model; F09 checked destination mapping; real F08/F11 labels/baseline; F12 selected access/host/retention/provider/pilot path. Questions Q01–Q10 are still pending; no independent coding feature remains ready under the current agreed scope.
+- **Independent work delivered:** source handling, manual review/version/export, mocked extraction, manual clarification boundaries, lookup, synthetic comparator/protocol, local operating guide and disposable recovery. New company data/rules/identity/approval must not be fabricated to extend these.
 - **Unrelated changes to preserve:** root `PROJECT_SUMMARY.md` and `SYSTEM_DESIGN.md` as seen on this machine; verify current status rather than assuming it remains identical.
 - **Open decisions:** real output mapping, model-processing path, operator and expected labels. None should be fabricated.
 
@@ -739,8 +748,9 @@ Continue the workshop job-sheet project in this repository. Read AGENTS.md,
 CLAUDE.md and car mechanic assistant/WORKSHOP_MASTER_PLAN.md first.
 Treat the master plan as the current implementation ledger. Inspect Git status
 and preserve unrelated user work. F01–F06 manual milestone is verified. Start
-F12 local guide/recovery rehearsal. Manual F08 is verified; actual meanings remain
-pending Q01. F11 synthetic
+the next branch whose prerequisite is supplied: F07 key/model smoke, F09 checked
+destination mapping, real F08/F11 labels/baseline or selected F12 access/operation.
+Local guide/recovery is verified. Manual F08 actual meanings remain pending Q01. F11 synthetic
 harness/F10 lookup are verified. F07 mocked checks passed; live
 provider use is unverified and private-source AI remains blocked. Use synthetic examples until
 real-data prerequisites are met. Keep company visit files and runtime artifacts
@@ -914,3 +924,15 @@ The assessment separates physical/parsable/quality-approved/indexed pages, class
 - **Limits/questions:** freeform text cannot validate the truth of a convention/repair action or authenticate its speaker. No real panel glossary, shorthand labels, automated diagram interpretation or company reviewer approval. Q01/Q02 remain pending; no screenshot-coordinate conversion or guessed operation is introduced.
 - **Commit/push:** intended small guard/UI/tests/docs increment; public tests fictional, private originals/runtime/unrelated root docs unchanged/excluded.
 - **Next:** local F12 operating guide and actual disposable-schema/source/output recovery rehearsal; real access/pilot/retention/mapping still require company answers.
+
+
+### 11 October 2026 — F12 local guide and disposable recovery rehearsal
+
+- **Status:** local development portion verified; full F12 WAITING_COMPANY. Company-dependent project objective is not marked complete.
+- **Files:** `WORKSHOP_OPERATING_GUIDE.md`, existing PG integration module's real dump/restore case, README/master/build updates. Only standard-library/PostgreSQL client test tools; no new runtime dependency/API/auth implementation.
+- **Recovery behaviour:** isolated random-schema source→two reviewed versions/CSV exports, custom-format PG dump plus private file copy, own-schema rename/restore into original temporary name, new storage restore. DB-only restore fails preview, full restore reproduces source bytes/draft/history/output identities/checksums and mapping/migration metadata. Restored PG trigger/source FK reject snapshot mutation/source deletion. Own schemas cleaned; fixture files may be retained by pytest. No public/company schema overwrite.
+- **Verification:** actual recovery case **1 passed/9 warnings**; final **249 passed/no skips/129 warnings** with PG14.20; clean API **176 passed/48 warnings**. All14 workshop PG cases ran, not skipped. Browser code unchanged since successful full F08 run. Root key/model presence checked without printing secrets: both absent, so no live provider attempt. Final18 original hashes unchanged/ignored; intended staged scope/whitespace checked.
+- **Guide:** verified root requirements environment, explicit isolated migration/localhost startup, complete source/manual/AI-proposal/review/correction/lookup/demo output routine, common errors and backup consistency/recovery limits. The fixture is quiescent/same-host namespace recovery, not production/offsite/encrypted backup proof.
+- **Unfinished:** real auth/named identity/roles/session-origin protection, permitted hosting/provider/data/retention/delete/reconciliation/backup support and company pilot. Those choices are unresolved Q06/Q07/Q09; no dummy approval/inferred24 users is substituted. Real F08 meaning/F09 mapping/F11 labels/baseline also pending; private-source AI still403. Core manual local milestone is working; full company project remains incomplete.
+- **Commit/push:** intended recovery test/guide/README/master/build increment; private visit/runtime and unrelated root docs excluded.
+- **Next:** input-dependent branch only: configure permitted key/model for fictional F07 smoke, or provide actual reviewer meanings/labels, one redacted source→invoice/software→spreadsheet chain plus columns, named operator/owner and operating/processing decisions. User asked to retain questions in Markdown; Q01–Q10 remain the durable company checklist rather than repeating chat requests. Do not repeatedly rerun unchanged passing checks while awaiting inputs.

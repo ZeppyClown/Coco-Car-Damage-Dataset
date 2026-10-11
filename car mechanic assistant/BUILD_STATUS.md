@@ -220,3 +220,12 @@ Verification:17 targeted evaluator/CLI checks; final **244 passed/no skips/127 w
 New confirmations with interpreted diagram notes now require stated clarification context; UI requests speaker/established meaning/vehicle direction convention. Area-only marks cannot become active work. Literal/cancelled/context/reviewer data survive history/demo output with stage unchanged. Earlier immutable snapshots remain readable/exportable and get a missing-context history notice; the stronger rule applies at new confirmation, not retroactive DTO validation.
 
 Verification: **248 passed/no skips/127 warnings** with PostgreSQL; clean API **175 passed/46 warnings**.4 new fictional boundary/preservation/legacy cases; browser full regression plus missing-context422 retained values and successful clarification/rereview passed. No actual company panel vocabulary/shorthand semantic validation or automated diagram recognition; Q01/Q02 pending. F12 local guide/recovery rehearsal is next.
+
+
+## Workshop F12 local operation/recovery verified; company pilot pending,11October2026
+
+Added an operating guide and actual custom-format PostgreSQL dump/restore test in an owned disposable namespace, with fictional source/two reviewed versions/two outputs and fresh file storage. DB-only restore correctly lacked source bytes; full restore preserved drafts/history/UTC metadata/repeat output identity/checksum, migration/model alignment and immutability/source-FK guards. No public/company schema restore/overwrite or new runtime dependency.
+
+Verification: recovery **1 passed/9 warnings**; final **249 passed/no skips/129 warnings** with PG14.20; clean API **176 passed/48 warnings**. All14 workshop PG cases ran. Last browser F08 complete flow remains verified, no UI code changed here.18 original hashes remain unchanged/ignored. Root Gemini key and workshop model checked by presence only: absent; no live call. Tests use quiescent same-host temporary namespace/private fictional files, not production/offsite/encrypted backup evidence.
+
+Local manual workflow/lookup/mocked AI/synthetic evaluator/guide/recovery work is delivered and committed. Full company project remains unfinished: live Gemini, actual semantics/independent labels/baseline, accepted mapping, real authentication/access/host/retention/reconciliation/pilot. Q01–Q10 master questions remain pending; no independently ready feature under agreed scope remains. Resume adoption/precision/history claims remain unverified. Next work needs an actual prerequisite, not more unchanged regression reruns.

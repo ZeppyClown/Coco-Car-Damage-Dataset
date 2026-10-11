@@ -1,0 +1,126 @@
+# Workshop local operating and recovery guide
+
+Last updated: 11 October 2026. This describes the tested **local fictional demonstration**. Company pilot approval, authenticated access, hosting, retention and actual destination mapping remain pending. The [master plan](WORKSHOP_MASTER_PLAN.md) records each feature and its exact evidence.
+
+## What is available
+
+`/workshop` supports JPEG/PNG source attachment, manual drafts, optional proposed AI fields, explicit review, immutable history, corrections, per-version demo CSV and latest-reviewed lookup. Jobs are separate UUID records even when customer/vehicle text matches. Nothing writes to the company's financial software. PDF/archive scanning, automatic diagram meanings and accounting mapping are not implemented.
+
+The existing automotive API and separate manual RAG assistant are independent applications. Their historical evidence/results must not be relabelled as this new workshop workflow. Company visit records and runtime artifacts stay private and ignored by Git.
+
+## Prepare an isolated local environment
+
+Use Python 3.12 and an already provisioned local development PostgreSQL database. The checked environment used PostgreSQL 14.20; PostgreSQL client tools are needed for recovery tests. Docker execution was not checked on this machine. Do not connect to a live company/default automotive database for these steps.
+
+On a fresh checkout, create an API-only environment once:
+
+```sh
+python3.12 -m venv 'car mechanic assistant/runtime/workshop-api-venv'
+'car mechanic assistant/runtime/workshop-api-venv/bin/python' -m pip install -r requirements.txt
+'car mechanic assistant/runtime/workshop-api-venv/bin/python' -m pip check
+```
+
+The runtime directory is ignored. An existing usable environment can be reused. This API-only requirements set includes the workshop, not the separate Chroma/RAG application's dependencies. The workspace's shared `.venv` has unrelated audio/telemetry conflicts; the isolated API environment was installed and checked successfully.
+
+Set the **actual separately provisioned local** connection. Replace these role/port/database placeholders; keep real credentials in a permitted local environment file, never in public docs/chat/Git:
+
+```sh
+export DATABASE_URL='postgresql://YOUR_LOCAL_ROLE@127.0.0.1:5432/yap_test_workshop'
+export WORKSHOP_ENABLED=true
+export WORKSHOP_AI_ENABLED=false
+export USE_GOOGLE_CSE=false
+export USE_EBAY_API=false
+export DEBUG=false
+'car mechanic assistant/runtime/workshop-api-venv/bin/python' -m alembic upgrade head
+'car mechanic assistant/runtime/workshop-api-venv/bin/python' -m alembic check
+'car mechanic assistant/runtime/workshop-api-venv/bin/python' -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+Check the target before migration. Startup does not create tables automatically. Current workshop head is `20261011_exports`, following draft and review-guard revisions. Future changes must add a new migration and update this guide/master rather than rewrite delivered revisions. Stop this task's server with Ctrl-C in its terminal.
+
+Open `http://127.0.0.1:8000/workshop`; `/docs` describes API request contracts. Keep the demo bound to localhost. `WORKSHOP_ENABLED` defaults false and is a feature gate, not authentication. Existing CORS/security placeholders do not establish a pilot boundary. Do not enable these routes on a shared/public host before F12 access decisions and implementation.
+
+## Complete one fictional job
+
+1. Start a new record, use **Fictional demonstration** origin and attach `tests/fixtures/workshop/synthetic-sheet.png`. Only JPEG/PNG is accepted, with 8 MiB/6000-pixels-per-side/20MP limits. Upload preserves original bytes; zoom/rotation change only the view. Duplicate identical bytes reuse a source, not a job/customer.
+2. Enter a unique fictional job reference, explicit stage and work items. Copy literal wording and amount notes separately from clarified values. A missing amount remains empty/null; enter 0.00 only if zero is known. Do not infer currency, year, repairs or totals from context.
+3. Keep crossed-out rows and mark them cancelled. Raw diagram/shorthand notes can remain uninterpreted. An area alone does not define an active repair item. For clarified diagram meaning, state the source of clarification and applicable vehicle direction convention in manual provenance; the software checks text presence, not its truth.
+4. Choose review states deliberately. Editing an interpreted value makes it proposed again. Optional truly missing fields can stay missing. Ambiguous interpretations remain unclear until someone establishes meaning. Unresolved interpretations block confirmation but do not prevent saving a draft.
+5. Save. Copy the job UUID/bookmark URL. Enter the self-reported demo reviewer name, explicitly acknowledge checking values and confirm. The server uses its current UTC clock; clients cannot backdate reviews. A reviewed quote remains a quote.
+6. Expand a reviewed version in history and download its demo CSV. `workshop-demo-v1` is not a company import mapping. It repeats snapshot fields per line, preserves unknown/zero distinction and marks cancelled literal rows without interpreted values. Formula-like cells get an apostrophe prefix; signed negatives are textual under this demo rule. Stored values remain unchanged.
+7. Reopen/search the job. Lookup returns latest reviewed records, excludes draft-only jobs, shows unknown references and flags newer unreviewed changes. Search raw/unknown/cancelled text does not establish its meaning. Date filters use inclusive UTC review dates; results open the current editable draft plus immutable history.
+8. To correct, edit/save a new draft version, resolve proposed fields and confirm again. Earlier snapshots/CSVs stay unchanged. Repeated unchanged confirmation/export returns the original identity/time. Reuse downstream still needs F09 mapping/correction agreement.
+
+For a manual entry without an image, state manual provenance. Older reviewed snapshots lacking the newer diagram-context rule remain readable/exportable and are labelled in history; add context in a new review to supersede them.
+
+## Optional AI drafting
+
+Manual entry needs no provider credentials. AI is default-off. The root application's Gemini key and workshop model were absent at verification; no live provider smoke/accuracy test is recorded. Unit/SDK/browser checks use mocks.
+
+For a later **fictional-source** smoke test, configure a permitted Gemini key locally using existing `GOOGLE_API_KEY`, choose a current explicit `WORKSHOP_AI_MODEL` and set `WORKSHOP_AI_ENABLED=true`. Read the current official [SDK documentation](https://github.com/googleapis/python-genai) before choosing a model. No default model is implied by this guide; an alias may change and actual run/model provenance must be recorded.
+
+Attach a fictional image to a new empty unsaved draft, explicitly acknowledge sending it to Google Gemini and request suggestions. Entered/saved fields are preserved by refusing replacement. The route does not save/confirm/export. All interpretations are proposed, unclear literal amounts remain unknown, stage remains unknown and diagram meaning must be supplied by a human. Correct/check ordinary fields and choose stage before the normal save/review flow. Initial source/model/prompt/time provenance survives edits/reopen; it is not signed evidence.
+
+There is one 60-second attempt, no automatic retry and no configured tools. Invalid/schema/oversized/provider responses fail without a saved draft. A valid shape can still contain invented text; review is required. Private-source AI returns403 while Q07 processing permission is unresolved and has no bypass setting. Do not declare a company image fictional. Do not count the mocked browser pipeline as model quality.
+
+## Handle failures without losing work
+
+| Result | Operator action | What is preserved |
+|---|---|---|
+|422 invalid draft/review | Correct the indicated value/state/context; save/review deliberately | Current form values and earlier stored versions |
+|409 stale version | Keep current unsaved values visible, reopen/compare the latest job in a separate view if needed, then apply intended corrections to the current version | Other person's save is not overwritten; no automatic merge |
+|503 source/output missing or corrupt | Investigate storage/restore the corresponding verified file; retry explicitly | Database identity/history; broken bytes are not silently regenerated/reused |
+|502/504 AI invalid/provider/timeout | Enter manually or retry explicitly after checking configuration/source | No draft/review/output was created by extraction |
+| Save succeeds but history read fails | Treat save as successful; reopen to reload history | Saved draft version; history failure is labelled separately |
+| Lookup fails | Retry; the page labels any retained results as from the prior successful search | Prior results/query/pagination and current editable draft |
+
+The page warns before discarding unsaved edits for new/open/navigation or item removal. A detach/remove UI action does not delete stored source/history. Preview integrity checks can fail if someone changes files outside the application. Do not repair this by editing checksums or immutable rows. There is no authorised deletion/retention workflow yet.
+
+## Run workshop checks
+
+Only use an isolated local DB with a name beginning `yap_test`; tests create/drop their own random schemas. PostgreSQL and source-file checks must actually run before claiming them passed:
+
+```sh
+YAP_TEST_POSTGRES_URL="$DATABASE_URL" \
+  'car mechanic assistant/runtime/workshop-api-venv/bin/python' -m pytest -q \
+  tests/unit/test_workshop*.py tests/integration/test_workshop_postgres.py
+```
+
+Without the explicit URL, PG checks skip. The recovery case also skips if `pg_dump`/`pg_restore` is unavailable; a skip is not recovery evidence. The whole repository suite additionally needs `requirements-dev.txt`/the separate assistant dependencies.
+
+For an installed Chrome and Node, the isolated browser harness creates fictional records on the local demo DB:
+
+```sh
+npm install --prefix 'car mechanic assistant/runtime/workshop-browser-tests' playwright@1.64.0
+node tests/browser/workshop.cjs 'car mechanic assistant/runtime/workshop-browser-tests/node_modules/playwright' http://127.0.0.1:8000
+```
+
+It uses a fresh browser context, never the user's profile. Screenshots/downloads stay ignored under runtime. API provider checks and browser AI proposal responses are mocked; no live AI request occurs. See the [evaluation guide](WORKSHOP_EVALUATION_GUIDE.md) for the no-network comparator and future actual trial protocol.
+
+## Local recovery rehearsal and its limits
+
+Repeat the implemented disposable test:
+
+```sh
+YAP_TEST_POSTGRES_URL="$DATABASE_URL" \
+  'car mechanic assistant/runtime/workshop-api-venv/bin/python' -m pytest -q \
+  tests/integration/test_workshop_postgres.py::test_disposable_dump_restore_recovers_history_sources_outputs_and_guards
+```
+
+The test creates a random schema, one fictional source, two reviewed versions and two private CSVs. With no writers to that schema, it takes a custom-format namespace dump and copies source/output files. It renames only its own disposable namespace, restores it using `pg_restore --exit-on-error --no-owner --no-acl`, restores files to a fresh directory and checks draft/history identity, source bytes, repeat export identities/checksums, migration/model alignment, immutable trigger and reviewed-source FK. It explicitly proves a DB-only restore leaves preview unavailable. Temporary schemas are cleaned by the test; pytest may retain its fictional temporary files under its own retention policy. The test does not rename/drop the application's public schema or restore over company records. Connection credentials pass through subprocess environment, not command arguments/logs. Dumps/source copies remain temporary private fixtures.
+
+For a future real backup, agree owner/host/storage/retention/access first. Freeze workshop writes or establish a coordinated database/files snapshot; a database dump and later uncoordinated file copy are not automatically a consistent pair. Back up the actual DB and referenced original source/CSV files, record schema/mapping versions and verify SHA-256. A source UUID/checksum is not a file backup. Keep permitted backups private with agreed access/encryption and verify restore into a fresh isolated target before relying on them. Do not blindly replay `--clean`, drop a DB, rewrite checksums or overwrite existing storage.
+
+The current rehearsal verifies a namespace restore on the same local PostgreSQL server plus a new file directory. It does not prove offsite/encrypted backup, disaster recovery on another host, retention/deletion, ownership/role restoration, production scale or an unattended backup schedule. Source/export write crashes can leave unreferenced files; reconciliation still needs an implementation selected with operating/retention decisions. Never delete an orphan candidate solely because its filename looks unfamiliar.
+
+## Before company use
+
+The master Q01–Q10 ledger remains unresolved. Required decisions/evidence:
+
+- Reviewer meanings, diagram convention, stage and independently checked examples.
+- Redacted source→actual invoice/software→spreadsheet chain, accepted destination format and correction handling.
+- Operator/decision owner and which copying step should disappear.
+- Source/external-provider permission and independently labelled cases/baseline task times.
+- Named user identity, access/roles, permitted host, origin/session/CSRF controls, storage, retention/deletion, backup/restore and support owner.
+
+No real authenticated pilot has been built/deployed. The default-disabled local gate and reviewer textbox are insufficient for that purpose. This guide and fictional recovery evidence complete a local development part of F12, not company authorisation or production readiness. Actual data/use/outcome claims require actual evidence; the résumé targets remain separate from these tests.

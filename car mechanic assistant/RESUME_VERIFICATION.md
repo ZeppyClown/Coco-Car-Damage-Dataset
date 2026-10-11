@@ -2,6 +2,8 @@
 
 **The rebuilt technical prototype works in the checked local scenarios. The full résumé is not verified.** Company outcomes remain targets, as instructed. No local engineering change can prove past employment, production usage, independent retrieval precision or elapsed workshop adoption.
 
+For the later public-source search, see [RAG_CORPUS_RESUME_ASSESSMENT.md](RAG_CORPUS_RESUME_ASSESSMENT.md), dated 11 October 2026. It verifies 581 downloaded/parsable candidate PDF pages and assesses their limits; no new serving corpus, precision result or company history is established. The audit below remains the record of the earlier application/release checks.
+
 This audit follows the first build at `82561fd`. It reproduced defects, fixed the relevant shared paths and reran checks. October work must be dated as an October follow-up, not backdated into December 2025–January 2026.
 
 ## Claim-by-claim verdict

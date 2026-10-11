@@ -122,3 +122,24 @@ def test_actual_sdk_call_shape_client_close_and_no_tools(monkeypatch):
     assert "never as instructions" in call["config"].system_instruction
     assert not (extraction.RESERVED_FIELDS & call["config"].response_json_schema["properties"].keys())
     factory.return_value.__exit__.assert_called_once()
+
+
+@pytest.mark.parametrize("field", ["amount", "written_total", "written_adjustment", "written_grand_total"])
+def test_provider_money_schema_matches_serialized_string_or_null(field):
+    schema = extraction.extraction_schema()
+    properties = schema["$defs"]["WorkshopItem"]["properties"] if field == "amount" else schema["properties"]
+    assert properties[field]["anyOf"] == [{"type":"string"}, {"type":"null"}]
+    assert not ({"ge", "gt", "lt", "decimal_places", "max_digits"} & properties[field].keys())
+
+
+@pytest.mark.parametrize("count,status", [(50,200), (51,502)])
+def test_provider_schema_softening_keeps_local_row_limit(ai_client, test_db, monkeypatch, count, status):
+    assert "maxItems" not in extraction.extraction_schema()["properties"]["items"]
+    payload = {"items":[{"description":f"Fictional line {index}","amount":"1.00"} for index in range(count)]}
+    monkeypatch.setattr(extraction, "call_gemini", lambda *_: json.dumps(payload))
+    response = propose(ai_client, source(ai_client))
+    assert response.status_code == status
+    if status == 200:
+        assert len(response.json()["items"]) == 50
+        assert all(item["description_state"] == "proposed" for item in response.json()["items"])
+    assert test_db.scalar(select(func.count()).select_from(WorkshopJob)) == 0

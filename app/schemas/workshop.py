@@ -68,7 +68,7 @@ class WorkshopItem(_WorkshopSchema):
         return self
 
     @field_serializer("amount", when_used="json")
-    def serialize_amount(self, value):
+    def serialize_amount(self, value) -> str | None:
         return None if value is None else format(value, ".2f")
 
 
@@ -116,7 +116,7 @@ class WorkshopDraft(_WorkshopSchema):
         return self
 
     @field_serializer("written_total", "written_adjustment", "written_grand_total", when_used="json")
-    def serialize_money(self, value):
+    def serialize_money(self, value) -> str | None:
         return None if value is None else format(value, ".2f")
 
 

@@ -36,6 +36,8 @@ def extraction_schema():
     for name in RESERVED_FIELDS:
         schema["properties"].pop(name)
     schema["required"] = []
+    # The tested Gemini model rejects this maxItems=50 grammar; enforce the 50-row limit locally.
+    schema["properties"]["items"].pop("maxItems")
     for name in ("description_state", "amount_state"):
         schema["$defs"]["WorkshopItem"]["properties"].pop(name)
     return schema

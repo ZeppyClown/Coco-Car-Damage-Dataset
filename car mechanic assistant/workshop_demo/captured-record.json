@@ -1,0 +1,57 @@
+{
+  "notice": "Fictional stored example; not a company record or accuracy benchmark.",
+  "reviewed_record": {
+    "job_id": "d877793b-66bc-4ca5-b9e2-e5395f749b9a",
+    "version": 2,
+    "record": {
+      "data_origin": "synthetic_demo",
+      "source_document_id": "1ffa318f-0736-46c6-82db-d90d4a847c1f",
+      "manual_provenance": "Fictional smoke operator inspected the authored printed source, checked its literal fields/item/25.10 and explicitly selected quote; this is not a company review.",
+      "ai_provenance": {
+        "provider": "google_gemini",
+        "model": "gemini-3.1-flash-lite",
+        "prompt_version": "workshop-extract-v1",
+        "proposed_at": "2026-10-11T10:14:52.318873Z",
+        "source_document_id": "1ffa318f-0736-46c6-82db-d90d4a847c1f"
+      },
+      "record_stage": "quote",
+      "job_reference": "DEMO-JOB-001",
+      "customer_reference": "Fictional Example Person",
+      "vehicle_reference": "DEMO-VEHICLE-A",
+      "make": null,
+      "model": null,
+      "quotation_date": null,
+      "date_in": null,
+      "date_out": null,
+      "date_note_raw": "",
+      "currency": "SGD",
+      "items": [
+        {
+          "description_raw": "Example filter replacement",
+          "description": "Example filter replacement",
+          "description_state": "confirmed",
+          "amount_raw": "25.10",
+          "amount": "25.10",
+          "amount_state": "confirmed",
+          "cancelled": false
+        }
+      ],
+      "diagram_notes_raw": "",
+      "diagram_notes": null,
+      "written_totals_raw": "",
+      "written_total": null,
+      "written_adjustment": null,
+      "written_grand_total": null,
+      "field_states": {
+        "job_reference": "confirmed",
+        "customer_reference": "confirmed",
+        "vehicle_reference": "confirmed",
+        "currency": "confirmed"
+      }
+    },
+    "reviewer": "fictional-local-operator",
+    "reviewer_identity": "authenticated",
+    "reviewed_at": "2026-10-11T10:14:54.549392Z",
+    "id": "7e5f9ef7-0bdc-4fbb-afcf-e5ad3ea95219"
+  }
+}

@@ -1,6 +1,8 @@
 # Workshop local operating and recovery guide
 
-Last updated: 12 October 2026. This describes the **local fictional demonstration**, now protected by one configured operator account. Company pilot approval, actual access policy, hosting, retention and destination mapping remain pending. The [master plan](WORKSHOP_MASTER_PLAN.md) records each feature and its exact evidence.
+Last updated: 12 October 2026. This describes the **local fictional demonstration**, protected by one configured operator account. Company pilot approval, actual access policy, hosting and retention remain pending; external destination mapping is optional under standalone scope. The [master plan](WORKSHOP_MASTER_PLAN.md) records each feature and its exact evidence.
+
+Current user scope: standalone workshop records; old financial/GST software is assumed gone. External mapping is optional, not a setup prerequisite. Invoicing/GST/accounting is a separate conditional extension. [Inspect the saved record/export and fresh verification](WORKSHOP_VERIFICATION_REPORT.md):217 tests passed with actual PostgreSQL recovery plus live HTTP/Chrome checks.
 
 ## What is available
 
@@ -64,7 +66,7 @@ Open the **exact configured origin** plus `/workshop` and enter the account/pass
 5. Save. Copy the job UUID/bookmark URL. Check the displayed read-only signed-in account, explicitly acknowledge checking values and confirm. The server binds the reviewer to that account regardless of a client-supplied name and uses its current UTC clock; clients cannot backdate reviews. A reviewed quote remains a quote. History distinguishes authenticated attribution from older self-reported identities; it does not retroactively verify them.
 6. Expand a reviewed version in history and download its demo CSV. `workshop-demo-v1` is not a company import mapping. It repeats snapshot fields per line, preserves unknown/zero distinction and marks cancelled literal rows without interpreted values. Formula-like cells get an apostrophe prefix; signed negatives are textual under this demo rule. Stored values remain unchanged.
 7. Reopen/search the job. Lookup returns latest reviewed records, excludes draft-only jobs, shows unknown references and flags newer unreviewed changes. Search raw/unknown/cancelled text does not establish its meaning. Date filters use inclusive UTC review dates; results open the current editable draft plus immutable history.
-8. To correct, edit/save a new draft version, resolve proposed fields and confirm again. Earlier snapshots/CSVs stay unchanged. Repeated unchanged confirmation/export returns the original identity/time. Reuse downstream still needs F09 mapping/correction agreement.
+8. To correct, edit/save a new draft version, resolve proposed fields and confirm again. Earlier snapshots/CSVs stay unchanged. Repeated unchanged confirmation/export returns the original identity/time. This works within the standalone system. Only a later selected external integration needs F09 mapping/correction agreement.
 
 For a manual entry without an image, state manual provenance. Older reviewed snapshots lacking the newer diagram-context rule remain readable/exportable and are labelled in history; add context in a new review to supersede them.
 
@@ -139,7 +141,7 @@ The current rehearsal verifies a namespace restore on the same local PostgreSQL 
 Usefulness is assumed by the user as of 12 October; demand interviews, baseline timing and adoption measurements are optional. Remaining technical decisions/evidence from master Q01–Q10:
 
 - Reviewer meanings, diagram convention, stage and independently checked examples.
-- Redacted source→actual invoice/software→spreadsheet chain, accepted destination format and correction handling.
+- External destination format/chain/correction rules only if an integration is later selected; not required for standalone capture/export.
 - Operator/decision owner for the selected operating scope.
 - Source/external-provider permission and independently labelled cases; baseline timing is not required.
 - Named user identity, access/roles, permitted host, origin/session/CSRF controls, storage, retention/deletion, backup/restore and support owner.

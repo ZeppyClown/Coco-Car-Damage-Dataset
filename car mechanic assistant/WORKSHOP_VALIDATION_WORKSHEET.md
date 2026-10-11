@@ -4,6 +4,8 @@ Blank template prepared 12 October 2026. This is for the selected **job-sheet ca
 
 **User decision, 12 October:** assume the project is useful to its customer. Demand, baseline timing, adoption and removed-copying studies are optional. Fill the technical sections for source meaning, destination correctness and selected operation; section 6 can be skipped while building. This is a user scope assumption, not a company answer or measured result.
 
+**Further scope decision:** old financial/GST software is assumed gone; target standalone workshop records/history/export. Sections2/4 external destination fields are optional and not required to verify this app. Invoicing/GST/accounting is a separate extension if needed. Saving/corrections/access/local recovery are developer checks, now verified in [the actual record/export report](WORKSHOP_VERIFICATION_REPORT.md).
+
 Start with **one permitted job and a person who can explain it**. One case can establish a candidate mapping; it cannot establish representative AI accuracy or time savings. Use more representative cases for those measurements after the company agrees the task and processing path. You do not need to scan the storeroom archive.
 
 ## 1. Make a private copy and capture the essential decisions
@@ -23,8 +25,7 @@ The ignored path is suitable only if the company permits this local storage. Fol
 If time is short, obtain these technical inputs first:
 
 - One permitted sheet and a reviewer who explains its notes, amounts, cancelled values and stage.
-- That job's final invoice/software entry and relevant spreadsheet row, if they exist.
-- Destination software/columns/import example and approved mapping/correction rules.
+- If an external integration is later selected: corresponding records/columns/import example and approved mapping/correction rules. Otherwise skip those fields.
 - A named operator/decision owner and separate local-storage/external-processing decisions.
 
 Current-task timing and evidence that a copying step disappears are optional; collect them later only if measured benefit is wanted.
@@ -125,7 +126,9 @@ If cancellation is uncertain, retain that uncertainty here. The current JSON con
 
 The developer can convert these checked tables into private JSONL using the existing [input contract](WORKSHOP_EVALUATION_GUIDE.md#input-files). The reviewer should cross-check that conversion. Use `private_source` and `independent_company_review` for actual company labels. Preserve a separate original model prediction/failure file; never replace it with the human-corrected record. The comparator does not verify reviewer authority, stage correctness, permitted processing or business usefulness.
 
-## 4. Specify one usable destination — Q03/Q04/Q10
+## 4. Optional: specify an external destination — Q03/Q04/Q10
+
+Skip this section for the current standalone app. Complete it only if a specific external integration is selected later. Do not recreate the old software's contract as an assumed requirement.
 
 Choose one actual copying destination first. Bring its permitted column/export/import example; a screenshot alone may need someone to explain types and rules. Blank invoice templates do not establish the software's import contract.
 
@@ -241,12 +244,12 @@ Record zero or not applicable explicitly when a phase is unnecessary. Retain fai
 | Evidence to return privately | Present / missing / follow-up | Permitted path/evidence ID and next action |
 |---|---|---|
 | Checked source meaning, stage, row order and cancellations | | |
-| Same-job final records and destination mapping/correction rules | | |
+| Optional selected integration: final records and mapping/correction rules | | |
 | Independent label tables and representative-case agreement | | |
 | Named operator/owner for actual operation | | |
 | Optional: baseline timings or an agreed observation appointment | | |
 | Processing/access/host/retention/support decisions | | |
 
-The master records Q05 usefulness as assumed by the user; do not report it as validated by the company. Other questions need actual answers/evidence. Start F09 once the checked destination contract is supplied; start real F08/F11 once meanings/labels and the required processing path are supplied; select real F07/F12 changes only after the processing/operating path is established. A timing baseline is not required. Partial answers can unlock one branch without requiring every answer at once.
+The master records usefulness and old-software removal as user assumptions, not company validation. External F09 is deferred unless later selected, then requires its checked destination contract. Start real F08/F11 with meanings/labels and permitted processing; select real F07/F12 changes after the processing/operating path is established. Timing and old-software mapping are not required. Partial answers can unlock one branch.
 
 This worksheet does not prove old résumé claims about 24 mechanics, 500+ repair-manual pages, 90% retrieval precision, six-month adoption or internship history. Those remain separate evidence questions. Real accuracy, compatibility and usefulness remain unverified until the corresponding checks actually run.

@@ -1,6 +1,6 @@
 # Workshop job-sheet project — master plan and implementation ledger
 
-**Last updated:** 12 October 2026. **Current phase:** local manual workflow/lookup, configured-account access, mocked and printed-fictional live AI integration, synthetic evaluation and disposable recovery checks delivered. A focused company validation worksheet is ready to fill privately. **Usefulness is assumed by the user; business-benefit measurement is optional. Company-dependent technical work remains incomplete:** real-source permission/quality, meanings/labels/mapping and permitted pilot operation.
+**Last updated:** 12 October 2026. **Current phase:** standalone local capture/review/history/lookup/record export delivered; saving/corrections/access/recovery freshly verified. Usefulness and removal of old financial/GST software are user assumptions. Business-benefit studies/external integrations are optional; invoicing/GST is conditional. Real-source permission/quality/meanings/labels and actual company pilot operation remain unverified. See [actual artifacts and fresh verification](WORKSHOP_VERIFICATION_REPORT.md).
 
 This is the authoritative implementation/handoff document for the workshop administrative project. Every contributor, including Codex and Claude, must update it for **every feature or implementation part**, including partial work, fixes, migrations, tests, configuration and changed decisions. Do not rely on chat history to resume the work.
 
@@ -8,11 +8,13 @@ The first product is a small local application that turns a permitted paper shee
 
 ## 1. Start here: the actual next task
 
-**Next task depends on technical company inputs:** Q01/Q02 meanings/stage, Q03/Q04/Q10 checked destination/correction mapping, Q06/Q07/Q09 operator/processing/access/operation and the independent-label portion of Q08. F07 now has a successful live **printed fictional** Gemini image→unsaved proposed draft→source-checked manual review→demo CSV API smoke. Reinspection found the existing manual assistant's ignored local key; it was supplied only to an explicitly configured temporary process. The workshop does not automatically load another application's credentials. Root/manual demo AI remains default-off, private-source processing blocked and real handwriting/company accuracy unverified. The selected project is job-sheet capture/review; public-reference RAG remains separate research.
+**Next real-data/operation work depends on technical inputs:** Q01/Q02 meanings/stage, Q06/Q07/Q09 operator/processing/access/operation and independent labels from Q08. Q03/Q04/Q10 external destination mapping is optional under the standalone scope below. F07 has a successful live **printed fictional** Gemini image→unsaved proposed draft→source-checked manual review→demo CSV API smoke. The separate assistant's ignored key was supplied only to an explicitly configured temporary process; workshop credentials are not loaded automatically. Normal demo AI is off, private-source AI blocked and real handwriting accuracy unverified. Job-sheet capture/review is selected; public-reference RAG remains separate research.
 
 **User decision, 12 October:** assume the project is useful to its customer/workshop users. Do not require interviews proving demand, baseline timings, adoption or removed-copying measurements before continuing implementation. Those studies are optional and needed only for actual benefit/outcome claims. This assumption does not establish what a source means, which destination columns exist, extraction accuracy or operating permission. Keep technical correctness and company compatibility checks.
 
-Use the [workshop validation worksheet](WORKSHOP_VALIDATION_WORKSHEET.md) for the next company discussion. Make a private copy, then follow one job through source meaning, actual destination, independent labels and permission. Complete-task timing is optional. It is tailored to this project; the earlier visit workbook also covers the separate manual-RAG investigation. No company answer or validation result is prefilled.
+**Further user decision, 12 October:** assume the old financial/GST software is gone. Target a standalone workshop record system; matching the old import format is not a prerequisite. External integration F09 is deferred unless selected later. Invoicing/GST/accounting is a separate conditional extension if needed. The CSV remains a record/demo export, not a tax invoice. Saving, corrections, access and local recovery are freshly verified: [actual record/export and verification report](WORKSHOP_VERIFICATION_REPORT.md),217 tests passed with no skips plus live HTTP/Chrome checks.
+
+Use the [workshop validation worksheet](WORKSHOP_VALIDATION_WORKSHEET.md) for source meaning/independent labels and selected real-data operation. External destination and timing sections are optional. The earlier workbook also covers separate manual-RAG research. No company answer or measured result is prefilled.
 
 Do not start by scanning an archive, training a model, building a vector database or integrating the accounting system. None is required to demonstrate the core review workflow.
 
@@ -29,14 +31,14 @@ This milestone is a local demonstration. It does not claim company deployment, r
 3. Read the existing schema/session/router/test fixtures listed in section 5. Confirm actual paths before adding code.
 4. Check whether the private visit files exist locally. Their absence does not block a synthetic/manual prototype. Do not obtain company files from public search as replacements for actual evidence.
 5. Mark the next branch whose company prerequisite is supplied `IN_PROGRESS` and state its exact scope. Printed-fictional F07 integration is verified; repeated smoke calls are not a substitute for missing company evidence.
-6. Choose a branch whose technical prerequisite is available. F09 needs one checked record chain/accepted destination schema; real F07/F08/F11 need permitted samples/reviewer labels; real F12 operation needs owner/access/host/retention decisions. Usefulness is assumed: do not gate coding on baseline time, demand or adoption. Do not build or claim guessed company rules. No public/live deployment is authorised.
+6. Choose a branch whose technical prerequisite is available. Real F07/F08/F11 need permitted samples/reviewer labels; real F12 operation needs owner/access/host/retention decisions. F09 is deferred unless an external integration is selected; do not require the old software's schema for this standalone app. Baseline timing, demand/adoption and old-format compatibility are not coding gates. No guessed rules or public/live deployment.
 7. Update the ledger, verification table, next task and work log **before** committing. Commit only the intended files, then push as previously authorised by the user.
 
 ## 2. Business problem and scope
 
 The reviewed visit material supports investigating repeated transcription of workshop job information. A useful product must make the record clearer and/or remove an existing copying step. If it produces an additional record but staff still retype every destination, it may increase work.
 
-The initial scope is one job-sheet capture/review flow, one reviewed record, and one demonstration output. It should remain usable without an AI key. Later, confirm a real output mapping. Measuring the complete task with an actual operator is an optional study under the user's usefulness assumption; it is not a coding prerequisite.
+The scope is standalone job-sheet capture/review, reviewed history, lookup and record export, usable without an AI key. External mapping is optional if later selected. Invoicing/GST/accounting is a separate conditional extension. Measuring task time/usefulness is optional and not a coding prerequisite.
 
 **Initial exclusions:** automatic repair diagnosis, automatic pricing, liability/claim decisions, tax/accounting treatment decisions, live financial-system writes, bulk archive scanning, supplier integrations and a new repair-manual RAG system. These are not dependencies of this project. Add them only when the user chooses a concrete new scope supported by evidence.
 
@@ -52,7 +54,7 @@ The private sources are in local `company visit/`. The key private documents are
 | Five populated job-sheet photos | Yes, local/private | Real handwriting/annotation development examples | Intended meaning, record stage, full header and independent labels |
 | Six illustrated component-reference photos | Yes, local/private | Basic component vocabulary discussion | Vehicle-specific repair instructions or extensive manuals |
 | Two text transcripts | Yes, local/private | Identify themes and workflow questions | Original audio, unclear terms and precise roles/rules |
-| Final invoice/accounting entry/spreadsheet chain | No | Would specify real reuse | Destination schema and approved field mappings |
+| Optional external invoice/software/spreadsheet chain | No | Would specify a later selected integration | Not required for standalone record export |
 | Independent expected extraction values | No | Would support accuracy evaluation | Correct interpretation of ambiguous notes/marks |
 | User's usefulness decision | Assumed by user, 12 October | Continue without business-benefit validation | Actual time savings/adoption remain unmeasured |
 | Pilot operator and owner | No | Would establish operating responsibility | Who will use/support and approve the selected pilot |
@@ -75,7 +77,7 @@ Having uploaded photos available for this review is not blanket approval to send
 
 - Meaning of real shorthand and diagram marks: company reviewer needed.
 - Real extraction accuracy: independent labels and permitted processing needed.
-- Company-compatible export: target schema and rules needed.
+- Optional external export/integration: target schema/rules needed only if selected; current standalone record export verified.
 - Automated imports/ledger changes: separate integration scope and operating authority needed.
 - Optional staff time-saving/adoption claims: actual task baseline and observations needed; not required to continue building.
 - Workshop deployment beyond the local demonstration: access/hosting/record-handling decisions needed.
@@ -363,10 +365,10 @@ Allowed statuses: `READY`, `IN_PROGRESS`, `IMPLEMENTED_UNVERIFIED`, `VERIFIED`, 
 | F06 | Reproducible demonstration CSV output | VERIFIED | F05 | Fixed demo mapping, private output identity/checksum, concurrent reuse and browser per-version download/reopen passed |
 | F07 | Optional AI image-to-draft extraction | IMPLEMENTED_UNVERIFIED for company quality | F03–F06 | Mock boundary and real printed-fictional Gemini3.1 Flash-Lite source→proposal→manual review→CSV flow verified; handwriting/independent semantic accuracy and private-source use remain pending Q07/Q08 |
 | F08 | Reviewed diagram/shorthand interpretation | IMPLEMENTED_UNVERIFIED | F04/F07 | Manual clarification/context/raw/cancelled/history/output checks verified; actual company meanings/vocabulary pending Q01 |
-| F09 | Actual destination mapping and export | WAITING_COMPANY | F06 | One destination schema plus checked record chain needed |
+| F09 | Optional external destination mapping/integration | DEFERRED | F06; explicit integration scope | Old software assumed gone; standalone record export exists in F06; target schema needed only if integration selected |
 | F10 | Basic lookup of confirmed records | VERIFIED | F05 | Latest reviewed per job, literal bounded filters/pagination/newer-draft status; SQLite/PG and Chrome checks passed |
 | F11 | Extraction evaluation; optional benefit measurement | IMPLEMENTED_UNVERIFIED for real accuracy | F06/F07; F09 for destination checks | Synthetic evaluator/CLI verified; independent labels/provider quality pending Q08; baseline timing/adoption optional, usefulness assumed |
-| F12 | Workshop pilot access, backup and operating guide | IMPLEMENTED_UNVERIFIED for company pilot | User-assumed usefulness; selected operating scope | Local account/origin/pre-parser boundary, authenticated review attribution, guide and disposable recovery verified; real access policy/operation/retention/pilot remain pending Q06/Q07/Q09 |
+| F12 | Workshop access/recovery/guide and later pilot | VERIFIED locally; company pilot pending | User-assumed usefulness; selected operating scope | Fresh217-test suite/live HTTP/Chrome verify access, saving/corrections and actual disposable recovery; company operation/retention/pilot pending Q06/Q07/Q09 |
 
 If a feature takes several turns, add subrows such as `F03.a upload validation` and `F03.b preview route`. Each subrow needs its own status and verification notes. Do not wait until the parent feature is finished to record partial work.
 
@@ -472,6 +474,8 @@ Validate all output through the same schemas. A valid JSON shape is not proof of
 
 ### F09 — one real destination mapping
 
+**Current status:** DEFERRED under the user's12October standalone decision. Matching the assumed-removed software is not required. The specification below applies only if an external integration is later selected; F06 record export exists now. Invoicing/GST/accounting would be a separate feature.
+
 **Purpose:** replace an existing entry step rather than add another.
 
 **Prerequisites:** one permitted/redacted source-to-final-record chain; destination software/spreadsheet columns and import capabilities; reviewer-approved mapping and correction process. Missing prerequisites do not block F01–F08.
@@ -528,7 +532,7 @@ Validate all output through the same schemas. A valid JSON shape is not proof of
 |---|---|---|---|
 | M1: manual vertical slice | F01–F06; fictional source → review → version → demo CSV | Yes, with isolated development environment | Is the review UI understandable and the record lifecycle correct? |
 | M2: AI drafting | F07 plus manual F08 | Mock and printed-fictional live integration verified; company processing/quality conditional | Are proposed values correct and uncertainty/review preserved? |
-| M3: real reuse | F09 plus selected F10 | Needs company mapping | Does the output match and work with the specified destination? |
+| M3: standalone reuse | F06 record export plus F10 lookup; optional F09 later | Current fictional record/CSV/lookup verified; external integration deferred | Does the output match the reviewed record and preserve correction history? |
 | M4: independent accuracy check | Real correctness portion of F11 | Needs permitted cases and independent labels; no timing baseline | Which critical errors/failures remain on representative held-out cases? |
 | M5: permitted workshop pilot | F12 and agreed scope | Needs operating decisions | Is actual use authorised and supportable? |
 
@@ -713,6 +717,16 @@ If interrupted mid-feature, record what exists, what is broken/unverified, the l
 
 Replace vague “tests pass” with the command, counts, skipped checks and test environment. PostgreSQL integration is skipped without its explicit disposable test URL; do not present a skipped test as passed.
 
+### 12 October — fresh software verification
+
+| Check | Actual result | Scope |
+|---|---|---|
+| Clean API workshop suite, explicit PG14.20 URL |217 passed/no skips/51 warnings in146.30s |All15 workshop PG cases, actual DB/file restore, migrations/concurrency/guards |
+| Live local HTTP persistence/corrections/export/access |Passed |New fictional manual correction25.10→30.10, stale409, preserved originals/repeat IDs, anonymous/wrong-password401/cross-origin403/static404/no-store |
+| Stored record/CSV and Chrome reopen |Passed |Actual earlier fictional quote/version2/25.10/source/history; original CSV checksum matches; screenshot/JSON/CSV published as fictional examples |
+
+Exact artifacts/command/limits are in [WORKSHOP_VERIFICATION_REPORT.md](WORKSHOP_VERIFICATION_REPORT.md). No company accuracy, tax/accounting, remote hosting or adoption result inferred.
+
 ### Commands to adapt during implementation
 
 Run from the repository root using the actual Python 3.12 environment. The checked workspace has `.venv/bin/python`, but a different machine may need its own environment.
@@ -749,14 +763,14 @@ Keep actual answers and documents in the private visit files. Here, record gener
 |---|---|---|---|
 | Q01 | One reviewer explains raw notes, abbreviations, panel convention and amounts on a sheet | Real F08 labels/semantic evaluation | Pending |
 | Q02 | Confirm whether source is quote, approved scope or completed work | Real stage/output correctness | Pending |
-| Q03 | One redacted sheet → final invoice/software record → spreadsheet chain | F09 mapping | Pending |
-| Q04 | Destination name, columns/import format and approved mapping | F09 real compatibility | Pending |
+| Q03 | Optional source→external invoice/software/spreadsheet chain | Selected future F09 only | Deferred under standalone scope |
+| Q04 | Optional destination columns/import format and mapping | Selected future F09 only | Deferred under standalone scope |
 | Q05 | Usefulness/demand; optional observation of which entry step disappears | No coding blocker; measured benefit claims only | Assumed by user, 12 October; actual benefit unmeasured |
 | Q06 | Real user/reviewer and pilot decision owner | Real F11/F12 | Pending |
 | Q07 | Permitted source storage and selected external-provider processing | Real F07/F12 | Pending |
 | Q08 | Independently checked expected values; optional baseline task time | Real accuracy; optional benefit claims | Labels pending; baseline optional |
 | Q09 | Access/retention/backup/hosting decisions | F12 | Pending |
-| Q10 | What happens when a record already reused downstream is corrected | F09 correction handling | Pending |
+| Q10 | Correction handling in selected external destination | Selected future F09 only | External handling deferred; local correction/history verified |
 
 Record a question as resolved only when there is an actual answer. An elapsed wait, a synthetic sample or a plausible inference is not an answer. Continue ready tasks while these are pending.
 
@@ -768,9 +782,9 @@ The [validation worksheet](WORKSHOP_VALIDATION_WORKSHEET.md) provides the fill-i
 - **Latest code delivery:** `f7b2c8c`, provider-schema fix and printed-fictional live AI/review/output verification, committed and pushed after authenticated access increment `276579c`.
 - **What exists:** existing automotive API/RAG and the separate workshop manual source/draft/review/history/correction/demo-output/lookup workflow, configured local account, mocked optional AI, synthetic evaluator, operating guide and disposable recovery checks.
 - **Latest implementation:** F07 provider schema compatibility and full printed-fictional live API flow. Final290 passed/no skips/132 warnings; clean API217 passed/no skips/51 warnings;15 workshop PG cases ran. Actual initial provider proposal/review/export provenance and browser reopening verified. Authentication/recovery still verified. The latest work log contains exact source/model/time/privacy evidence and remaining requirements.
-- **What does not exist:** real handwriting/independently labelled benchmark, actual destination mapping, company account/pilot operating policy, production backup/reconciliation/retention or permitted company deployment.
+- **What does not exist:** real handwriting/independently labelled benchmark, company account/pilot operating policy, production backup/reconciliation/retention or permitted company deployment. External mapping and invoicing/GST/accounting are optional future extensions, not implemented current features.
 - **Latest provider integration:** F07 original schema failed400/endpoint502 without DB writes. Explicit string/null money serialization and provider-only omission of nested maxItems50 retain all local validators. Full printed-fictional live API proposal→source-checked quote review→repeatable CSV/provenance passed on `gemini-3.1-flash-lite`. Final tests/browser/privacy results appear in the newest work-log/result entries.
-- **Next conditional work:** Q01/Q02 meanings/stage; Q03/Q04/Q10 destination/correction mapping; Q06/Q07/Q09 actual operator/provider/access/operation; Q08 independent labels. These technical questions remain pending. Independent planned coding and printed-fictional provider smoke are delivered; actual inputs are needed for the remaining technical requirements. Baseline timing and usefulness evidence are not required.
+- **Next conditional work:** Q01/Q02 meanings/stage; Q06/Q07/Q09 actual operator/provider/access/operation; Q08 independent labels. External mapping Q03/Q04/Q10 is deferred under standalone scope. Saving, corrections, access and local recovery are freshly verified developer checks, not waiting for company validation. Baseline timing/usefulness and old-format compatibility are not required.
 - **Usefulness decision:** assumed by user on 12 October. Demand, baseline timing, adoption and removed-copying studies are optional; do not treat them as implementation blockers. Q08 independent labels and the destination/operating rules remain technical inputs.
 - **Independent work delivered:** source handling, manual review/version/export, configured local account/origin/attribution controls, mocked extraction, manual clarification boundaries, lookup, synthetic comparator/protocol, local operating guide and disposable recovery. New company data/rules/identity/approval must not be fabricated to extend these.
 - **Unrelated changes to preserve:** root `PROJECT_SUMMARY.md` and `SYSTEM_DESIGN.md` as seen on this machine; verify current status rather than assuming it remains identical.
@@ -785,7 +799,7 @@ Bring back these specific artifacts rather than another general interview. Keep 
 | Remaining work | Minimum input to return | What the next implementer can then do | Evidence needed before completion |
 |---|---|---|---|
 | F08: actual meanings/stage (Q01/Q02) | A reviewer explains one permitted sheet, each raw note/amount/cancellation/diagram mark and whether it is a quote, approved work or completed work; unresolved values remain unknown | Save independently reviewed expected values and any approved vocabulary without guessing from the photograph | Reviewer checks that captured meaning and stage match that source |
-| F09/M3: destination correctness (Q03/Q04/Q10) | The same job's redacted source, final invoice/software record and relevant spreadsheet row; destination columns/import example; approved required fields/conversions and correction procedure | Implement one deterministic, versioned destination mapping using the existing reviewed-record/export path | Checked representative output and permitted destination acceptance; actual entry-step removal is optional to measure |
+| Optional F09: external destination correctness (Q03/Q04/Q10) | Only if a specific integration is later selected: target schema/conversions/correction procedure | Implement a versioned mapping for that selected destination | Not a current standalone-build requirement; record/CSV match verified |
 | Real F07/F11/M4: extraction correctness (Q01/Q02/Q07/Q08) | Permitted processing/storage path and representative source cases with independently checked labels and reviewer explanations | Select the approved extraction path, retain failures and compare held-out values | Recorded sample/denominator/error/failure results; a fictional smoke or developer correction is insufficient; no baseline time required |
 | Real F12/M5: workshop operation (Q06/Q07/Q09) | Decision owner and intended users/host; agreed access, provider, retention/deletion, backup and support rules; actual pilot decision | Implement only the selected operational gaps and verify them on the agreed host before any separately authorised deployment | Access and recovery checks in that environment plus actual operating approval; the current single-account local drill is insufficient |
 
@@ -798,8 +812,8 @@ Continue the workshop job-sheet project in this repository. Read AGENTS.md,
 CLAUDE.md and car mechanic assistant/WORKSHOP_MASTER_PLAN.md first.
 Treat the master plan as the current implementation ledger. Inspect Git status
 and preserve unrelated user work. F01–F06 manual milestone is verified. Start
-the next branch whose prerequisite is supplied: F09 checked
-destination mapping, real F08/F11 labels/quality or selected F12 access/operation.
+the next branch whose prerequisite is supplied: real F08/F11 labels/quality or selected F12 access/operation.
+Old financial/GST software is assumed gone: target standalone records/export; F09 external mapping is deferred. Invoicing/GST/accounting is a separate conditional extension if needed.
 Usefulness is assumed by the user; baseline timing, demand/adoption and removed-copying studies are optional and must not block coding.
 Local account/origin/attribution and guide/recovery are verified. Manual F08 actual meanings remain pending Q01. F11 synthetic
 harness/F10 lookup are verified. F07 mock and printed-fictional live API integration
@@ -813,6 +827,17 @@ remain recorded and unanswered.
 ```
 
 ## 16. Work log
+
+### 12 October 2026 — actual record/export shown; fresh software checks and standalone scope
+
+- User requested the captured record/export and direct saving/corrections/access/recovery verification, and assumes old financial/GST software gone. Target is standalone records/history/export; external mapping F09 deferred. Invoicing/GST/accounting is conditional, with no tax rules/outcomes assumed.
+- Read live existing fictional reviewed job/source and downloaded original CSV; verified source bytes, quote/version2/four headers/description/25.10/authenticated attribution, repeat identity and SHA256. Added public fictional JSON/CSV/Chrome screenshot and `WORKSHOP_VERIFICATION_REPORT.md` for direct inspection.
+- Live local HTTP check: new fictional manual case saved/reopened; amount25.10→30.10 in new version; stale save/confirm409; original review/CSV unchanged; new authenticated review and repeated output identity correct; fresh-client reopen persisted correction. Anonymous page/job/source/CSV401, wrong password401, cross-origin write403/static bypass404 and no-store passed. Run IDs/report stay ignored/private.
+- Fresh Chrome reopened actual earlier stored source/quote/25.10/history, readonly account/no page errors. Screenshot visually inspected. No new model call or company-source processing.
+- Fresh clean API suite with explicit local PostgreSQL14.20: **217 passed, no skips,51 warnings in146.30s**. All15 PG cases ran, including actual `pg_dump`/`pg_restore` plus fictional source/output recovery. DB-only restore correctly lacked bytes; full restore preserved records/history/identities/checksums/schema/guards. Scope is local/quiescent, not production/offsite/concurrent-write recovery.
+- Delivery checks: exported snapshot passes shared schema;32-column CSV/revision/source/checksum match;63 local links resolve;18 original company hashes unchanged; actual password/hash/provider key absent from intended public files. Screenshot inspected. Updated only unchanged blank private worksheet, mode0600/ignored retained; no filled answers overwritten. Explicit staged-scope/whitespace checks pass.
+- Staging exposed Git CRLF→LF normalisation of the exact CSV artifact. Added an exact-path `.gitattributes` rule (`-text`, CR-at-EOL whitespace handling), restaged and checked indexed bytes/checksum equal the downloaded original; no other file's text handling changed.
+- Update companions with standalone scope and verified software behavior. No application code/schema/config change. Keep unrelated root docs, company sources and credentials private; commit/push intended documentation and authored-fictional showcase only.
 
 ### 12 October 2026 — usefulness assumed; technical checks retained
 

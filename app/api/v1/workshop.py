@@ -6,8 +6,8 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.session import get_db
-from app.schemas.workshop import WorkshopDraft, WorkshopDraftUpdate, WorkshopJobResponse, WorkshopDocumentResponse, DataOrigin, WorkshopConfirmRequest, WorkshopRevisionResponse
-from app.services.workshop import create_job, get_job, update_job, attach_document, get_document, document_file, MAX_UPLOAD_BYTES, confirm_job, list_revisions
+from app.schemas.workshop import WorkshopDraft, WorkshopDraftUpdate, WorkshopJobResponse, WorkshopDocumentResponse, DataOrigin, WorkshopConfirmRequest, WorkshopRevisionResponse, WorkshopExportResponse
+from app.services.workshop import create_job, get_job, update_job, attach_document, get_document, document_file, MAX_UPLOAD_BYTES, confirm_job, list_revisions, generate_export, get_export, export_file
 
 
 def require_workshop_enabled():
@@ -57,3 +57,17 @@ def confirm_draft(job_id: UUID, request: WorkshopConfirmRequest, db: Session = D
 @router.get("/jobs/{job_id}/revisions", response_model=list[WorkshopRevisionResponse])
 def read_revisions(job_id: UUID, limit: int = Query(20, ge=1, le=100), offset: int = Query(0, ge=0), db: Session = Depends(get_db)):
     return list_revisions(db, job_id, limit, offset)
+
+
+@router.post("/revisions/{revision_id}/exports", response_model=WorkshopExportResponse)
+def create_demo_export(revision_id: UUID, db: Session = Depends(get_db)):
+    return generate_export(db, revision_id)
+
+
+@router.get("/exports/{export_id}/download")
+def download_demo_export(export_id: UUID, db: Session = Depends(get_db)):
+    export = get_export(db, export_id)
+    return FileResponse(
+        export_file(export), media_type="text/csv; charset=utf-8", filename=f"workshop-demo-{export.id}.csv",
+        headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
+    )

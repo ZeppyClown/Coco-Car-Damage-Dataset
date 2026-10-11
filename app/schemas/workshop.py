@@ -188,3 +188,13 @@ class WorkshopConfirmRequest(_WorkshopSchema):
 
 class WorkshopRevisionResponse(WorkshopReviewedRevision):
     id: UUID
+
+
+class WorkshopExportResponse(_WorkshopSchema):
+    id: UUID
+    revision_id: UUID
+    mapping_version: str
+    checksum: str
+    byte_size: int
+    created_at: AwareDatetime
+    status: Literal["generated"] = "generated"

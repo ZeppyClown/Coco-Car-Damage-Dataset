@@ -24,6 +24,8 @@ from app.services.workshop import create_job, get_job, update_job
 from app.services.workshop import attach_document, confirm_job, list_revisions
 from app.core.config import settings
 from app.db.models import WorkshopDocument
+from app.db.models import WorkshopExport
+from app.services.workshop import generate_export, export_file
 
 
 @pytest.fixture
@@ -270,3 +272,26 @@ def test_detaching_current_source_cannot_delete_reviewed_source(workshop_postgre
             connection.execute(WorkshopDocument.__table__.delete().where(WorkshopDocument.id == source.id))
     with Session(engine) as db:
         assert db.get(WorkshopDocument, source.id) is not None
+
+
+def test_export_migration_and_simultaneous_generation(workshop_postgres, tmp_path, monkeypatch):
+    engine = workshop_postgres
+    migrate(engine, "20261011_review_guard")
+    monkeypatch.setattr(settings, "WORKSHOP_STORAGE_DIR", tmp_path)
+    with Session(engine) as db:
+        job_id = create_job(db, reviewed_fixture()).id
+        revision = confirm_job(db, job_id, WorkshopConfirmRequest(expected_version=1, reviewer="Fictional", acknowledged=True))
+    migrate(engine)
+    barrier = Barrier(2)
+    def generate(_):
+        with Session(engine) as db:
+            barrier.wait(timeout=10)
+            return generate_export(db, revision.id)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(generate, range(2)))
+    assert results[0].model_dump() == results[1].model_dump()
+    with Session(engine) as db:
+        exports = db.scalars(select(WorkshopExport)).all()
+        assert len(exports) == 1 and len(list(tmp_path.iterdir())) == 1
+        assert export_file(exports[0]).read_bytes().startswith(b"\xef\xbb\xbf")
+        assert list_revisions(db, job_id)[0].model_dump() == revision.model_dump()

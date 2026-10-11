@@ -330,3 +330,19 @@ class WorkshopJobRevision(Base):
     record = Column(JSON, nullable=False)
     reviewer = Column(String(200), nullable=False)
     reviewed_at = Column(DateTime(timezone=True), nullable=False)
+
+
+class WorkshopExport(Base):
+    __tablename__ = "workshop_exports"
+    __table_args__ = (
+        UniqueConstraint("revision_id", "mapping_version", name="uq_workshop_export_identity"),
+        CheckConstraint("byte_size > 0", name="ck_workshop_export_size"),
+    )
+
+    id = Column(Uuid, primary_key=True, default=uuid4)
+    revision_id = Column(Uuid, ForeignKey("workshop_job_revisions.id"), nullable=False)
+    mapping_version = Column(String(40), nullable=False)
+    checksum = Column(String(64), nullable=False)
+    storage_key = Column(String(120), nullable=False, unique=True)
+    byte_size = Column(Integer, nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())

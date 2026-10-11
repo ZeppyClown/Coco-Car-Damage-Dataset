@@ -123,6 +123,18 @@ function renderHistory() {
       const source = element("a", "Open this version's original source");
       source.href = api + "/documents/" + encodeURIComponent(record.source_document_id) + "/preview"; source.target = "_blank"; source.rel = "noopener"; details.append(source);
     } else details.append(element("p", "Manual provenance: " + record.manual_provenance));
+    const download = element("button", `Download demo CSV · version ${revision.version}`); download.type = "button";
+    download.addEventListener("click", () => action(async () => {
+      const exported = await request("/revisions/" + revision.id + "/exports", { method: "POST" });
+      const response = await fetch(api + "/exports/" + exported.id + "/download");
+      if (!response.ok) throw new Error("Demo CSV download failed. The reviewed version remains saved.");
+      const url = URL.createObjectURL(await response.blob());
+      const link = element("a"); link.href = url; link.download = `workshop-demo-${job.id}-v${revision.version}.csv`;
+      document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000);
+      status(`Demo CSV generated for reviewed version ${revision.version}. It has not been imported into accounting software.`);
+    }));
+    details.append(element("p", "Demo output only. Unknown amounts stay empty; cancelled rows contain literal text without interpreted values."));
+    details.append(download);
     container.append(details);
   }
 }

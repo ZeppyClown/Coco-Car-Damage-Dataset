@@ -1,7 +1,8 @@
-"""Local source, draft and reviewed history; exports/authentication come later."""
+"""Local source, draft, review and demo output; authentication comes later."""
 from uuid import UUID, uuid4
 from hashlib import sha256
-from io import BytesIO
+from io import BytesIO, StringIO
+import csv
 import os
 from datetime import datetime, timezone
 from pathlib import Path
@@ -13,11 +14,12 @@ from sqlalchemy.orm import Session
 from PIL import Image, UnidentifiedImageError
 from pydantic import ValidationError
 
-from app.db.models import WorkshopDocument, WorkshopJob, WorkshopJobRevision
+from app.db.models import WorkshopDocument, WorkshopJob, WorkshopJobRevision, WorkshopExport
 from app.core.config import settings
 from app.schemas.workshop import (
     WorkshopDraft, WorkshopDraftUpdate, WorkshopDocumentResponse, DataOrigin,
     WorkshopConfirmRequest, WorkshopReviewedDraft, WorkshopRevisionResponse,
+    WorkshopExportResponse,
 )
 
 
@@ -34,17 +36,21 @@ def storage_directory() -> Path:
     return directory
 
 
-def document_file(document: WorkshopDocument) -> Path:
+def _stored_file(storage_key: str, byte_size: int, checksum: str, label: str) -> Path:
     directory = storage_directory()
-    path = (directory / document.storage_key).resolve()
+    path = (directory / storage_key).resolve()
     if path.parent != directory:
-        raise HTTPException(status_code=503, detail="Stored source is unavailable")
+        raise HTTPException(status_code=503, detail=f"Stored {label} is unavailable")
     try:
-        if path.stat().st_size != document.byte_size or sha256(path.read_bytes()).hexdigest() != document.checksum:
-            raise HTTPException(status_code=503, detail="Stored source failed its integrity check")
+        if path.stat().st_size != byte_size or sha256(path.read_bytes()).hexdigest() != checksum:
+            raise HTTPException(status_code=503, detail=f"Stored {label} failed its integrity check")
     except OSError:
-        raise HTTPException(status_code=503, detail="Stored source is unavailable") from None
+        raise HTTPException(status_code=503, detail=f"Stored {label} is unavailable") from None
     return path
+
+
+def document_file(document: WorkshopDocument) -> Path:
+    return _stored_file(document.storage_key, document.byte_size, document.checksum, "source")
 
 
 def get_document(db: Session, document_id: UUID) -> WorkshopDocument:
@@ -239,4 +245,107 @@ def confirm_job(db: Session, job_id: UUID, request: WorkshopConfirmRequest):
         return response
     except (SQLAlchemyError, HTTPException):
         db.rollback()
+        raise
+
+
+DEMO_MAPPING_VERSION = "workshop-demo-v1"
+DEMO_CSV_COLUMNS = (
+    "mapping_version", "output_kind", "job_id", "revision_id", "revision", "data_origin", "record_stage",
+    "job_reference", "customer_reference", "vehicle_reference", "make", "model", "currency",
+    "line_number", "cancelled", "description", "amount", "description_raw", "amount_raw",
+    "diagram_notes", "diagram_notes_raw", "written_total", "written_adjustment", "written_grand_total",
+    "date_note_raw", "quotation_date", "date_in", "date_out", "reviewer", "reviewed_at",
+    "source_document_id", "manual_provenance",
+)
+
+
+def _csv_cell(value):
+    text = "" if value is None else str(value)
+    # Prefix dangerous cells without changing the canonical reviewed record.
+    if text.startswith(("\t", "\r", "\n")) or text.lstrip().startswith(tuple("=+-@＝＋－＠")):
+        return "'" + text
+    return text
+
+
+def demo_csv(revision: WorkshopRevisionResponse) -> bytes:
+    record = revision.record.model_dump(mode="json")
+    common = {name: record.get(name) for name in DEMO_CSV_COLUMNS}
+    common.update(mapping_version=DEMO_MAPPING_VERSION, output_kind="DEMO_ONLY",
+                  job_id=str(revision.job_id), revision_id=str(revision.id), revision=revision.version,
+                  reviewer=revision.reviewer, reviewed_at=revision.reviewed_at.isoformat())
+    output = StringIO(newline="")
+    writer = csv.DictWriter(output, fieldnames=DEMO_CSV_COLUMNS, lineterminator="\r\n")
+    writer.writeheader()
+    for index, item in enumerate(record["items"], 1):
+        row = {**common, "line_number": index, "cancelled": "true" if item["cancelled"] else "false",
+               "description_raw": item["description_raw"], "amount_raw": item["amount_raw"],
+               "description": None if item["cancelled"] else item["description"],
+               "amount": None if item["cancelled"] else item["amount"]}
+        writer.writerow({key: _csv_cell(value) for key, value in row.items()})
+    return output.getvalue().encode("utf-8-sig")
+
+
+def get_export(db: Session, export_id: UUID) -> WorkshopExport:
+    export = db.get(WorkshopExport, export_id)
+    if export is None:
+        raise HTTPException(status_code=404, detail="Workshop export not found")
+    return export
+
+
+def export_file(export: WorkshopExport) -> Path:
+    return _stored_file(export.storage_key, export.byte_size, export.checksum, "demo export")
+
+
+def _export_response(export: WorkshopExport):
+    created_at = export.created_at
+    if created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=timezone.utc)
+    return WorkshopExportResponse(
+        id=export.id, revision_id=export.revision_id, mapping_version=export.mapping_version,
+        checksum=export.checksum, byte_size=export.byte_size, created_at=created_at.astimezone(timezone.utc),
+    )
+
+
+def generate_export(db: Session, revision_id: UUID):
+    path = None
+    created = False
+    try:
+        revision = db.scalar(select(WorkshopJobRevision).where(WorkshopJobRevision.id == revision_id)
+                             .with_for_update().execution_options(populate_existing=True))
+        if revision is None:
+            raise HTTPException(status_code=404, detail="Reviewed workshop revision not found")
+        content = demo_csv(_revision_response(revision))
+        checksum = sha256(content).hexdigest()
+        existing = db.scalar(select(WorkshopExport).where(
+            WorkshopExport.revision_id == revision_id, WorkshopExport.mapping_version == DEMO_MAPPING_VERSION))
+        if existing is not None:
+            if existing.checksum != checksum:
+                raise HTTPException(status_code=503, detail="Demo mapping no longer matches its recorded output")
+            export_file(existing)
+            response = _export_response(existing)
+            db.commit()
+            return response
+        directory = storage_directory()
+        directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+        export_id = uuid4()
+        path = directory / (export_id.hex + ".csv")
+        # shortcut: a crash can orphan this file; F12 reconciles private storage.
+        with os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "wb") as output:
+            created = True
+            output.write(content)
+            output.flush()
+            os.fsync(output.fileno())
+        export = WorkshopExport(id=export_id, revision_id=revision_id, mapping_version=DEMO_MAPPING_VERSION,
+                                checksum=checksum, storage_key=path.name, byte_size=len(content))
+        db.add(export)
+        db.flush()
+        response = _export_response(export)
+        db.commit()
+        return response
+    except (SQLAlchemyError, OSError, HTTPException) as error:
+        db.rollback()
+        if created:
+            path.unlink(missing_ok=True)
+        if isinstance(error, OSError):
+            raise HTTPException(status_code=503, detail="Demo export storage failed") from None
         raise

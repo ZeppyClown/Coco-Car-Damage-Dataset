@@ -1,6 +1,6 @@
 # Workshop job-sheet project — master plan and implementation ledger
 
-**Last updated:** 11 October 2026. **Current phase:** F01 schemas and fictional fixtures verified; next is F02 persistence. No workshop UI/API/storage exists yet.
+**Last updated:** 11 October 2026. **Current phase:** F01–F02 verified. Draft persistence/API and additive migration work; next is F03 image attach/preview. Workshop UI/confirmation/export/AI remain pending.
 
 This is the authoritative implementation/handoff document for the workshop administrative project. Every contributor, including Codex and Claude, must update it for **every feature or implementation part**, including partial work, fixes, migrations, tests, configuration and changed decisions. Do not rely on chat history to resume the work.
 
@@ -8,7 +8,7 @@ The first product is a small local application that turns a permitted paper shee
 
 ## 1. Start here: the actual next task
 
-**Next ready task: F02 — add isolated workshop persistence and an additive migration.** F01 schemas/fictional fixtures are verified. Implement F02–F06 to produce the first complete manual workflow before adding AI. The user explicitly selected job-sheet capture/review; public-reference RAG remains separate research.
+**Next ready task: F03 — safe image attach/preview and duplicate warning.** F01 schemas and F02 draft persistence/migration are verified. Implement F03–F06 to produce the first complete manual workflow before adding AI. The user explicitly selected job-sheet capture/review; public-reference RAG remains separate research.
 
 Do not start by scanning an archive, training a model, building a vector database or integrating the accounting system. None is required to demonstrate the core review workflow.
 
@@ -24,8 +24,8 @@ This milestone is a local demonstration. It does not claim company deployment, r
 2. Run `git status --short` and identify unrelated user work. On 11 October, `PROJECT_SUMMARY.md` is modified and `SYSTEM_DESIGN.md` is untracked; preserve both unless the user explicitly includes them in the task.
 3. Read the existing schema/session/router/test fixtures listed in section 5. Confirm actual paths before adding code.
 4. Check whether the private visit files exist locally. Their absence does not block a synthetic/manual prototype. Do not obtain company files from public search as replacements for actual evidence.
-5. Mark the next ready feature (currently F02) `IN_PROGRESS` and state the exact scope in the ledger below.
-6. Reuse the verified F01 schemas and fictional fixtures. Inspect the current migration head and implement F02 in isolated development/test storage, with its actual acceptance checks.
+5. Mark the next ready feature (currently F03) `IN_PROGRESS` and state the exact scope in the ledger below.
+6. Reuse F01 schemas/fictional fixtures and the F02 router/session/models. Implement bounded local image attach/preview outside static storage; declare Pillow in the actual host requirements when imported.
 7. Update the ledger, verification table, next task and work log **before** committing. Commit only the intended files, then push as previously authorised by the user.
 
 ## 2. Business problem and scope
@@ -120,7 +120,7 @@ Do not create a third server or install a frontend framework. The existing separ
 | Path | Existing purpose | Proposed relationship |
 |---|---|---|
 | `app/main.py` | FastAPI app, routers, static mount, root/health | Register the workshop router and a separate `/workshop` page; preserve existing routes |
-| `app/db/models.py` | Shared SQLAlchemy `Base` and current automotive models | Add workshop models or import their definitions before metadata collection |
+| `app/db/models.py` | Shared SQLAlchemy `Base`, automotive and three workshop models | F02 added workshop document/job/revision tables to shared metadata |
 | `app/db/session.py` | Engine, `SessionLocal`, `get_db` | Reuse sessions/transactions; no second connection layer |
 | `alembic/env.py` | Migration metadata/settings | Ensure workshop tables enter `Base.metadata`; no startup `create_all` |
 | `alembic/versions/` | Existing migration chain | Add a new revision after the actual current head; do not rewrite old revisions |
@@ -136,19 +136,19 @@ The existing `Vehicle` model expects fields not necessarily present in a job she
 
 ### Proposed new code files
 
-F01 schema/test/fixture paths below now exist. The remaining paths are proposed. If existing code offers a smaller correct arrangement, change the list and explain the decision in this master file before continuing.
+F01 schema/test/fixture and F02 router/service/integration-test paths below now exist. Static UI and extraction paths remain proposed. If existing code offers a smaller correct arrangement, change the list and explain the decision in this master file before continuing.
 
 | Path | Purpose | First feature |
 |---|---|---|
-| `app/schemas/workshop.py` | Implemented draft, reviewed-draft, item and revision validation; export schemas deferred until F06 | F01 |
-| `app/services/workshop.py` | Draft updates, review/version rules and deterministic output logic | F02/F05/F06 |
-| `app/api/v1/workshop.py` | HTTP input boundary and workshop operations | F02/F03 |
+| `app/schemas/workshop.py` | F01 record/review validation plus F02 draft-update/job-response contracts; export schemas deferred until F06 | F01/F02 |
+| `app/services/workshop.py` | F02 create/read/replace draft and source/origin/version checks; review/export later | F02/F05/F06 |
+| `app/api/v1/workshop.py` | F02 create/read/replace routes and default-disabled demo gate; image routes later | F02/F03 |
 | `app/static/workshop.html` | Source/draft review page | F04 |
 | `app/static/workshop.js` | Page actions and accessible feedback | F04 |
 | `app/static/workshop.css` | Necessary page styles; reuse existing styles where practical | F04 |
 | `app/services/workshop_extraction.py` | One optional image-to-draft integration, added only when justified | F07 |
 | `tests/unit/test_workshop.py` | Draft/review/export/identity failure checks | F01 onward |
-| `tests/integration/test_workshop_postgres.py` | Real DB/migration and concurrent version/export checks | F02/F05/F06 |
+| `tests/integration/test_workshop_postgres.py` | F02 real migrations, reopen, concurrent saves, rollback and revision constraints; review/export checks later | F02/F05/F06 |
 | `tests/fixtures/workshop/` | Clearly labelled fictional inputs and expected records | F01 |
 
 No generic provider/plugin/agent abstraction is required. Add one integration when it is chosen, with a testable call boundary and validated results.
@@ -224,6 +224,26 @@ Add **WorkshopExport** in F06 when export exists: job/revision, format/mapping v
 - An output already generated remains reproducible from its snapshot. New corrections require a new reviewed version, not alteration of old export evidence.
 - Keep review state distinct from repair stage. A reviewed quote remains a quote.
 
+### Implemented F02 persistence and API
+
+[Models](../app/db/models.py) now include `WorkshopDocument`, `WorkshopJob` and `WorkshopJobRevision`. [Migration](../alembic/versions/20261011_workshop_drafts.py) is additive; timestamps use timezone-aware PostgreSQL columns, IDs are ORM-generated UUIDs, jobs persist an entire JSON-safe draft plus nullable source FK and version. A written Decimal is stored as its fixed two-decimal string. Assign/replace the JSON payload instead of mutating it in place.
+
+Revision storage has a job FK, positive version check and unique `(job_id, version)` constraint. It has no confirmation writer, access protection or database immutability trigger yet. F05 must write validated reviewed records and preserve snapshots; F12 supplies real user access controls. The document table is available for F03 but no source files are uploaded by F02.
+
+The [router](../app/api/v1/workshop.py) uses the shared `get_db` session and [service](../app/services/workshop.py), gated by `WORKSHOP_ENABLED=false` by default. Disabled routes return 404. Enable only in a local isolated demonstration; the flag is not authentication.
+
+| Operation now | Actual route | Input/result |
+|---|---|---|
+| Create editable draft | `POST /api/v1/workshop/jobs` | Full `WorkshopDraft` body → 201 with generated `id`, `draft`, `draft_version=1`, `created_at`, `updated_at` |
+| Reopen editable draft | `GET /api/v1/workshop/jobs/{job_id}` | UUID → current draft/version/timestamps; missing ID 404, malformed UUID 422 |
+| Replace editable draft | `PATCH /api/v1/workshop/jobs/{job_id}` | `{ "expected_version": 1, "draft": { ...full draft... } }` → new version; stale save 409 |
+
+PATCH replaces the entire draft, not selected fields. Read the latest version, edit its full payload and send the version that was loaded. Every successful save advances the version, including unchanged saves; stale/repeated saves conflict and must reload. SQL updates match both job ID and expected version atomically. Drafts may remain incomplete, with stage unknown and no source/provenance; they are never presented as reviewed by this API.
+
+A supplied source UUID must exist in `workshop_documents` and match draft origin. Source FK and payload are saved together. `data_origin` cannot change once a job exists; clearing an attachment does not let a private job become a synthetic job. Jobs sharing customer/reference text remain distinct UUIDs. F03 will add actual file handling; F12 must additionally verify source ownership/access for real users.
+
+Database write failures rollback and use the existing sanitised DB error handler; request logging records route/status/type without the draft contents. F02 performs no model calls, arithmetic, confirmation, automatic record merge, export or external writes.
+
 ### Suggested API boundaries
 
 The implementer may simplify route naming, but must document the final contract here. All are under `/api/v1/workshop`; the HTML page is `/workshop`.
@@ -250,9 +270,9 @@ Allowed statuses: `READY`, `IN_PROGRESS`, `IMPLEMENTED_UNVERIFIED`, `VERIFIED`, 
 | ID | Part | Status now | Dependencies | Evidence / next action |
 |---|---|---|---|---|
 | F00 | Master plan, handoff and private-source boundary | VERIFIED | None | Documentation/link/exclusion/staged-scope checks for this change; no app implementation |
-| F01 | Draft/review contract and fictional fixtures | VERIFIED | F00 | Four Pydantic schemas, five fictional JSON cases and one printed demo PNG; 45 targeted checks passed; no runtime routes/storage yet |
-| F02 | Workshop storage, models and migration | READY — next | F01 | Add three models and an additive migration; verify on a dedicated PostgreSQL test DB |
-| F03 | Safe image attach/preview and duplicate warning | READY | F02 | JPEG/PNG initially; immutable original bytes |
+| F01 | Draft/review contract and fictional fixtures | VERIFIED | F00 | Four record/review schemas, five fictional JSON cases and one printed demo PNG; 45 targeted checks passed |
+| F02 | Workshop storage, models and migration | VERIFIED | F01 | Three tables, migration 20261011_workshop and create/read/replace routes; 133 total tests passed with real PostgreSQL; live app restart preserved draft |
+| F03 | Safe image attach/preview and duplicate warning | READY — next | F02 | JPEG/PNG initially; immutable original bytes; no attach/preview routes yet |
 | F04 | Manual source/draft review screen | READY | F01–F03 | First usable UI; no AI dependency |
 | F05 | Confirmation, immutable revisions and conflict handling | READY | F02/F04 | Separate review state from repair stage |
 | F06 | Reproducible demonstration CSV output | READY | F05 | Demo-only mapping; deterministic output/export identity |
@@ -288,6 +308,8 @@ If a feature takes several turns, add subrows such as `F03.a upload validation` 
 **Checks:** new database upgrades to head; a database at the previous head upgrades while preserving a seeded existing row; schema and models align; draft survives process/reopen; rollback leaves no partial reviewed state. Run these on an isolated PostgreSQL database, not only SQLite.
 
 **Completion:** draft create/read/update service or routes working, migration tests/evidence recorded, actual new revision documented. Downstream feature blockers are explicit if PostgreSQL is unavailable.
+
+**Delivered:** VERIFIED on 11 October 2026. Three tables are registered in shared metadata. Revision `20261011_workshop` follows `20261009_complete`; no historical migration is rewritten. Three local draft routes, source/origin checks and atomic version-checked saves work. Fifteen new F02 cases pass within the 133-test suite. Fresh/previous-head migrations, model alignment, concurrent saves, rollback, constraints and a live process restart were checked on PostgreSQL 14.20. Review confirmation/immutable snapshots belong to F05; their table alone is not that feature.
 
 ### F03 — attach and preview an image
 
@@ -419,6 +441,44 @@ If M2 loses to direct entry, keep the simpler form. If M3 cannot remove entry, d
 
 The manual milestone requires no search, marketplace or AI credentials. Provider failures must not prevent manual entry/review. Inspect existing settings loading before adding new environment handling.
 
+**Implemented setting:** `WORKSHOP_ENABLED` defaults to false in Settings and `.env.example`. The workshop endpoints are local demo operations without authentication; keep them disabled in any existing shared/public host. Enabling them does not install tables. Run Alembic explicitly against the intended isolated DB first; startup does not call `create_all` or migrate.
+
+### Run the current F02 local API
+
+From the repository root, use the existing Python environment and a separately provisioned local development PostgreSQL database. Set the actual connection through your private environment/config; do not copy a company database URL into this example.
+
+```sh
+export DATABASE_URL='postgresql://YOUR_LOCAL_ROLE@127.0.0.1:5432/yap_test_workshop'
+export WORKSHOP_ENABLED=true
+export USE_GOOGLE_CSE=false
+export USE_EBAY_API=false
+.venv/bin/python -m alembic upgrade head
+.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+The role/database placeholder must be replaced with an existing isolated local target. `/docs` describes the three draft operations; `/workshop` is not implemented yet. In a second terminal, this sends the authored fixture only:
+
+```python
+import json
+from pathlib import Path
+import httpx
+
+record = json.loads(Path("tests/fixtures/workshop/examples.json").read_text())["examples"][0]["record"]
+with httpx.Client(base_url="http://127.0.0.1:8000") as client:
+    response = client.post("/api/v1/workshop/jobs", json=record)
+    response.raise_for_status()
+    job = response.json()
+    job["draft"]["diagram_notes_raw"] = "Fictional clarified note"
+    saved = client.patch("/api/v1/workshop/jobs/" + job["id"], json={
+        "expected_version": job["draft_version"], "draft": job["draft"],
+    })
+    saved.raise_for_status()
+    print(saved.json()["draft_version"])
+```
+
+F02 verification used a task-created PostgreSQL 14.20 cluster under ignored `runtime/workshop-f02-tests/`, listening on `127.0.0.1:55441`, database `yap_test_workshop_f02`. Tests use random disposable schemas and an explicitly supplied local `YAP_TEST_POSTGRES_URL`; the migration tests accept a caller-provided connection via Alembic config attributes so they cannot fall back to the application DB. A normal CLI migration/check and live Uvicorn on `127.0.0.1:18041` were also tested against that same isolated database. Two app processes and the test PostgreSQL process were stopped after verification. The ignored cluster/synthetic restart artifact remain local; no company data was used.
+
+
 Possible settings, added only when needed:
 
 - `WORKSHOP_STORAGE_DIR`: nonpublic directory for source/output files.
@@ -485,6 +545,11 @@ If interrupted mid-feature, record what exists, what is broken/unverified, the l
 | 11 October 2026 | F01 schema/review rules | `.venv/bin/python -m pytest -q tests/unit/test_workshop.py --disable-warnings` | 45 passed, 7 warnings | Fictional contracts only; initial large-integer boundary failure fixed and retested |
 | 11 October 2026 | F01 broader regression | `.venv/bin/python -m pytest -q tests` | 117 passed, 1 skipped, 76 warnings | Existing PostgreSQL integration skipped without `YAP_TEST_POSTGRES_URL`; dependency/deprecation warnings remain |
 | 11 October 2026 | Fictional image and public/private boundary | Visual PNG inspection, fixture decode/record check, document links, original checksums, ignore/staged scope and `git diff --check` | Checked; image labelled fictional, 18 original source hashes unchanged | No browser UI, provider processing, handwriting or company-outcome test |
+| 11 October 2026 | Initial F02 API/migration checks | Explicit local test URL + `pytest -q tests/unit/test_workshop_api.py tests/integration/test_workshop_postgres.py --disable-warnings` | Initial 14 cases passed, 18 warnings; one later constraint case verified by full suite | SQLite API boundary plus actual PostgreSQL migrations/transactions; all fictional |
+| 11 October 2026 | F02 full regression with real DB | Explicit local `YAP_TEST_POSTGRES_URL` + `.venv/bin/python -m pytest -q tests` | **133 passed, 0 skipped, 100 warnings** | PostgreSQL 14.20; 15 new F02 cases. Existing dependency/deprecation warnings remain; no business outcome claims |
+| 11 October 2026 | Normal migration/environment path | Isolated `DATABASE_URL` + `alembic upgrade head` and `alembic check` | All revisions upgraded to 20261011_workshop; no new upgrade operations detected | Disposable task DB only; production migration/deployment not run |
+| 11 October 2026 | Live F02 HTTP/restart | Local Uvicorn: health/create/update/stale save; stop/restart and GET/OpenAPI | 200/201/200/409; second process returned identical draft/version/timestamps | Synthetic example only; no browser UI or authentication test |
+| 11 October 2026 | F02 delivery boundaries | Local links, private exclusions, unchanged 18 original hashes, explicit staged scope and whitespace | Checked; only intended code/tests/docs/config included | Company questions remain pending |
 
 Replace vague “tests pass” with the command, counts, skipped checks and test environment. PostgreSQL integration is skipped without its explicit disposable test URL; do not present a skipped test as passed.
 
@@ -498,7 +563,7 @@ git status --short
 .venv/bin/python -m pytest -q tests/unit/test_workshop.py
 ```
 
-`test_workshop.py` now exists and its 45 F01 checks passed. These checks validate schemas, not runtime storage, UI, source existence or authenticated review.
+`test_workshop.py` covers 45 F01 schema cases. F02 adds `tests/unit/test_workshop_api.py` and `tests/integration/test_workshop_postgres.py`; run those too when changing persistence/routes. PostgreSQL checks require the explicit disposable test URL.
 
 After changes to shared routes/models/dependencies:
 
@@ -538,12 +603,12 @@ Record a question as resolved only when there is an actual answer. An elapsed wa
 ## 15. Current handoff snapshot
 
 - **Branch/repository:** `main`, remote `origin` is the user's existing GitHub repository. Verify actual remote before pushing on a different machine.
-- **Previous delivery before F01:** `7252480`, public-corpus résumé assessment. Read Git history for the final F01 commit hash.
-- **What exists:** current automotive API/RAG code, visit review/planning documents, private uploaded examples and verified F01 schemas/tests/fictional fixtures.
-- **Latest implementation:** F01 adds four validation schemas, five fictional payload examples, one labelled printed-sheet PNG and 45 targeted checks; master/README/build status updated together.
-- **What does not exist:** workshop upload/review/confirmation/export/search application features, real extraction benchmark, real destination mapping or authorised company pilot.
-- **Next ready feature:** F02 persistence/migration, followed by F03–F06 to finish the manual milestone.
-- **Independent work available:** isolated persistence, local manual UI, demo output and later mocked extraction; lack of company access does not block these.
+- **Previous delivery before F02:** `b7c4ef7`, verified F01 schemas/fictional fixtures. Read Git history for the final F02 commit hash.
+- **What exists:** current automotive API/RAG, visit review/planning material, F01 schemas/fictional fixtures and F02 workshop models/migration/draft service/API/tests.
+- **Latest implementation:** F02 adds three tables, two API schemas, three draft operations, optimistic versions, source/origin checks and default-disabled demo configuration. All 133 tests passed with disposable PostgreSQL; live process restart preserved a draft.
+- **What does not exist:** workshop image attach/preview, browser review screen, confirmation/immutable-snapshot service, output/search/AI extraction, real benchmark/mapping or permitted company pilot.
+- **Next ready feature:** F03 image attach/preview, followed by F04–F06 to finish the manual milestone.
+- **Independent work available:** safe source attach/preview, local manual UI, confirmation, demo output and later mocked extraction; lack of company access does not block these.
 - **Unrelated changes to preserve:** root `PROJECT_SUMMARY.md` and `SYSTEM_DESIGN.md` as seen on this machine; verify current status rather than assuming it remains identical.
 - **Open decisions:** real output mapping, model-processing path, operator and expected labels. None should be fabricated.
 
@@ -553,8 +618,8 @@ Record a question as resolved only when there is an actual answer. An elapsed wa
 Continue the workshop job-sheet project in this repository. Read AGENTS.md,
 CLAUDE.md and car mechanic assistant/WORKSHOP_MASTER_PLAN.md first.
 Treat the master plan as the current implementation ledger. Inspect Git status
-and preserve unrelated user work. F01 is verified. Start with the next ready
-feature, F02, then finish the manual F03–F06 vertical slice. Use synthetic examples until
+and preserve unrelated user work. F01–F02 are verified. Start with F03 image
+attach/preview, then finish the manual F04–F06 vertical slice. Use synthetic examples until
 real-data prerequisites are met. Keep company visit files and runtime artifacts
 private. After every implementation part, update the master with actual files,
 behaviour, tests, limitations and next task; commit the intended changes and
@@ -616,3 +681,17 @@ The assessment separates physical/parsable/quality-approved/indexed pages, class
 - **Company prerequisites:** Q01–Q10 remain pending for real interpretation, mapping, evaluation and pilot use. No company answer is needed to implement F02 in isolated storage.
 - **Commit/push:** intended code/tests/fixtures/docs form one increment on `main`; read Git history/remote for its final hash and delivery status. Unrelated PROJECT_SUMMARY.md and SYSTEM_DESIGN.md are preserved.
 - **Next smallest ready task:** F02: add three workshop models and one additive Alembic migration; implement draft persistence/version checks and verify both fresh/previous-head upgrade on a disposable PostgreSQL database. Then F03–F06 complete the manual workflow. Do not mark the application usable based on schema tests alone.
+
+
+### 11 October 2026 — F02, local draft persistence and migration
+
+- **Status:** VERIFIED for draft storage/API and schema migration. F03 is next; no complete workshop UI/review/output workflow exists yet.
+- **Behaviour:** create and reopen incomplete drafts; replace a whole draft with an expected version; stale/concurrent writes fail with 409 instead of overwriting. Validate source existence/origin; keep origin immutable and jobs distinct. Persist literal Unicode/null/Decimal-string values. SQL failures rollback and return sanitised errors.
+- **Files/schema/routes/config:** three workshop models in `app/db/models.py`; additive `alembic/versions/20261011_workshop_drafts.py`, head `20261011_workshop` after `20261009_complete`; Alembic env accepts an explicit connection for isolated tests. New `app/services/workshop.py` and `app/api/v1/workshop.py`; two F02 schema classes added. Main registers three operations under `/api/v1/workshop/jobs`; Settings/`.env.example` add default-false `WORKSHOP_ENABLED`. Existing dependencies/session/error handling reused. README/build status/master updated.
+- **Tests:** new `tests/unit/test_workshop_api.py` (9 cases) and `tests/integration/test_workshop_postgres.py` (6 cases); original automotive routing test now checks the seven original paths explicitly while allowing workshop additions. Initial collection used a pytest-reserved parameter name, fixed before checks passed; full-suite route-count assumption also corrected and retested. Final full run: 133 passed, no skips, 100 warnings, with actual disposable PostgreSQL.
+- **DB evidence:** fresh migration and upgrade from previous head with a retained vehicle; metadata comparison and CLI Alembic check show alignment. New-session persistence, timezone-aware DB timestamps, simultaneous saves, transaction rollback, revision uniqueness and job FK enforced. Failed transaction leaves no partial draft/revision changes. Constraint fixtures are not reviewed company records.
+- **Live/manual evidence:** normal migration on the task DB; synthetic draft create/update/stale rejection over local HTTP; stop/restart app and reopen identical record/version/timestamps; OpenAPI methods checked. No provider calls or company-data processing. Task-owned app and PostgreSQL processes stopped; local test artifacts ignored.
+- **Limits:** no attach/preview route, source-file storage, UI, confirmation writer, enforced snapshot immutability, CSV/search/extraction or access-control implementation. The feature flag is a local-demo gate, not authentication; keep it disabled on shared/public hosts until F12. PATCH is full replacement and advances version on every successful save. No business accuracy/usefulness result.
+- **Company questions:** Q01–Q10 remain pending; no company answer is needed for the next synthetic/local F03 increment.
+- **Commit/push:** implementation, tests, configuration and master updates form one intended `main` increment; check Git history/remote for the final delivery hash. Preserve unrelated PROJECT_SUMMARY.md/SYSTEM_DESIGN.md; private visit/runtime files excluded.
+- **Next smallest ready task:** F03 bounded JPEG/PNG attach/preview, decoded-content checks, opaque IDs, private storage and duplicate-byte warning/reuse. Then F04–F06 deliver the manual workflow before optional AI.

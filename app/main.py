@@ -15,7 +15,7 @@ from app.core.middleware import (
     http_exception_handler,
     database_exception_handler,
 )
-from app.api.v1 import query, parts, valuation, paint_code, specifications, diagnostics
+from app.api.v1 import query, parts, valuation, paint_code, specifications, diagnostics, workshop
 
 logger = get_logger(__name__)
 
@@ -92,6 +92,7 @@ app.include_router(valuation.router, prefix=f"/api/{settings.API_VERSION}", tags
 app.include_router(paint_code.router, prefix=f"/api/{settings.API_VERSION}", tags=["Paint Code"])
 app.include_router(specifications.router, prefix=f"/api/{settings.API_VERSION}", tags=["Specifications"])
 app.include_router(diagnostics.router, prefix=f"/api/{settings.API_VERSION}", tags=["Diagnostics"])
+app.include_router(workshop.router, prefix=f"/api/{settings.API_VERSION}", tags=["Workshop demo"])
 
 @app.on_event("startup")
 async def startup_event():

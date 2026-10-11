@@ -1,5 +1,5 @@
 """Draft/review contracts; no persistence or automatic extraction is implied."""
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Literal, get_args
 from uuid import UUID
@@ -149,3 +149,18 @@ class WorkshopReviewedRevision(_WorkshopSchema):
     record: WorkshopReviewedDraft
     reviewer: Reference
     reviewed_at: AwareDatetime
+
+
+class WorkshopDraftUpdate(_WorkshopSchema):
+    expected_version: int = Field(ge=1, strict=True)
+    draft: WorkshopDraft
+
+
+class WorkshopJobResponse(_WorkshopSchema):
+    model_config = ConfigDict(extra="forbid", from_attributes=True)
+
+    id: UUID
+    draft: WorkshopDraft
+    draft_version: int
+    created_at: datetime
+    updated_at: datetime

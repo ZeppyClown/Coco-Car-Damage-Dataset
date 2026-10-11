@@ -3,9 +3,13 @@ from app.services.entity_extractor import EntityExtractor
 from app.services.external.nhtsa import NHTSAService
 
 
-def test_seven_routes_and_request_id(client):
+def test_original_automotive_routes_and_request_id(client):
     paths = client.get("/openapi.json").json()["paths"]
-    assert len([path for path in paths if path.startswith("/api/v1/")]) == 7
+    assert {
+        "/api/v1/query", "/api/v1/parts/identify", "/api/v1/parts/compatibility",
+        "/api/v1/valuation/estimate", "/api/v1/paint-code/lookup",
+        "/api/v1/specifications/{vin}", "/api/v1/diagnostics/troubleshoot",
+    } <= paths.keys()
     assert client.get("/health").headers["x-request-id"]
 
 

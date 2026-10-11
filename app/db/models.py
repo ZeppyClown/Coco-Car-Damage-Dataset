@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, func, Numeric, JSON, Index, UniqueConstraint, text
+from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, func, Numeric, JSON, Index, UniqueConstraint, CheckConstraint, Uuid, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
+from uuid import uuid4
 
 Base = declarative_base()
 
@@ -284,3 +285,47 @@ class APIRateLimit(Base):
 
     def __repr__(self):
         return f"<APIRateLimit {self.source} {self.call_count}/{self.daily_limit}>"
+
+
+class WorkshopDocument(Base):
+    __tablename__ = "workshop_documents"
+    __table_args__ = (
+        CheckConstraint("byte_size > 0", name="ck_workshop_document_size"),
+        CheckConstraint("data_origin IN ('synthetic_demo', 'private_source')", name="ck_workshop_document_origin"),
+        CheckConstraint("media_type IN ('image/jpeg', 'image/png')", name="ck_workshop_document_media"),
+    )
+
+    id = Column(Uuid, primary_key=True, default=uuid4)
+    checksum = Column(String(64), nullable=False, unique=True)
+    storage_key = Column(String(120), nullable=False, unique=True)
+    media_type = Column(String(20), nullable=False)
+    byte_size = Column(Integer, nullable=False)
+    data_origin = Column(String(20), nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class WorkshopJob(Base):
+    __tablename__ = "workshop_jobs"
+    __table_args__ = (CheckConstraint("draft_version >= 1", name="ck_workshop_job_version"),)
+
+    id = Column(Uuid, primary_key=True, default=uuid4)
+    source_document_id = Column(Uuid, ForeignKey("workshop_documents.id"))
+    draft = Column(JSON, nullable=False)
+    draft_version = Column(Integer, nullable=False, default=1, server_default="1")
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class WorkshopJobRevision(Base):
+    __tablename__ = "workshop_job_revisions"
+    __table_args__ = (
+        UniqueConstraint("job_id", "version", name="uq_workshop_job_revision"),
+        CheckConstraint("version >= 1", name="ck_workshop_revision_version"),
+    )
+
+    id = Column(Uuid, primary_key=True, default=uuid4)
+    job_id = Column(Uuid, ForeignKey("workshop_jobs.id"), nullable=False)
+    version = Column(Integer, nullable=False)
+    record = Column(JSON, nullable=False)
+    reviewer = Column(String(200), nullable=False)
+    reviewed_at = Column(DateTime(timezone=True), nullable=False)

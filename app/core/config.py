@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
     API_VERSION: str = "v1"
+    WORKSHOP_ENABLED: bool = False
 
     # Database
     DATABASE_URL: str = "postgresql://automotive:automotive123@localhost:5432/automotive_db"

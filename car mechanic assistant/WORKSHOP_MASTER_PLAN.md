@@ -1,6 +1,6 @@
 # Workshop job-sheet project — master plan and implementation ledger
 
-**Last updated:** 11 October 2026. **Current phase:** F01–F02 verified. Draft persistence/API and additive migration work; next is F03 image attach/preview. Workshop UI/confirmation/export/AI remain pending.
+**Last updated:** 11 October 2026. **Current phase:** F01–F03 verified. Draft and image APIs work; next is F04 manual review UI. Confirmation/export/AI remain pending.
 
 This is the authoritative implementation/handoff document for the workshop administrative project. Every contributor, including Codex and Claude, must update it for **every feature or implementation part**, including partial work, fixes, migrations, tests, configuration and changed decisions. Do not rely on chat history to resume the work.
 
@@ -8,7 +8,7 @@ The first product is a small local application that turns a permitted paper shee
 
 ## 1. Start here: the actual next task
 
-**Next ready task: F03 — safe image attach/preview and duplicate warning.** F01 schemas and F02 draft persistence/migration are verified. Implement F03–F06 to produce the first complete manual workflow before adding AI. The user explicitly selected job-sheet capture/review; public-reference RAG remains separate research.
+**Next ready task: F04 — manual source/draft review screen.** F01–F03 schemas, drafts and image handling are verified. Implement F04–F06 to produce the first complete manual workflow before adding AI. The user explicitly selected job-sheet capture/review; public-reference RAG remains separate research.
 
 Do not start by scanning an archive, training a model, building a vector database or integrating the accounting system. None is required to demonstrate the core review workflow.
 
@@ -24,8 +24,8 @@ This milestone is a local demonstration. It does not claim company deployment, r
 2. Run `git status --short` and identify unrelated user work. On 11 October, `PROJECT_SUMMARY.md` is modified and `SYSTEM_DESIGN.md` is untracked; preserve both unless the user explicitly includes them in the task.
 3. Read the existing schema/session/router/test fixtures listed in section 5. Confirm actual paths before adding code.
 4. Check whether the private visit files exist locally. Their absence does not block a synthetic/manual prototype. Do not obtain company files from public search as replacements for actual evidence.
-5. Mark the next ready feature (currently F03) `IN_PROGRESS` and state the exact scope in the ledger below.
-6. Reuse F01 schemas/fictional fixtures and the F02 router/session/models. Implement bounded local image attach/preview outside static storage; declare Pillow in the actual host requirements when imported.
+5. Mark the next ready feature (currently F04) `IN_PROGRESS` and state the exact scope in the ledger below.
+6. Reuse the verified draft/source APIs and fictional fixtures. Build the manual page with source zoom/rotation, explicit field states, save/reopen and visible failures; no provider dependency.
 7. Update the ledger, verification table, next task and work log **before** committing. Commit only the intended files, then push as previously authorised by the user.
 
 ## 2. Business problem and scope
@@ -244,6 +244,16 @@ A supplied source UUID must exist in `workshop_documents` and match draft origin
 
 Database write failures rollback and use the existing sanitised DB error handler; request logging records route/status/type without the draft contents. F02 performs no model calls, arithmetic, confirmation, automatic record merge, export or external writes.
 
+### Implemented F03 sources
+
+`POST /api/v1/workshop/documents` accepts multipart `file` and explicit `data_origin`; returns opaque UUID, media type, byte size, origin and `duplicate`. `GET /api/v1/workshop/documents/{document_id}/preview` returns unchanged bytes with `Cache-Control: no-store` and `nosniff`. Both use the default-disabled workshop gate. The original filename is not retained or used as a path.
+
+JPEG/PNG only, single frame, decoded content/MIME/suffix agreement, 1 byte–8 MiB file size, 6,000 pixels per side and 20,000,000 pixels total. The ASGI upload middleware buffers at most 8 MiB + 64 KiB of multipart input and rejects overflow before parsing/spooling, including requests without Content-Length. Inner request logging still assigns request IDs to limit responses. Empty/corrupt/mismatched/unsupported/oversized input fails visibly, not as a saved attachment.
+
+`WORKSHOP_STORAGE_DIR` defaults to ignored `car mechanic assistant/runtime/workshop/`, resolved outside `app/static`. Files use generated UUID keys, exclusive creation and private permissions; raw bytes are fsynced before DB commit. Duplicate checksums reuse the existing source only when origin matches and its file passes size/SHA-256 verification; concurrent duplicates retain one row/file. No job merge occurs. Database/write errors rollback and remove newly created files where cleanup succeeds. Missing/altered/unsafe stored paths fail preview/reuse with 503, without exposing a disk path.
+
+Known limit: a process crash between file creation and DB commit can leave an unreferenced file; F12 storage reconciliation/backup work must handle it. Byte deduplication does not detect a different photograph of the same sheet. Pillow 12.3.0 is declared in the root host requirements; no company images were used for checks.
+
 ### Suggested API boundaries
 
 The implementer may simplify route naming, but must document the final contract here. All are under `/api/v1/workshop`; the HTML page is `/workshop`.
@@ -272,8 +282,8 @@ Allowed statuses: `READY`, `IN_PROGRESS`, `IMPLEMENTED_UNVERIFIED`, `VERIFIED`, 
 | F00 | Master plan, handoff and private-source boundary | VERIFIED | None | Documentation/link/exclusion/staged-scope checks for this change; no app implementation |
 | F01 | Draft/review contract and fictional fixtures | VERIFIED | F00 | Four record/review schemas, five fictional JSON cases and one printed demo PNG; 45 targeted checks passed |
 | F02 | Workshop storage, models and migration | VERIFIED | F01 | Three tables, migration 20261011_workshop and create/read/replace routes; 133 total tests passed with real PostgreSQL; live app restart preserved draft |
-| F03 | Safe image attach/preview and duplicate warning | READY — next | F02 | JPEG/PNG initially; immutable original bytes; no attach/preview routes yet |
-| F04 | Manual source/draft review screen | READY | F01–F03 | First usable UI; no AI dependency |
+| F03 | Safe image attach/preview and duplicate warning | VERIFIED | F02 | 16 new cases plus live upload/preview/duplicate/chunked-limit checks; full suite 149 passed |
+| F04 | Manual source/draft review screen | READY — next | F01–F03 | First usable UI; no AI dependency |
 | F05 | Confirmation, immutable revisions and conflict handling | READY | F02/F04 | Separate review state from repair stage |
 | F06 | Reproducible demonstration CSV output | READY | F05 | Demo-only mapping; deterministic output/export identity |
 | F07 | Optional AI image-to-draft extraction | READY for mocks; real source use conditional | F03–F06 | Provider/permission checks before real uploaded records |
@@ -322,6 +332,8 @@ If a feature takes several turns, add subrows such as `F03.a upload validation` 
 **Duplicate behaviour:** warn/reuse the source reference when the same bytes already exist; do not merge job records or assume a new photo of the same sheet is unrelated. Byte checksums do not detect all semantic duplicates. Document this limit.
 
 **Completion:** UI can display the stored original by opaque ID; originals unchanged; limits and storage path documented. Real-world remote access is not approved by this local feature.
+
+**Delivered:** VERIFIED for attach/preview service and routes. Sixteen new synthetic cases include live-limit/failure checks and a real PostgreSQL duplicate race. Browser display is exercised by F04; the API already returns the original image. Full suite: 149 passed, 101 warnings, no skips. Live HTTP upload, unchanged preview, duplicate reuse and a chunked oversized request passed.
 
 ### F04 — manual source/draft review UI
 
@@ -443,7 +455,7 @@ The manual milestone requires no search, marketplace or AI credentials. Provider
 
 **Implemented setting:** `WORKSHOP_ENABLED` defaults to false in Settings and `.env.example`. The workshop endpoints are local demo operations without authentication; keep them disabled in any existing shared/public host. Enabling them does not install tables. Run Alembic explicitly against the intended isolated DB first; startup does not call `create_all` or migrate.
 
-### Run the current F02 local API
+### Run the current draft/source API
 
 From the repository root, use the existing Python environment and a separately provisioned local development PostgreSQL database. Set the actual connection through your private environment/config; do not copy a company database URL into this example.
 
@@ -479,7 +491,13 @@ with httpx.Client(base_url="http://127.0.0.1:8000") as client:
 F02 verification used a task-created PostgreSQL 14.20 cluster under ignored `runtime/workshop-f02-tests/`, listening on `127.0.0.1:55441`, database `yap_test_workshop_f02`. Tests use random disposable schemas and an explicitly supplied local `YAP_TEST_POSTGRES_URL`; the migration tests accept a caller-provided connection via Alembic config attributes so they cannot fall back to the application DB. A normal CLI migration/check and live Uvicorn on `127.0.0.1:18041` were also tested against that same isolated database. Two app processes and the test PostgreSQL process were stopped after verification. The ignored cluster/synthetic restart artifact remain local; no company data was used.
 
 
-Possible settings, added only when needed:
+Implemented private storage setting: `WORKSHOP_STORAGE_DIR`. Override only with a nonpublic directory; the service rejects the static mount. Example synthetic upload after local startup:
+
+```sh
+curl -f -F data_origin=synthetic_demo -F file=@tests/fixtures/workshop/synthetic-sheet.png http://127.0.0.1:8000/api/v1/workshop/documents
+```
+
+Possible later settings, added only when needed:
 
 - `WORKSHOP_STORAGE_DIR`: nonpublic directory for source/output files.
 - A minimal upload size/pixel limit: choose sensible bounded development limits, then document their actual values rather than promising unsupported formats.
@@ -551,6 +569,9 @@ If interrupted mid-feature, record what exists, what is broken/unverified, the l
 | 11 October 2026 | Live F02 HTTP/restart | Local Uvicorn: health/create/update/stale save; stop/restart and GET/OpenAPI | 200/201/200/409; second process returned identical draft/version/timestamps | Synthetic example only; no browser UI or authentication test |
 | 11 October 2026 | F02 delivery boundaries | Local links, private exclusions, unchanged 18 original hashes, explicit staged scope and whitespace | Checked; only intended code/tests/docs/config included | Company questions remain pending |
 
+| 11 October 2026 | F03 source/API/PG regression | Local test URL + `.venv/bin/python -m pytest -q tests --disable-warnings` | 149 passed, no skips, 101 warnings | Synthetic sources only; real PG deduplication race |
+| 11 October 2026 | Clean API host environment | Install root requirements; clean pip check; workshop unit/integration tests | No broken requirements; 76 passed, 20 warnings | Isolated runtime venv; shared environment has unrelated conflicts; Docker unchecked |
+
 Replace vague “tests pass” with the command, counts, skipped checks and test environment. PostgreSQL integration is skipped without its explicit disposable test URL; do not present a skipped test as passed.
 
 ### Commands to adapt during implementation
@@ -603,11 +624,11 @@ Record a question as resolved only when there is an actual answer. An elapsed wa
 ## 15. Current handoff snapshot
 
 - **Branch/repository:** `main`, remote `origin` is the user's existing GitHub repository. Verify actual remote before pushing on a different machine.
-- **Previous delivery before F02:** `b7c4ef7`, verified F01 schemas/fictional fixtures. Read Git history for the final F02 commit hash.
+- **Previous delivery before F03:** `75b8a58`, verified draft storage/migration/API. Read Git history for the final F03 commit hash.
 - **What exists:** current automotive API/RAG, visit review/planning material, F01 schemas/fictional fixtures and F02 workshop models/migration/draft service/API/tests.
-- **Latest implementation:** F02 adds three tables, two API schemas, three draft operations, optimistic versions, source/origin checks and default-disabled demo configuration. All 133 tests passed with disposable PostgreSQL; live process restart preserved a draft.
-- **What does not exist:** workshop image attach/preview, browser review screen, confirmation/immutable-snapshot service, output/search/AI extraction, real benchmark/mapping or permitted company pilot.
-- **Next ready feature:** F03 image attach/preview, followed by F04–F06 to finish the manual milestone.
+- **Latest implementation:** F03 adds bounded image upload, unchanged private storage, checksum-verified preview and duplicate-byte reuse. Full suite: 149 passed with PostgreSQL; live HTTP upload/preview/duplicate/chunked-body rejection checked.
+- **What does not exist:** browser review screen, confirmation/immutable-snapshot service, output/search/AI extraction, real benchmark/mapping or permitted company pilot.
+- **Next ready feature:** F04 manual screen, followed by F05–F06 to finish the manual milestone.
 - **Independent work available:** safe source attach/preview, local manual UI, confirmation, demo output and later mocked extraction; lack of company access does not block these.
 - **Unrelated changes to preserve:** root `PROJECT_SUMMARY.md` and `SYSTEM_DESIGN.md` as seen on this machine; verify current status rather than assuming it remains identical.
 - **Open decisions:** real output mapping, model-processing path, operator and expected labels. None should be fabricated.
@@ -618,8 +639,8 @@ Record a question as resolved only when there is an actual answer. An elapsed wa
 Continue the workshop job-sheet project in this repository. Read AGENTS.md,
 CLAUDE.md and car mechanic assistant/WORKSHOP_MASTER_PLAN.md first.
 Treat the master plan as the current implementation ledger. Inspect Git status
-and preserve unrelated user work. F01–F02 are verified. Start with F03 image
-attach/preview, then finish the manual F04–F06 vertical slice. Use synthetic examples until
+and preserve unrelated user work. F01–F03 are verified. Start with F04 manual
+review UI, then finish the F05–F06 vertical slice. Use synthetic examples until
 real-data prerequisites are met. Keep company visit files and runtime artifacts
 private. After every implementation part, update the master with actual files,
 behaviour, tests, limitations and next task; commit the intended changes and
@@ -695,3 +716,16 @@ The assessment separates physical/parsable/quality-approved/indexed pages, class
 - **Company questions:** Q01–Q10 remain pending; no company answer is needed for the next synthetic/local F03 increment.
 - **Commit/push:** implementation, tests, configuration and master updates form one intended `main` increment; check Git history/remote for the final delivery hash. Preserve unrelated PROJECT_SUMMARY.md/SYSTEM_DESIGN.md; private visit/runtime files excluded.
 - **Next smallest ready task:** F03 bounded JPEG/PNG attach/preview, decoded-content checks, opaque IDs, private storage and duplicate-byte warning/reuse. Then F04–F06 deliver the manual workflow before optional AI.
+
+
+### 11 October 2026 — F03, safe source attach/preview
+
+- **Status:** VERIFIED for upload/private storage/preview/duplicate reuse. Next: F04 browser manual review.
+- **Files/routes/config:** root Pillow dependency; Settings storage path; shared workshop schema/service/router; narrowly scoped upload-body middleware and main registration. Added `tests/unit/test_workshop_documents.py` (15 cases) and one PostgreSQL duplicate-race case. No new migration/table. Master/build status/README updated together.
+- **Verification:** targeted source + workshop PG checks: 22 passed/16 warnings. Final full suite with explicit local PostgreSQL URL: 149 passed/101 warnings/no skips. Live local HTTP: 201 upload, 200 byte-identical preview, duplicate UUID reuse, chunked over-limit 413. Corrupt, empty, mismatched, animated, over-size/dimension/pixel, unsafe filename/path, missing/corrupt stored source, storage/DB failure and disabled-route checks passed. Shared request-ID/routing checks passed.
+- **Failure resolved:** raising a receive-time exception through the multipart/error stack produced 400; bounded buffering/replay now returns 413 before parsing. An initial live probe ran before server startup and was retried against the same confirmed process after startup; final checks passed.
+- **Origin/manual checks:** only the authored PNG and generated JPEG/GIF/APNG fixtures; original company sources remain private/unchanged. Source previews do not rewrite/rotate originals. No provider call.
+- **Environment:** shared `.venv` pip check reported unrelated audio/telemetry dependency conflicts. A clean root-requirements-only environment at ignored `runtime/workshop-api-venv/` installed successfully, passed pip check and 76 workshop cases (20 warnings); do not call the shared environment dependency-consistent. Docker execution remains unavailable/unverified.
+- **Limits/prerequisites:** no browser UI/confirmation/export yet. No authenticated source access; local gated demo only. Crash-orphan and semantic-duplicate limits are documented above. Q01–Q10 remain pending for real mapping/labels/pilot, not for F04.
+- **Commit/push:** intended feature/code/tests/docs increment on main; consult Git history for hash. Unrelated user files excluded.
+- **Next:** F04 manual form/source viewer/save/reopen, then F05 confirmation/history and F06 demo CSV.

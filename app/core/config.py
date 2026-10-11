@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings
 from typing import Optional
 import os
+from pathlib import Path
 
 
 class Settings(BaseSettings):
@@ -12,6 +13,7 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     API_VERSION: str = "v1"
     WORKSHOP_ENABLED: bool = False
+    WORKSHOP_STORAGE_DIR: Path = Path(__file__).resolve().parents[2] / "car mechanic assistant/runtime/workshop"
 
     # Database
     DATABASE_URL: str = "postgresql://automotive:automotive123@localhost:5432/automotive_db"

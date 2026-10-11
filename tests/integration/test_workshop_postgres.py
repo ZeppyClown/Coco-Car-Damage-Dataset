@@ -2,6 +2,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 import os
+from pathlib import Path
 from threading import Barrier
 from uuid import uuid4
 
@@ -19,6 +20,9 @@ from sqlalchemy.orm import Session
 from app.db.models import Base, Vehicle, WorkshopJob, WorkshopJobRevision
 from app.schemas.workshop import WorkshopDraft, WorkshopDraftUpdate
 from app.services.workshop import create_job, get_job, update_job
+from app.services.workshop import attach_document
+from app.core.config import settings
+from app.db.models import WorkshopDocument
 
 
 @pytest.fixture
@@ -145,3 +149,22 @@ def test_revision_identity_and_foreign_key_are_enforced(workshop_postgres):
             db.commit()
         db.rollback()
         assert len(db.scalars(select(WorkshopJobRevision)).all()) == 1
+
+
+def test_concurrent_identical_sources_reuse_one_row_and_file(workshop_postgres, tmp_path, monkeypatch):
+    engine = workshop_postgres
+    migrate(engine)
+    monkeypatch.setattr(settings, "WORKSHOP_STORAGE_DIR", tmp_path / "sources")
+    content = (Path(__file__).parents[1] / "fixtures/workshop/synthetic-sheet.png").read_bytes()
+    barrier = Barrier(2)
+    def attach(_):
+        with Session(engine) as db:
+            barrier.wait(timeout=10)
+            return attach_document(db, content, "fixture.png", "image/png", "synthetic_demo")
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(attach, range(2)))
+    assert results[0].id == results[1].id
+    assert sorted(result.duplicate for result in results) == [False, True]
+    assert len(list(settings.WORKSHOP_STORAGE_DIR.iterdir())) == 1
+    with Session(engine) as db:
+        assert len(db.scalars(select(WorkshopDocument)).all()) == 1

@@ -12,6 +12,32 @@ from fastapi.encoders import jsonable_encoder
 logger = get_logger(__name__)
 
 
+class WorkshopUploadLimitMiddleware:
+    """Bound streamed multipart input before the parser can spool large files."""
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http" or scope.get("method") != "POST" or not scope.get("path", "").rstrip("/").endswith("/workshop/documents"):
+            return await self.app(scope, receive, send)
+        received, messages = 0, []
+        while True:
+            message = await receive()
+            if message["type"] == "http.disconnect":
+                return
+            received += len(message.get("body", b""))
+            if received > 8 * 1024 * 1024 + 64 * 1024:
+                response = JSONResponse(status_code=413, content={"detail": "Workshop upload request exceeds 8 MiB plus form overhead"})
+                return await response(scope, receive, send)
+            messages.append(message)
+            if not message.get("more_body", False):
+                break
+        iterator = iter(messages)
+        async def replay_receive():
+            return next(iterator, None) or await receive()
+        await self.app(scope, replay_receive, send)
+
+
 async def error_handling_middleware(request: Request, call_next):
     """Global error handling middleware"""
     start_time = time.time()

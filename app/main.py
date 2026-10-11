@@ -14,6 +14,7 @@ from app.core.middleware import (
     validation_exception_handler,
     http_exception_handler,
     database_exception_handler,
+    WorkshopUploadLimitMiddleware,
 )
 from app.api.v1 import query, parts, valuation, paint_code, specifications, diagnostics, workshop
 
@@ -42,6 +43,7 @@ app.add_middleware(
 )
 
 # Error handling middleware
+app.add_middleware(WorkshopUploadLimitMiddleware)
 app.middleware("http")(error_handling_middleware)
 
 # Serve static files (HTML, CSS, JS)

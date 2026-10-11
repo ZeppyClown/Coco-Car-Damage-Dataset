@@ -164,3 +164,11 @@ class WorkshopJobResponse(_WorkshopSchema):
     draft_version: int
     created_at: datetime
     updated_at: datetime
+
+
+class WorkshopDocumentResponse(_WorkshopSchema):
+    id: UUID
+    media_type: str
+    byte_size: int
+    data_origin: DataOrigin
+    duplicate: bool

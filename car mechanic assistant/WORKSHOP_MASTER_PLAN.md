@@ -557,3 +557,23 @@ remain recorded and unanswered.
 
 Unverified: new application behaviour, real extraction accuracy, destination compatibility, staff time savings and company deployment.
 Main risk: capture/review adds work unless a reviewed record replaces an existing entry step; missing facts and unconfirmed shorthand cannot be repaired by confident generation.
+
+### 11 October 2026 — public automotive corpus feasibility research
+
+The user asked whether public automotive parts information could supply 500+ pages for a separate retrieval project. This is research, not a replacement of the selected workshop workflow or an implemented ingestion feature. **Next ready task remains F01** unless the user chooses a different project direction.
+
+| Candidate | Source checked | Actual verification | Limits |
+|---|---|---|---|
+| MANN-FILTER cars/transporters catalogue, 2024–2026 | [Official PDF](https://www.mann-filter.com/content/dam/mann-filter/communication-media/brochures-catalogs/mann-filter-catalog-cars-transporters-2024-26-interactive.pdf), linked from the manufacturer's [download hub](https://www.mann-filter.com/de-de/service/download-hub.html) | Downloaded locally; pypdf counted **513 pages**; text extraction sampled pages 1, 25 and 513 | Parts catalogue, not a comprehensive repair manual; full page quality/relevance and RAG ingestion not checked |
+| DENSO spark-plug technical manual | [Official PDF](https://assets.denso-am.eu/staging/attachments/1663942351%20EN_Spark%20Plug%20Manual.pdf) | Browser PDF parser reports **68 pages**; contents include technical explanation, installation and troubleshooting sections | Candidate source only; not downloaded into the application corpus or validated against workshop tasks |
+| Other manufacturer references | [DENSO downloads](https://www.denso-am.eu/downloads), [Bosch download centre](https://ap.boschaftermarket.com/in/en/news/download-centre/browse-all-downloads) | Official reference/download entry points found | Individual documents, editions, applicability and use conditions need review |
+
+Private research download/inventory: `runtime/public-corpus-research-20261011/mann-filter-cars-transporters-2024-26.pdf` and `mann-filter-inventory.json` under this assistant directory. Inventory records source URL, byte size, SHA-256, physical PDF page count and sample extraction lengths. The file has **not** been embedded or added to any Chroma collection. The PDF is not committed or redistributed.
+
+Initial Python urllib download encountered a local certificate-store error; retry with the installed certifi CA bundle succeeded with certificate verification enabled. Browser retrieval of the large catalogue exceeded that tool's size limit; local download/page counting supplied the result. Neither failure was counted as successful ingestion.
+
+If a public-reference RAG direction is selected, first review permitted use/processing, relevance and unique accepted content. Record publisher, edition, region, document type, source hash and original page IDs; separate tabular fitment retrieval from narrative technical passages. Count accepted source pages separately from downloaded pages and chunk counts. Test model/engine/year matching, tables, missing context, citations and unsupported-query abstention using independently labelled questions. A corpus with 513 physical pages does not automatically contain 513 useful ingested pages or demonstrate retrieval accuracy.
+
+A future résumé may describe a public manufacturer-document corpus after it is actually processed and tested. Public pages found now do not establish Yap Motor ownership/use, internship timing, multilingual EN/CN/JP coverage, 24 mechanics, 90% precision or six-month adoption. Parts catalogues must not be labelled repair manuals.
+
+Status: **research verified; ingestion not implemented**. No application code or provider/model calls changed. Current decision: public sources are available; business usefulness and the chosen project direction remain distinct questions.

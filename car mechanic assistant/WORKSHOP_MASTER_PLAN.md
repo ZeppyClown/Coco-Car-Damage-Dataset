@@ -1,6 +1,6 @@
 # Workshop job-sheet project — master plan and implementation ledger
 
-**Last updated:** 11 October 2026. **Current phase:** F01–F04 verified. Manual source/draft screen works at `/workshop`; next is F05 confirmation/history. Export/AI remain pending.
+**Last updated:** 11 October 2026. **Current phase:** F01–F05 verified. Manual capture, confirmation, history and corrections work at `/workshop`; next is F06 demonstration CSV. Export/AI remain pending.
 
 This is the authoritative implementation/handoff document for the workshop administrative project. Every contributor, including Codex and Claude, must update it for **every feature or implementation part**, including partial work, fixes, migrations, tests, configuration and changed decisions. Do not rely on chat history to resume the work.
 
@@ -8,7 +8,7 @@ The first product is a small local application that turns a permitted paper shee
 
 ## 1. Start here: the actual next task
 
-**Next ready task: F05 — reviewed snapshots, history and corrections.** F01–F04 schemas, drafts, images and manual screen are verified. Implement F05–F06 to produce the first complete manual workflow before adding AI. The user explicitly selected job-sheet capture/review; public-reference RAG remains separate research.
+**Next ready task: F06 — reproducible demonstration CSV.** F01–F05 schemas, drafts, images, manual screen and reviewed history are verified. Implement F06 to finish the first complete manual workflow before adding AI. The user explicitly selected job-sheet capture/review; public-reference RAG remains separate research.
 
 Do not start by scanning an archive, training a model, building a vector database or integrating the accounting system. None is required to demonstrate the core review workflow.
 
@@ -24,8 +24,8 @@ This milestone is a local demonstration. It does not claim company deployment, r
 2. Run `git status --short` and identify unrelated user work. On 11 October, `PROJECT_SUMMARY.md` is modified and `SYSTEM_DESIGN.md` is untracked; preserve both unless the user explicitly includes them in the task.
 3. Read the existing schema/session/router/test fixtures listed in section 5. Confirm actual paths before adding code.
 4. Check whether the private visit files exist locally. Their absence does not block a synthetic/manual prototype. Do not obtain company files from public search as replacements for actual evidence.
-5. Mark the next ready feature (currently F05) `IN_PROGRESS` and state the exact scope in the ledger below.
-6. Reuse the manual screen and existing revision model/schema. Add atomic confirmation/version checks, idempotent repeat confirmation, read-only history and correction/review flow; keep reviewer self-reporting explicit.
+5. Mark the next ready feature (currently F06) `IN_PROGRESS` and state the exact scope in the ledger below.
+6. Reuse reviewed revisions and private storage for deterministic demo CSV, a unique export identity and per-version download controls. Keep destination compatibility and reviewer self-reporting limits explicit.
 7. Update the ledger, verification table, next task and work log **before** committing. Commit only the intended files, then push as previously authorised by the user.
 
 ## 2. Business problem and scope
@@ -141,7 +141,7 @@ F01–F04 schema/test/fixture/router/service/UI paths below now exist. Extractio
 | Path | Purpose | First feature |
 |---|---|---|
 | `app/schemas/workshop.py` | F01 record/review validation plus F02 draft-update/job-response contracts; export schemas deferred until F06 | F01/F02 |
-| `app/services/workshop.py` | F02 create/read/replace draft and source/origin/version checks; review/export later | F02/F05/F06 |
+| `app/services/workshop.py` | F02 draft/source checks plus F03 image storage and F05 confirmation/history; F06 export next | F02/F05/F06 |
 | `app/api/v1/workshop.py` | F02 create/read/replace routes and default-disabled demo gate; image routes later | F02/F03 |
 | `app/templates/workshop.html` | F04 gated source/draft review page outside static mount; no HTML bypass when disabled | F04 |
 | `app/static/workshop.js` | Page actions and accessible feedback | F04 |
@@ -228,7 +228,7 @@ Add **WorkshopExport** in F06 when export exists: job/revision, format/mapping v
 
 [Models](../app/db/models.py) now include `WorkshopDocument`, `WorkshopJob` and `WorkshopJobRevision`. [Migration](../alembic/versions/20261011_workshop_drafts.py) is additive; timestamps use timezone-aware PostgreSQL columns, IDs are ORM-generated UUIDs, jobs persist an entire JSON-safe draft plus nullable source FK and version. A written Decimal is stored as its fixed two-decimal string. Assign/replace the JSON payload instead of mutating it in place.
 
-Revision storage has a job FK, positive version check and unique `(job_id, version)` constraint. It has no confirmation writer, access protection or database immutability trigger yet. F05 must write validated reviewed records and preserve snapshots; F12 supplies real user access controls. The document table is available for F03 but no source files are uploaded by F02.
+Revision storage has job/source FKs, a positive version check and unique `(job_id, version)`. F05 adds the confirmation writer and PostgreSQL UPDATE/DELETE rejection trigger; F12 still supplies real user access controls. F03 supplies actual source storage. Historical F02 checks alone did not establish these later features.
 
 The [router](../app/api/v1/workshop.py) uses the shared `get_db` session and [service](../app/services/workshop.py), gated by `WORKSHOP_ENABLED=false` by default. Disabled routes return 404. Enable only in a local isolated demonstration; the flag is not authentication.
 
@@ -253,6 +253,14 @@ JPEG/PNG only, single frame, decoded content/MIME/suffix agreement, 1 byte–8 M
 `WORKSHOP_STORAGE_DIR` defaults to ignored `car mechanic assistant/runtime/workshop/`, resolved outside `app/static`. Files use generated UUID keys, exclusive creation and private permissions; raw bytes are fsynced before DB commit. Duplicate checksums reuse the existing source only when origin matches and its file passes size/SHA-256 verification; concurrent duplicates retain one row/file. No job merge occurs. Database/write errors rollback and remove newly created files where cleanup succeeds. Missing/altered/unsafe stored paths fail preview/reuse with 503, without exposing a disk path.
 
 Known limit: a process crash between file creation and DB commit can leave an unreferenced file; F12 storage reconciliation/backup work must handle it. Byte deduplication does not detect a different photograph of the same sheet. Pillow 12.3.0 is declared in the root host requirements; no company images were used for checks.
+
+### Implemented F05 review and correction
+
+`POST /api/v1/workshop/jobs/{id}/confirm` requires strict positive `expected_version`, a nonblank self-reported `reviewer` and strict `acknowledged: true`; client timestamps/extra properties are rejected. It locks and refreshes the persisted job, rejects stale versions with 409, validates the full reviewed contract and verifies an attached source's hash/availability. It writes one snapshot with a server UTC timestamp. Repeat confirmation returns the original snapshot/reviewer/time. Confirmation does not increment the draft version or convert a quote to completed work.
+
+`GET /jobs/{id}/revisions` returns newest-first snapshots with default 20, maximum 100 and nonnegative offset. The UI shows read-only records, literal/cancelled rows and original-source links, with older-history pagination. Edits invalidate interpreted confirmation state, require saving a new draft version and then rereview; previous records remain unchanged. Failed validation/confirmation keeps the draft; a history read failure after a successful save is reported separately from the known save result.
+
+Additive revision `20261011_review_guard` follows `20261011_workshop`: source FK/backfill plus a PostgreSQL trigger rejecting snapshot UPDATE/DELETE. This source link prevents deleting the source row even after a newer draft detaches it. SQLite unit tests do not provide that DB trigger guarantee; actual PostgreSQL integration verifies it. A privileged DB administrator can change schema/disable triggers; local reviewer names are not authenticated identities. No production audit/adoption claim follows from these controls.
 
 ### Suggested API boundaries
 
@@ -284,7 +292,7 @@ Allowed statuses: `READY`, `IN_PROGRESS`, `IMPLEMENTED_UNVERIFIED`, `VERIFIED`, 
 | F02 | Workshop storage, models and migration | VERIFIED | F01 | Three tables, migration 20261011_workshop and create/read/replace routes; 133 total tests passed with real PostgreSQL; live app restart preserved draft |
 | F03 | Safe image attach/preview and duplicate warning | VERIFIED | F02 | 16 new cases plus live upload/preview/duplicate/chunked-limit checks; full suite 149 passed |
 | F04 | Manual source/draft review screen | VERIFIED | F01–F03 | Gated page/ordinary JS/CSS; Chrome browser flow and failure retention passed; Python suite 150 passed |
-| F05 | Confirmation, immutable revisions and conflict handling | READY — next | F02/F04 | Separate review state from repair stage; no confirmation service/UI yet |
+| F05 | Confirmation, immutable revisions and conflict handling | VERIFIED | F02/F04 | Atomic/idempotent confirmation, bounded read-only history, corrections, source FK and PG mutation guard; local self-reported reviewer |
 | F06 | Reproducible demonstration CSV output | READY | F05 | Demo-only mapping; deterministic output/export identity |
 | F07 | Optional AI image-to-draft extraction | READY for mocks; real source use conditional | F03–F06 | Provider/permission checks before real uploaded records |
 | F08 | Reviewed diagram/shorthand interpretation | WAITING_COMPANY for real labels | F04/F07 | Manual annotation can work now; meaning cannot be fabricated |
@@ -356,6 +364,8 @@ If a feature takes several turns, add subrows such as `F03.a upload validation` 
 **Checks:** incomplete draft can save but cannot confirm; repeated unchanged confirmation does not duplicate; stale edit/confirm returns conflict; two concurrent confirmations produce one correct result; old snapshot survives correction; reviewed quote stays a quote. Usernames typed into a local demo are self-reported reviewers, not authenticated identities; label that limitation until F12.
 
 **Completion:** draft → review → correction → rereview is demonstrable; immutable versions and conflict behaviour verified. Do not claim a compliance-grade audit trail from a local self-reported reviewer.
+
+**Delivered:** VERIFIED on 11 October 2026. API, row locking/idempotence, source retention, PG guard, bounded history and manual correction/rereview UI tested using fictional records. See register/work log for exact checks and limits.
 
 ### F06 — demo CSV and export identity
 
@@ -592,6 +602,10 @@ If interrupted mid-feature, record what exists, what is broken/unverified, the l
 | 11 October 2026 | F04 Python regression | Explicit local test URL + pytest tests | 150 passed, no skips, 101 warnings | One new page/gate/assets check; DB checks still enabled |
 | 11 October 2026 | F04 rendered manual workflow | `node tests/browser/workshop.cjs ...` against task server | Attach, validation retention, save/reload, Unicode/Decimal text, unchanged rotated/zoomed source, keyboard, stale/503 retention, mobile width, untrusted note rendering passed | Chrome desktop/390px viewport only; no operator usability/baseline measurement |
 
+| 11 October 2026 | F05 review/source-retention regression | Explicit local PG URL + `.venv/bin/python -m pytest -q --disable-warnings` | **167 passed, no skips, 115 warnings** | 17 F05 cases added; fictional inputs; dependency/deprecation warnings remain |
+| 11 October 2026 | F05 isolated API environment | Clean root requirements env + workshop unit/integration pytest | **94 passed, 34 warnings** | No assistant/RAG dependencies in this environment |
+| 11 October 2026 | F05 migration/browser/privacy | CLI upgrade/head alignment; isolated Chrome harness; original hashes/ignore/whitespace | No new Alembic operations; confirmation/correction/history/idempotence browser checks passed; 18 originals unchanged/ignored | PG14.20 task DB only; no authenticated identity or company trial |
+
 Replace vague “tests pass” with the command, counts, skipped checks and test environment. PostgreSQL integration is skipped without its explicit disposable test URL; do not present a skipped test as passed.
 
 ### Commands to adapt during implementation
@@ -644,11 +658,11 @@ Record a question as resolved only when there is an actual answer. An elapsed wa
 ## 15. Current handoff snapshot
 
 - **Branch/repository:** `main`, remote `origin` is the user's existing GitHub repository. Verify actual remote before pushing on a different machine.
-- **Previous delivery before F04:** `ebf3209`, verified bounded source handling. Read Git history for the final F04 commit hash.
+- **Previous delivery before F05:** `e99e054`, verified manual screen. Read Git history for the final F05 commit hash.
 - **What exists:** current automotive API/RAG, visit review/planning material, F01 schemas/fictional fixtures and F02 workshop models/migration/draft service/API/tests.
-- **Latest implementation:** F04 adds the gated manual page, source view controls, explicit record/item fields, draft save/reopen and error retention. Python suite: 150 passed with PostgreSQL; isolated Chrome flow and desktop/mobile renders checked.
-- **What does not exist:** confirmation/immutable-snapshot service, output/search/AI extraction, real benchmark/mapping or permitted company pilot.
-- **Next ready feature:** F05 confirmation/history/corrections, then F06 demonstration CSV.
+- **Latest implementation:** F05 adds atomic confirmation, immutable reviewed snapshots, read-only history and correction/rereview. Review source links survive detachment from later drafts; the PG guard rejects mutation. Browser confirmation/correction checks passed; see verification register for final test counts.
+- **What does not exist:** output/search/AI extraction, real benchmark/mapping or permitted company pilot.
+- **Next ready feature:** F06 demonstration CSV; then optional mocked extraction and confirmed-record lookup.
 - **Independent work available:** safe source attach/preview, local manual UI, confirmation, demo output and later mocked extraction; lack of company access does not block these.
 - **Unrelated changes to preserve:** root `PROJECT_SUMMARY.md` and `SYSTEM_DESIGN.md` as seen on this machine; verify current status rather than assuming it remains identical.
 - **Open decisions:** real output mapping, model-processing path, operator and expected labels. None should be fabricated.
@@ -659,8 +673,8 @@ Record a question as resolved only when there is an actual answer. An elapsed wa
 Continue the workshop job-sheet project in this repository. Read AGENTS.md,
 CLAUDE.md and car mechanic assistant/WORKSHOP_MASTER_PLAN.md first.
 Treat the master plan as the current implementation ledger. Inspect Git status
-and preserve unrelated user work. F01–F04 are verified. Start with F05
-confirmation/history/corrections, then finish F06 demo CSV. Use synthetic examples until
+and preserve unrelated user work. F01–F05 are verified. Start with F06
+reproducible demo CSV from reviewed snapshots. Use synthetic examples until
 real-data prerequisites are met. Keep company visit files and runtime artifacts
 private. After every implementation part, update the master with actual files,
 behaviour, tests, limitations and next task; commit the intended changes and
@@ -762,3 +776,15 @@ The assessment separates physical/parsable/quality-approved/indexed pages, class
 - **Company questions:** pending Q01–Q10 recorded; no answer blocks F05/F06 development.
 - **Commit/push:** intended code/browser/route tests and documentation increment; read Git history for delivery hash. User's unrelated files preserved.
 - **Next:** F05 atomic confirmation/history/correction UI and concurrency/idempotence checks; F06 deterministic demo CSV afterward.
+
+
+### 11 October 2026 — F05, reviewed snapshots and corrections
+
+- **Status:** VERIFIED; F06 demo CSV next.
+- **Files/routes:** schemas/service/router, revision model plus additive `20261011_review_guard`, manual HTML/JS/CSS, `tests/unit/test_workshop_review.py`, PostgreSQL tests and browser harness. POST confirm and GET bounded revision history; no new runtime dependency/config.
+- **Behaviour:** explicit acknowledgement/reviewer/version, locked fresh persisted draft, reviewed-contract/source integrity checks, server UTC time and repeat-confirm identity. Source FK/backfill prevents deleting a reviewed source after draft detachment. PostgreSQL rejects reviewed-row UPDATE/DELETE. Read-only paginated history includes original sources/literal/cancelled rows; corrections create newer drafts and require rereview. Known successful saves are distinguished from failed history reads.
+- **Verification:** final whole suite **167 passed/no skips/115 warnings** with PostgreSQL; clean API-only environment **94 passed/34 warnings**. Actual concurrent confirmations, stale cached ORM state, correction history, mutation guard, source FK and old-schema source backfill checked. Normal Alembic head/check aligned. Isolated Chrome flow passed acknowledgement, unresolved-field rejection, version 2 → corrected version 4 history preservation and repeat confirmation; reviewed-history screenshot inspected. Original 18 source hashes unchanged/ignored; intended diff whitespace checked.
+- **Failure resolved:** migration preservation test initially called current ORM against a pre-column schema. It now inserts through reflected historical table shape and verifies actual source backfill plus unchanged snapshot/reviewer/time; final rerun passed.
+- **Limits:** demo-only reviewer self-report and no authentication, CSV/lookup/AI or company semantic evaluation yet. PG trigger is not enforced by SQLite and does not resist a privileged schema administrator. No tax/total inference, accounting write or stage promotion. Company questions Q01–Q10 remain pending without blocking F06.
+- **Commit/push:** intended implementation/tests/master/build/readme increment on main; read Git history for hash. Unrelated `PROJECT_SUMMARY.md`/`SYSTEM_DESIGN.md` preserved.
+- **Next:** F06 deterministic demo CSV from a specific reviewed revision, private reproducible output identity/checksum, formula-safe cells and per-version downloads; complete manual milestone using fictional sources.

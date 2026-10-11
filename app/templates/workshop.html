@@ -51,8 +51,19 @@
         <h3>Literal notes</h3><div id="raw-fields"></div>
       </details>
       <div class="save-bar"><button type="submit" id="save-draft">Save draft</button><span id="dirty-label">No unsaved changes</span></div>
+      <section class="review-controls" aria-labelledby="review-heading">
+        <h3 id="review-heading">Confirm a saved version</h3>
+        <p class="hint">Save first. Check the source and every interpreted value, including its review state. Confirming a quote keeps it a quote.</p>
+        <label>Reviewer name (self-reported demo identity)<input id="reviewer" maxlength="200" autocomplete="off"></label>
+        <label><input id="review-ack" type="checkbox">I checked the interpreted values against the source or stated clarification.</label>
+        <button type="button" id="confirm-record" disabled>Confirm saved draft</button>
+      </section>
     </form>
   </div>
+  <section class="card history-panel" aria-labelledby="history-heading">
+    <h2 id="history-heading">Reviewed history</h2><p id="review-state">No record opened.</p>
+    <div id="reviewed-history"></div><button type="button" id="more-history" hidden>Older reviewed versions</button>
+  </section>
 </main>
 </body>
 </html>

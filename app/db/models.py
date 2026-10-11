@@ -325,6 +325,7 @@ class WorkshopJobRevision(Base):
 
     id = Column(Uuid, primary_key=True, default=uuid4)
     job_id = Column(Uuid, ForeignKey("workshop_jobs.id"), nullable=False)
+    source_document_id = Column(Uuid, ForeignKey("workshop_documents.id"))
     version = Column(Integer, nullable=False)
     record = Column(JSON, nullable=False)
     reviewer = Column(String(200), nullable=False)

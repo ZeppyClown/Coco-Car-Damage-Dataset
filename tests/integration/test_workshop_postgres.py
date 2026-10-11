@@ -10,17 +10,18 @@ from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.migration import MigrationContext
+from alembic.script import ScriptDirectory
 from fastapi import HTTPException
 import pytest
-from sqlalchemy import create_engine, inspect, select, text
+from sqlalchemy import create_engine, inspect, select, text, Table, MetaData
 from sqlalchemy.engine import make_url
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, DBAPIError
 from sqlalchemy.orm import Session
 
 from app.db.models import Base, Vehicle, WorkshopJob, WorkshopJobRevision
-from app.schemas.workshop import WorkshopDraft, WorkshopDraftUpdate
+from app.schemas.workshop import WorkshopDraft, WorkshopDraftUpdate, WorkshopConfirmRequest
 from app.services.workshop import create_job, get_job, update_job
-from app.services.workshop import attach_document
+from app.services.workshop import attach_document, confirm_job, list_revisions
 from app.core.config import settings
 from app.db.models import WorkshopDocument
 
@@ -64,7 +65,7 @@ def test_additive_migration_alignment_and_existing_data(workshop_postgres, previ
             db.commit()
     migrate(engine)
     with engine.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20261011_workshop"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == ScriptDirectory.from_config(Config("alembic.ini")).get_current_head()
         assert {"workshop_documents", "workshop_jobs", "workshop_job_revisions"} <= set(inspect(connection).get_table_names())
         assert compare_metadata(MigrationContext.configure(connection), Base.metadata) == []
     if previous_head:
@@ -168,3 +169,104 @@ def test_concurrent_identical_sources_reuse_one_row_and_file(workshop_postgres, 
     assert len(list(settings.WORKSHOP_STORAGE_DIR.iterdir())) == 1
     with Session(engine) as db:
         assert len(db.scalars(select(WorkshopDocument)).all()) == 1
+
+
+def reviewed_fixture():
+    import json
+    data = json.loads((Path(__file__).parents[1] / "fixtures/workshop/examples.json").read_text())
+    return WorkshopDraft.model_validate(data["examples"][0]["record"])
+
+
+def test_simultaneous_confirmation_is_one_immutable_revision(workshop_postgres):
+    engine = workshop_postgres
+    migrate(engine)
+    with Session(engine) as db:
+        job_id = create_job(db, reviewed_fixture()).id
+    barrier = Barrier(2)
+    def confirm(name):
+        with Session(engine) as db:
+            barrier.wait(timeout=10)
+            return confirm_job(db, job_id, WorkshopConfirmRequest(expected_version=1, reviewer=name, acknowledged=True))
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(confirm, ["Fictional A", "Fictional B"]))
+    assert results[0].model_dump() == results[1].model_dump()
+    with Session(engine) as db:
+        revisions = list_revisions(db, job_id)
+        assert len(revisions) == 1
+        assert revisions[0].record.record_stage == "quote"
+    for operation in ("UPDATE workshop_job_revisions SET reviewer='tampered'", "DELETE FROM workshop_job_revisions"):
+        with pytest.raises(DBAPIError, match="Reviewed revisions cannot change"):
+            with engine.begin() as connection:
+                connection.execute(text(operation))
+    with Session(engine) as db:
+        assert list_revisions(db, job_id)[0].model_dump() == results[0].model_dump()
+
+
+def test_stale_cached_job_cannot_confirm_and_correction_preserves_history(workshop_postgres):
+    engine = workshop_postgres
+    migrate(engine)
+    draft = reviewed_fixture()
+    with Session(engine) as db:
+        job_id = create_job(db, draft).id
+    with Session(engine) as stale, Session(engine) as other:
+        cached = get_job(stale, job_id)
+        assert cached.draft_version == 1
+        draft.job_reference = "DEMO-CORRECTED"
+        update_job(other, job_id, WorkshopDraftUpdate(expected_version=1, draft=draft))
+        with pytest.raises(HTTPException) as error:
+            confirm_job(stale, job_id, WorkshopConfirmRequest(expected_version=1, reviewer="Fictional", acknowledged=True))
+        assert error.value.status_code == 409
+        revision = confirm_job(stale, job_id, WorkshopConfirmRequest(expected_version=2, reviewer="Fictional", acknowledged=True))
+        assert revision.record.job_reference == "DEMO-CORRECTED"
+        draft.job_reference = "DEMO-THIRD"
+        update_job(other, job_id, WorkshopDraftUpdate(expected_version=2, draft=draft))
+        assert list_revisions(stale, job_id)[0].record.job_reference == "DEMO-CORRECTED"
+
+
+def test_review_guard_upgrade_preserves_existing_snapshot(workshop_postgres, tmp_path, monkeypatch):
+    engine = workshop_postgres
+    migrate(engine, "20261011_workshop")
+    monkeypatch.setattr(settings, "WORKSHOP_STORAGE_DIR", tmp_path)
+    draft = reviewed_fixture()
+    revision_id = uuid4()
+    reviewed_at = datetime.now(timezone.utc)
+    with Session(engine) as db:
+        content = (Path(__file__).parents[1] / "fixtures/workshop/synthetic-sheet.png").read_bytes()
+        source = attach_document(db, content, "demo.png", "image/png", "synthetic_demo")
+        draft.source_document_id = source.id
+        job_id = create_job(db, draft).id
+    # Insert using the old table shape; current ORM requires the new source column.
+    previous = Table("workshop_job_revisions", MetaData(), autoload_with=engine)
+    with engine.begin() as connection:
+        connection.execute(previous.insert().values(
+            id=revision_id, job_id=job_id, version=1, record=draft.model_dump(mode="json"),
+            reviewer="Fictional migration reviewer", reviewed_at=reviewed_at,
+        ))
+    migrate(engine)
+    with Session(engine) as db:
+        revision = list_revisions(db, job_id)[0]
+        assert revision.id == revision_id and revision.reviewed_at == reviewed_at
+        assert revision.record.model_dump(mode="json") == draft.model_dump(mode="json")
+        assert revision.reviewer == "Fictional migration reviewer"
+        assert db.get(WorkshopJobRevision, revision_id).source_document_id == source.id
+
+
+def test_detaching_current_source_cannot_delete_reviewed_source(workshop_postgres, tmp_path, monkeypatch):
+    engine = workshop_postgres
+    migrate(engine)
+    monkeypatch.setattr(settings, "WORKSHOP_STORAGE_DIR", tmp_path)
+    content = (Path(__file__).parents[1] / "fixtures/workshop/synthetic-sheet.png").read_bytes()
+    with Session(engine) as db:
+        source = attach_document(db, content, "demo.png", "image/png", "synthetic_demo")
+        draft = reviewed_fixture()
+        draft.source_document_id = source.id
+        job_id = create_job(db, draft).id
+        confirm_job(db, job_id, WorkshopConfirmRequest(expected_version=1, reviewer="Fictional", acknowledged=True))
+        draft.source_document_id = None
+        update_job(db, job_id, WorkshopDraftUpdate(expected_version=1, draft=draft))
+        assert db.scalar(select(WorkshopJobRevision)).source_document_id == source.id
+    with pytest.raises(IntegrityError):
+        with engine.begin() as connection:
+            connection.execute(WorkshopDocument.__table__.delete().where(WorkshopDocument.id == source.id))
+    with Session(engine) as db:
+        assert db.get(WorkshopDocument, source.id) is not None

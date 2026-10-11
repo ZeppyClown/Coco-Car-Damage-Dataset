@@ -1,8 +1,9 @@
-"""Local draft persistence; review/export and authentication are later features."""
+"""Local source, draft and reviewed history; exports/authentication come later."""
 from uuid import UUID, uuid4
 from hashlib import sha256
 from io import BytesIO
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import HTTPException
@@ -10,10 +11,14 @@ from sqlalchemy import update, func, select
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from sqlalchemy.orm import Session
 from PIL import Image, UnidentifiedImageError
+from pydantic import ValidationError
 
-from app.db.models import WorkshopDocument, WorkshopJob
+from app.db.models import WorkshopDocument, WorkshopJob, WorkshopJobRevision
 from app.core.config import settings
-from app.schemas.workshop import WorkshopDraft, WorkshopDraftUpdate, WorkshopDocumentResponse, DataOrigin
+from app.schemas.workshop import (
+    WorkshopDraft, WorkshopDraftUpdate, WorkshopDocumentResponse, DataOrigin,
+    WorkshopConfirmRequest, WorkshopReviewedDraft, WorkshopRevisionResponse,
+)
 
 
 MAX_UPLOAD_BYTES = 8 * 1024 * 1024
@@ -177,3 +182,61 @@ def update_job(db: Session, job_id: UUID, request: WorkshopDraftUpdate) -> Works
         raise
     db.refresh(job)
     return job
+
+
+def _revision_response(revision: WorkshopJobRevision) -> WorkshopRevisionResponse:
+    reviewed_at = revision.reviewed_at
+    # SQLite drops timezone metadata; test/local timestamps are written in UTC.
+    if reviewed_at.tzinfo is None:
+        reviewed_at = reviewed_at.replace(tzinfo=timezone.utc)
+    reviewed_at = reviewed_at.astimezone(timezone.utc)
+    return WorkshopRevisionResponse(
+        id=revision.id, job_id=revision.job_id, version=revision.version,
+        record=revision.record, reviewer=revision.reviewer, reviewed_at=reviewed_at,
+    )
+
+
+def list_revisions(db: Session, job_id: UUID, limit: int = 20, offset: int = 0):
+    get_job(db, job_id)
+    revisions = db.scalars(select(WorkshopJobRevision).where(WorkshopJobRevision.job_id == job_id)
+                           .order_by(WorkshopJobRevision.version.desc()).limit(limit).offset(offset))
+    return [_revision_response(revision) for revision in revisions]
+
+
+def confirm_job(db: Session, job_id: UUID, request: WorkshopConfirmRequest):
+    try:
+        job = db.scalar(select(WorkshopJob).where(WorkshopJob.id == job_id).with_for_update()
+                        .execution_options(populate_existing=True))
+        if job is None:
+            raise HTTPException(status_code=404, detail="Workshop job not found")
+        if job.draft_version != request.expected_version:
+            raise HTTPException(status_code=409, detail="Draft changed; reload before confirming")
+        existing = db.scalar(select(WorkshopJobRevision).where(
+            WorkshopJobRevision.job_id == job_id, WorkshopJobRevision.version == job.draft_version))
+        if existing is not None:
+            response = _revision_response(existing)
+            db.commit()
+            return response
+        try:
+            record = WorkshopReviewedDraft.model_validate(job.draft)
+        except ValidationError as error:
+            raise HTTPException(status_code=422, detail=[
+                {"loc": ["draft", *issue["loc"]], "msg": issue["msg"], "type": issue["type"]}
+                for issue in error.errors()
+            ]) from None
+        _validate_source(db, record)
+        if record.source_document_id is not None:
+            document_file(get_document(db, record.source_document_id))
+        revision = WorkshopJobRevision(
+            job_id=job.id, version=job.draft_version, record=record.model_dump(mode="json"),
+            source_document_id=record.source_document_id,
+            reviewer=request.reviewer, reviewed_at=datetime.now(timezone.utc),
+        )
+        db.add(revision)
+        db.flush()
+        response = _revision_response(revision)
+        db.commit()
+        return response
+    except (SQLAlchemyError, HTTPException):
+        db.rollback()
+        raise

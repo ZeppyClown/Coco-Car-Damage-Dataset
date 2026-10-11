@@ -112,7 +112,7 @@ class WorkshopDraft(_WorkshopSchema):
 
 
 class WorkshopReviewedDraft(WorkshopDraft):
-    """Validation gate; database snapshot immutability is a later service feature."""
+    """Ready-record contract used by atomic confirmation."""
 
     @model_validator(mode="after")
     def ready_for_reviewed_record(self):
@@ -172,3 +172,19 @@ class WorkshopDocumentResponse(_WorkshopSchema):
     byte_size: int
     data_origin: DataOrigin
     duplicate: bool
+
+
+class WorkshopConfirmRequest(_WorkshopSchema):
+    expected_version: int = Field(ge=1, strict=True)
+    reviewer: Reference
+    acknowledged: bool = Field(strict=True)
+
+    @model_validator(mode="after")
+    def require_acknowledgement(self):
+        if not self.acknowledged:
+            raise ValueError("Explicit review acknowledgement is required")
+        return self
+
+
+class WorkshopRevisionResponse(WorkshopReviewedRevision):
+    id: UUID

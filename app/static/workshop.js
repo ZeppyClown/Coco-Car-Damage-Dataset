@@ -11,7 +11,7 @@ const scalarFields = [
   ["written_grand_total", "Written grand total", "money"],
 ];
 const rawFields = [["date_note_raw", "Literal date note"], ["diagram_notes_raw", "Literal diagram / panel notes"], ["written_totals_raw", "Literal total / adjustment notes"]];
-let job = null, sourceId = null, dirty = false, zoom = 1, rotation = 0;
+let job = null, sourceId = null, dirty = false, zoom = 1, rotation = 0, reviewed = [];
 
 function element(tag, text) { const node = document.createElement(tag); if (text) node.textContent = text; return node; }
 function control(parent, id, labelText, type = "text", limit = 200) {
@@ -29,7 +29,10 @@ function stateControl(parent, id, labelText) {
   for (const state of states) { const option = element("option", state); option.value = state; select.append(option); }
   label.append(select); parent.append(label); return select;
 }
-function markDirty() { dirty = true; $("dirty-label").textContent = "Unsaved changes"; }
+function markDirty() {
+  dirty = true; $("dirty-label").textContent = "Unsaved changes";
+  $("confirm-record").disabled = true; $("review-ack").checked = false;
+}
 function watchValue(input, state) {
   input.addEventListener("input", () => { state.value = input.value.trim() ? "proposed" : "missing"; markDirty(); });
 }
@@ -99,6 +102,41 @@ function render(record = { data_origin: "synthetic_demo", items: [] }) {
   $("source-file").value = "";
   $("record-identity").textContent = job ? `Job ID: ${job.id} · editable draft version ${job.draft_version}` : "New, unsaved draft";
   $("open-id").value = job?.id || ""; showSource();
+  $("review-ack").checked = false; $("confirm-record").disabled = !job;
+}
+function renderHistory() {
+  const container = $("reviewed-history"); container.replaceChildren();
+  const current = reviewed.find(revision => revision.version === job?.draft_version);
+  $("review-state").textContent = !job ? "No record opened." : current ? "This saved draft version has been reviewed. Edit and save to create a correction; earlier snapshots remain unchanged." : "This draft version has not been reviewed.";
+  for (const revision of reviewed) {
+    const details = element("details"); const record = revision.record;
+    const stages = { quote: "Quote", approved_scope: "Approved scope", completed_work: "Completed work" };
+    details.append(element("summary", `Reviewed version ${revision.version} · ${stages[record.record_stage]} · ${record.job_reference}`));
+    details.append(element("p", `Reviewer: ${revision.reviewer} (self-reported) · ${new Date(revision.reviewed_at).toLocaleString()}`));
+    for (const [name, label] of scalarFields) if (record[name] != null) details.append(element("p", label + ": " + record[name]));
+    for (const [name, label] of rawFields) if (record[name]) details.append(element("pre", label + ": " + record[name]));
+    for (const item of record.items) {
+      details.append(element("pre", (item.cancelled ? "Cancelled row" : "Reviewed item") + ": " + (item.description || "Unknown description") +
+        "\nLiteral text: " + item.description_raw + "\nAmount: " + (item.amount ?? "Unknown") + (record.currency ? " " + record.currency : "") + "\nLiteral amount: " + item.amount_raw));
+    }
+    if (record.source_document_id) {
+      const source = element("a", "Open this version's original source");
+      source.href = api + "/documents/" + encodeURIComponent(record.source_document_id) + "/preview"; source.target = "_blank"; source.rel = "noopener"; details.append(source);
+    } else details.append(element("p", "Manual provenance: " + record.manual_provenance));
+    container.append(details);
+  }
+}
+async function refreshHistory(append = false) {
+  if (!job) { reviewed = []; $("more-history").hidden = true; renderHistory(); return; }
+  if (!append) { reviewed = []; $("reviewed-history").replaceChildren(); $("review-state").textContent = "Loading reviewed history…"; }
+  let rows;
+  try { rows = await request("/jobs/" + job.id + "/revisions?limit=20&offset=" + (append ? reviewed.length : 0)); }
+  catch (error) { $("review-state").textContent = "Reviewed history could not load. Reopen the record to retry."; throw error; }
+  reviewed = append ? reviewed.concat(rows) : rows; $("more-history").hidden = rows.length < 20; renderHistory();
+}
+async function historyStatus(message) {
+  try { await refreshHistory(); status(message); }
+  catch (error) { status(message + " Reviewed history could not load: " + error.message, true); }
 }
 function status(message, error = false) { $("status").textContent = message; $("status").classList.toggle("error", error); }
 async function request(path, options = {}) {
@@ -114,17 +152,18 @@ async function action(task) {
   const controls = [...document.querySelectorAll("button,input,select,textarea")].map(node => [node, node.disabled]);
   controls.forEach(([node]) => node.disabled = true);
   try { await task(); } catch (error) { status(error.message || "Request failed. Your draft remains on screen.", true); }
-  finally { controls.forEach(([node, disabled]) => node.disabled = disabled); $("data-origin").disabled = Boolean(job); $("add-item").disabled = $("items").children.length >= 50; }
+  finally { controls.forEach(([node, disabled]) => node.disabled = disabled); $("data-origin").disabled = Boolean(job); $("add-item").disabled = $("items").children.length >= 50; $("confirm-record").disabled = !job || dirty; }
 }
-$("draft-form").addEventListener("input", markDirty);
-$("draft-form").addEventListener("change", markDirty);
+function draftChanged(event) { if (!event.target.closest(".review-controls")) markDirty(); }
+$("draft-form").addEventListener("input", draftChanged);
+$("draft-form").addEventListener("change", draftChanged);
 $("data-origin").addEventListener("change", markDirty);
 $("add-item").addEventListener("click", () => { addItem(); markDirty(); });
-$("new-record").addEventListener("click", () => { if (!dirty || window.confirm("Discard unsaved changes and start a new record?")) { job = null; render(); status("New draft. No saved record was deleted."); } });
+$("new-record").addEventListener("click", () => { if (!dirty || window.confirm("Discard unsaved changes and start a new record?")) { job = null; render(); refreshHistory(); history.replaceState(null, "", "/workshop"); status("New draft. No saved record was deleted."); } });
 $("open-record").addEventListener("click", () => {
   if (dirty && !window.confirm("Discard unsaved changes and open another record?")) return;
   const id = $("open-id").value.trim(); if (!id) return status("Enter a saved job ID.", true);
-  action(async () => { const loaded = await request("/jobs/" + encodeURIComponent(id)); job = loaded; render(job.draft); status("Loaded editable draft version " + job.draft_version + "."); });
+  action(async () => { const loaded = await request("/jobs/" + encodeURIComponent(id)); job = loaded; render(job.draft); await historyStatus("Loaded editable draft version " + job.draft_version + "."); });
 });
 $("draft-form").addEventListener("submit", event => {
   event.preventDefault(); const draft = readDraft();
@@ -132,7 +171,7 @@ $("draft-form").addEventListener("submit", event => {
     const payload = job ? { expected_version: job.draft_version, draft } : draft;
     const saved = await request(job ? "/jobs/" + job.id : "/jobs", { method: job ? "PATCH" : "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload) });
     job = saved; render(job.draft); history.replaceState(null, "", "/workshop?job=" + encodeURIComponent(job.id));
-    status("Draft saved. Copy the job ID to reopen it. It has not been reviewed.");
+    await historyStatus("Draft saved. Copy the job ID to reopen it. It has not been reviewed.");
   });
 });
 $("attach-source").addEventListener("click", () => {
@@ -141,6 +180,17 @@ $("attach-source").addEventListener("click", () => {
   action(async () => { const source = await request("/documents", { method: "POST", body: data }); sourceId = source.id; showSource(); markDirty(); status(source.duplicate ? "These bytes already exist; reused the source. Jobs were not merged. Save the draft to retain this attachment." : "Source attached. Save the draft to retain this attachment."); });
 });
 $("detach-source").addEventListener("click", () => { sourceId = null; showSource(); markDirty(); status("Detached from this draft; the stored source was not deleted."); });
+$("confirm-record").addEventListener("click", () => {
+  if (!job || dirty) return status("Save the draft before confirming.", true);
+  const reviewer = $("reviewer").value.trim();
+  if (!reviewer || !$("review-ack").checked) return status("Enter your reviewer name and acknowledge checking the values.", true);
+  action(async () => {
+    const revision = await request("/jobs/" + job.id + "/confirm", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ expected_version: job.draft_version, reviewer, acknowledged: true }) });
+    $("review-ack").checked = false;
+    await historyStatus(`Saved reviewed version ${revision.version}. This preserves its selected stage; it does not create an invoice or completed repair.`);
+  });
+});
+$("more-history").addEventListener("click", () => action(() => refreshHistory(true)));
 $("zoom-in").addEventListener("click", () => { zoom = Math.min(3, zoom + .25); viewImage(); });
 $("zoom-out").addEventListener("click", () => { zoom = Math.max(.25, zoom - .25); viewImage(); });
 $("rotate-source").addEventListener("click", () => { rotation = (rotation + 90) % 360; viewImage(); });
@@ -149,5 +199,6 @@ $("source-image").addEventListener("error", () => status("Source preview could n
 window.addEventListener("resize", viewImage);
 window.addEventListener("beforeunload", event => { if (dirty) { event.preventDefault(); event.returnValue = ""; } });
 render();
+renderHistory();
 const initialJob = new URLSearchParams(location.search).get("job");
 if (initialJob) { $("open-id").value = initialJob; $("open-record").click(); }

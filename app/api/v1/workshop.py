@@ -1,13 +1,13 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.session import get_db
-from app.schemas.workshop import WorkshopDraft, WorkshopDraftUpdate, WorkshopJobResponse, WorkshopDocumentResponse, DataOrigin
-from app.services.workshop import create_job, get_job, update_job, attach_document, get_document, document_file, MAX_UPLOAD_BYTES
+from app.schemas.workshop import WorkshopDraft, WorkshopDraftUpdate, WorkshopJobResponse, WorkshopDocumentResponse, DataOrigin, WorkshopConfirmRequest, WorkshopRevisionResponse
+from app.services.workshop import create_job, get_job, update_job, attach_document, get_document, document_file, MAX_UPLOAD_BYTES, confirm_job, list_revisions
 
 
 def require_workshop_enabled():
@@ -47,3 +47,13 @@ def read_draft(job_id: UUID, db: Session = Depends(get_db)):
 @router.patch("/jobs/{job_id}", response_model=WorkshopJobResponse)
 def replace_draft(job_id: UUID, request: WorkshopDraftUpdate, db: Session = Depends(get_db)):
     return update_job(db, job_id, request)
+
+
+@router.post("/jobs/{job_id}/confirm", response_model=WorkshopRevisionResponse)
+def confirm_draft(job_id: UUID, request: WorkshopConfirmRequest, db: Session = Depends(get_db)):
+    return confirm_job(db, job_id, request)
+
+
+@router.get("/jobs/{job_id}/revisions", response_model=list[WorkshopRevisionResponse])
+def read_revisions(job_id: UUID, limit: int = Query(20, ge=1, le=100), offset: int = Query(0, ge=0), db: Session = Depends(get_db)):
+    return list_revisions(db, job_id, limit, offset)

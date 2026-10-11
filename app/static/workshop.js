@@ -11,7 +11,7 @@ const scalarFields = [
   ["written_grand_total", "Written grand total", "money"],
 ];
 const rawFields = [["date_note_raw", "Literal date note"], ["diagram_notes_raw", "Literal diagram / panel notes"], ["written_totals_raw", "Literal total / adjustment notes"]];
-let job = null, sourceId = null, dirty = false, zoom = 1, rotation = 0, reviewed = [];
+let job = null, sourceId = null, aiProvenance = null, dirty = false, zoom = 1, rotation = 0, reviewed = [];
 
 function element(tag, text) { const node = document.createElement(tag); if (text) node.textContent = text; return node; }
 function control(parent, id, labelText, type = "text", limit = 200) {
@@ -65,7 +65,7 @@ function addItem(item = {}) {
 }
 function readDraft() {
   const draft = { data_origin: $("data-origin").value, source_document_id: sourceId, record_stage: $("record-stage").value,
-    manual_provenance: $("manual-provenance").value.trim() || null, field_states: {}, items: [] };
+    manual_provenance: $("manual-provenance").value.trim() || null, ai_provenance: aiProvenance, field_states: {}, items: [] };
   for (const [name] of scalarFields) { draft[name] = $(name).value.trim() || null; draft.field_states[name] = $(name + "-state").value; }
   for (const [name] of rawFields) draft[name] = $(name).value;
   for (const card of $("items").children) {
@@ -93,6 +93,8 @@ function showSource() {
   else { image.removeAttribute("src"); $("image-stage").style.height = "0px"; }
 }
 function render(record = { data_origin: "synthetic_demo", items: [] }) {
+  aiProvenance = record.ai_provenance || null; $("ai-send-ack").checked = false;
+  $("ai-provenance").textContent = aiProvenance ? `Initial AI proposal: ${aiProvenance.model} · ${aiProvenance.prompt_version} · source ${aiProvenance.source_document_id}. Review every value; this is not an accuracy result.` : "";
   sourceId = record.source_document_id || null; $("data-origin").value = record.data_origin; $("data-origin").disabled = Boolean(job);
   $("record-stage").value = record.record_stage || "unknown"; $("manual-provenance").value = record.manual_provenance || "";
   for (const [name] of scalarFields) { $(name).value = record[name] ?? ""; $(name + "-state").value = record.field_states?.[name] || (record[name] == null ? "missing" : "proposed"); }
@@ -113,6 +115,7 @@ function renderHistory() {
     const stages = { quote: "Quote", approved_scope: "Approved scope", completed_work: "Completed work" };
     details.append(element("summary", `Reviewed version ${revision.version} · ${stages[record.record_stage]} · ${record.job_reference}`));
     details.append(element("p", `Reviewer: ${revision.reviewer} (self-reported) · ${new Date(revision.reviewed_at).toLocaleString()}`));
+    if (record.ai_provenance) details.append(element("p", `Initial AI proposal: ${record.ai_provenance.model} · ${record.ai_provenance.prompt_version} · source ${record.ai_provenance.source_document_id}`));
     for (const [name, label] of scalarFields) if (record[name] != null) details.append(element("p", label + ": " + record[name]));
     for (const [name, label] of rawFields) if (record[name]) details.append(element("pre", label + ": " + record[name]));
     for (const item of record.items) {
@@ -192,6 +195,20 @@ $("attach-source").addEventListener("click", () => {
   action(async () => { const source = await request("/documents", { method: "POST", body: data }); sourceId = source.id; showSource(); markDirty(); status(source.duplicate ? "These bytes already exist; reused the source. Jobs were not merged. Save the draft to retain this attachment." : "Source attached. Save the draft to retain this attachment."); });
 });
 $("detach-source").addEventListener("click", () => { sourceId = null; showSource(); markDirty(); status("Detached from this draft; the stored source was not deleted."); });
+$("extract-source").addEventListener("click", () => {
+  const draft = readDraft();
+  if (!sourceId) return status("Attach a fictional image first.", true);
+  if (job || draft.items.length || draft.manual_provenance || draft.record_stage !== "unknown" ||
+      scalarFields.some(([name]) => draft[name] != null) || rawFields.some(([name]) => draft[name])) {
+    return status("AI suggestions require a new empty draft. Your entered or saved values were kept.", true);
+  }
+  if (Object.values(draft.field_states).some(state => state !== "missing")) return status("Your review states were kept. Start a new empty draft for AI suggestions.", true);
+  if (!$("ai-send-ack").checked) return status("Acknowledge sending this fictional image to Gemini first.", true);
+  action(async () => {
+    const proposed = await request("/documents/" + sourceId + "/extract", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ send_to_gemini: true }) });
+    render(proposed); markDirty(); status("AI proposal loaded without saving. Check literal text, resolve unclear values, choose the stage and review all interpretations.");
+  });
+});
 $("confirm-record").addEventListener("click", () => {
   if (!job || dirty) return status("Save the draft before confirming.", true);
   const reviewer = $("reviewer").value.trim();

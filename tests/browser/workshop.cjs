@@ -12,9 +12,9 @@ fs.mkdirSync(artifactDir, { recursive: true });
   const browser = await chromium.launch({ channel: "chrome", headless: true });
   try {
     const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
-    const page = await context.newPage();
     const errors = [];
-    page.on("pageerror", error => errors.push(error.message));
+    context.on("page", page => page.on("pageerror", error => errors.push(error.message)));
+    const page = await context.newPage();
     await page.goto(base + "/workshop");
     await page.locator("#source-file").setInputFiles("tests/fixtures/workshop/synthetic-sheet.png");
     await page.locator("#attach-source").click();
@@ -139,9 +139,60 @@ fs.mkdirSync(artifactDir, { recursive: true });
     await afterExport.goto(base + "/workshop?job=" + job.id);
     await afterExport.waitForFunction(() => document.getElementById("review-state").textContent.includes("has been reviewed"));
     assert.equal(await afterExport.locator("#reviewed-history details").count(), 2);
+
+    // Browser response is mocked; server validation/provider boundaries have unit checks.
+    const aiPage = await context.newPage();
+    await aiPage.goto(base + "/workshop");
+    await aiPage.locator("#source-file").setInputFiles("tests/fixtures/workshop/synthetic-sheet.png");
+    await aiPage.locator("#attach-source").click();
+    await aiPage.waitForFunction(() => document.getElementById("source-identity").textContent.startsWith("Source ID:"));
+    const aiSource = (await aiPage.locator("#source-identity").textContent()).slice("Source ID: ".length);
+    let aiCalls = 0;
+    await aiPage.route(base + "/api/v1/workshop/documents/" + aiSource + "/extract", route => {
+      aiCalls++;
+      return route.fulfill({ json: { data_origin: "synthetic_demo", source_document_id: aiSource, record_stage: "unknown",
+        job_reference: "DEMO-MOCKED-AI-" + Date.now(), currency: "SGD", field_states: { job_reference: "proposed", currency: "proposed" },
+        items: [{ description_raw: "Fictional AI source text", description: "Fictional AI proposal", description_state: "proposed", amount_raw: "8?", amount: null, amount_state: "unclear", cancelled: false }],
+        ai_provenance: { provider: "google_gemini", model: "fictional-browser-mock", prompt_version: "workshop-extract-v1", proposed_at: new Date().toISOString(), source_document_id: aiSource } } });
+    });
+    await aiPage.locator("#extract-source").click();
+    assert((await aiPage.locator("#status").textContent()).includes("Acknowledge sending"));
+    assert.equal(aiCalls, 0);
+    await aiPage.locator("#ai-send-ack").check();
+    await aiPage.locator("#extract-source").click();
+    await aiPage.waitForFunction(() => document.getElementById("status").textContent.startsWith("AI proposal loaded"));
+    assert.equal(aiCalls, 1);
+    assert.equal(await aiPage.locator("#record-stage").inputValue(), "unknown");
+    assert.equal(await aiPage.locator("#job_reference-state").inputValue(), "proposed");
+    const aiItem = aiPage.locator("#items .item").first();
+    await aiItem.getByLabel("Clarified description", { exact: true }).fill("Fictional human corrected AI proposal");
+    await aiPage.locator("#extract-source").click();
+    assert((await aiPage.locator("#status").textContent()).includes("new empty draft"));
+    assert.equal(aiCalls, 1);
+    assert.equal(await aiItem.getByLabel("Clarified description", { exact: true }).inputValue(), "Fictional human corrected AI proposal");
+    await aiItem.getByLabel("Description review state", { exact: true }).selectOption("confirmed");
+    await aiItem.getByLabel("Amount review state", { exact: true }).selectOption("missing");
+    await aiPage.locator("#job_reference-state").selectOption("confirmed");
+    await aiPage.locator("#currency-state").selectOption("confirmed");
+    await aiPage.locator("#record-stage").selectOption("quote");
+    const aiSavedPromise = aiPage.waitForResponse(response => response.url() === base + "/api/v1/workshop/jobs" && response.status() === 201);
+    await aiPage.locator("#save-draft").click();
+    const aiJob = await (await aiSavedPromise).json();
+    assert.equal(aiJob.draft.ai_provenance.model, "fictional-browser-mock");
+    await aiPage.locator("#reviewer").fill("Fictional AI reviewer");
+    await aiPage.locator("#review-ack").check();
+    await aiPage.locator("#confirm-record").click();
+    await aiPage.waitForFunction(() => document.getElementById("review-state").textContent.includes("has been reviewed"));
+    await aiPage.locator("#reviewed-history summary").click();
+    const aiDownloadPromise = aiPage.waitForEvent("download");
+    await aiPage.getByRole("button", { name: "Download demo CSV · version 1", exact: true }).click();
+    await (await aiDownloadPromise).saveAs(path.join(artifactDir, "fictional-mocked-ai-v1.csv"));
+    await aiPage.reload();
+    await aiPage.waitForFunction(() => document.getElementById("review-state").textContent.includes("has been reviewed"));
+    assert((await aiPage.locator("#ai-provenance").textContent()).includes("fictional-browser-mock"));
     await reopened.screenshot({ path: path.join(artifactDir, "reviewed-history.png"), fullPage: true });
     assert.deepEqual(errors, []);
-    console.log("Browser checks passed: manual capture/failure handling, safe source view, mobile/keyboard/untrusted text, review/correction/history, versioned CSV download/checksum/repeat and reopen after output.");
+    console.log("Browser checks passed: manual capture/review/history/CSV/reopen; mocked AI acknowledgement, proposed-only values, edited-draft preservation, human correction/review/output and provenance reopen. No live provider call.");
   } finally {
     await browser.close();
   }

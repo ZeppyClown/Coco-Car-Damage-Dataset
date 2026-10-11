@@ -6,7 +6,8 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.session import get_db
-from app.schemas.workshop import WorkshopDraft, WorkshopDraftUpdate, WorkshopJobResponse, WorkshopDocumentResponse, DataOrigin, WorkshopConfirmRequest, WorkshopRevisionResponse, WorkshopExportResponse
+from app.schemas.workshop import WorkshopDraft, WorkshopDraftUpdate, WorkshopJobResponse, WorkshopDocumentResponse, DataOrigin, WorkshopConfirmRequest, WorkshopRevisionResponse, WorkshopExportResponse, WorkshopExtractionRequest
+from app.services.workshop_extraction import extract_source
 from app.services.workshop import create_job, get_job, update_job, attach_document, get_document, document_file, MAX_UPLOAD_BYTES, confirm_job, list_revisions, generate_export, get_export, export_file
 
 
@@ -32,6 +33,11 @@ def preview_source(document_id: UUID, db: Session = Depends(get_db)):
         document_file(document), media_type=document.media_type,
         headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
     )
+
+
+@router.post("/documents/{document_id}/extract", response_model=WorkshopDraft)
+def propose_source_fields(document_id: UUID, request: WorkshopExtractionRequest, db: Session = Depends(get_db)):
+    return extract_source(db, document_id)
 
 
 @router.post("/jobs", response_model=WorkshopJobResponse, status_code=201)

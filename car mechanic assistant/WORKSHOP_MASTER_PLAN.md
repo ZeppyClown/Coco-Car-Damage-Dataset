@@ -1,6 +1,6 @@
 # Workshop job-sheet project — master plan and implementation ledger
 
-**Last updated:** 11 October 2026. **Current phase:** F01–F06 VERIFIED: the full manual source → draft → review → correction → demo CSV → reopen workflow works at `/workshop`. Optional AI remains pending.
+**Last updated:** 11 October 2026. **Current phase:** F01–F06 VERIFIED; F07 mocked AI boundary/UI verified, live provider unverified. The full manual workflow works at `/workshop`. Next independent work: F10 reviewed-record lookup.
 
 This is the authoritative implementation/handoff document for the workshop administrative project. Every contributor, including Codex and Claude, must update it for **every feature or implementation part**, including partial work, fixes, migrations, tests, configuration and changed decisions. Do not rely on chat history to resume the work.
 
@@ -8,7 +8,7 @@ The first product is a small local application that turns a permitted paper shee
 
 ## 1. Start here: the actual next task
 
-**Next ready task: F07 — optional image-to-draft extraction with mocked checks first.** F01–F06 manual milestone is verified. The user explicitly selected job-sheet capture/review; public-reference RAG remains separate research.
+**Next ready task: F10 — bounded lookup over reviewed records.** F01–F06 manual milestone and F07 mocked AI workflow are verified. Live Gemini acceptance/accuracy still needs explicit model configuration and a synthetic smoke test; private-source processing remains blocked. The user explicitly selected job-sheet capture/review; public-reference RAG remains separate research.
 
 Do not start by scanning an archive, training a model, building a vector database or integrating the accounting system. None is required to demonstrate the core review workflow.
 
@@ -24,8 +24,8 @@ This milestone is a local demonstration. It does not claim company deployment, r
 2. Run `git status --short` and identify unrelated user work. On 11 October, `PROJECT_SUMMARY.md` is modified and `SYSTEM_DESIGN.md` is untracked; preserve both unless the user explicitly includes them in the task.
 3. Read the existing schema/session/router/test fixtures listed in section 5. Confirm actual paths before adding code.
 4. Check whether the private visit files exist locally. Their absence does not block a synthetic/manual prototype. Do not obtain company files from public search as replacements for actual evidence.
-5. Mark the next ready feature (currently F07) `IN_PROGRESS` and state the exact scope in the ledger below.
-6. Verify current official provider documentation, reuse existing Gemini SDK if selected, and add an explicit image-to-proposed-draft path that never overwrites edited work or sends real records without processing agreement. Mock responses first; manual entry must remain available.
+5. Mark the next ready feature (currently F10) `IN_PROGRESS` and state the exact scope in the ledger below.
+6. Add bounded lookup over the latest reviewed revision of each job, with literal escaped filters, pagination, source/history links and a clear indication when the editable draft is newer. Preserve manual/AI capture behaviour.
 7. Update the ledger, verification table, next task and work log **before** committing. Commit only the intended files, then push as previously authorised by the user.
 
 ## 2. Business problem and scope
@@ -274,6 +274,16 @@ Every row includes `output_kind: DEMO_ONLY`. Snapshot-level fields repeat per li
 
 Outputs use opaque filenames in existing private storage, mode0600; write/fsync before DB commit and cleanup on handled file/DB failure. A process crash can still orphan a file and F12 must reconcile/backup storage. A generated row means file generation succeeded, never that staff downloaded/imported/accepted it. The UI downloads each reviewed version from history without saving/confirming the mutable draft or changing its stage.
 
+### Implemented F07 optional proposal boundary (live provider unverified)
+
+`POST /api/v1/workshop/documents/{id}/extract` requires strict `send_to_gemini: true`. It reads one registered, checksum-verified source. The source must be declared `synthetic_demo`; `private_source` returns403 before the call and no configuration flag bypasses unresolved Q07. Origin is an operator declaration, not image-content recognition. `WORKSHOP_AI_ENABLED` defaults false; missing `GOOGLE_API_KEY` or explicit nonblank `WORKSHOP_AI_MODEL` returns503. There is no default model or automatic network request. Existing Gemini key/SDK is reused; root requirements now pin `google-genai==2.29.0` like the separate assistant.
+
+One SDK client per request closes in a context manager. GenerateContent receives inline image bytes, a system prompt and JSON schema derived from the F01 serialization contract. Only extractable properties are requested; stage, origins, source IDs, provenance, field states and diagram interpretation remain application/operator decisions. No tools are configured. The prompt treats written instructions as untrusted data, preserves literal/CJK/crossed-out text, keeps uncertainty null and forbids guessed currency, repairs/totals/tax. A 60-second request timeout, one attempt and 8000-token output bound avoid automatic repeated processing. Current official sources checked 11 October: [SDK GenerateContent JSON schema/inline image support](https://github.com/googleapis/python-genai), [structured output constraints](https://ai.google.dev/gemini-api/docs/generate-content/structured-output), [image input documentation](https://ai.google.dev/gemini-api/docs/image-understanding). SDK configuration construction is tested; actual provider schema/model acceptance is not yet proven.
+
+Response JSON is bounded 100000 characters and validated using the same `WorkshopDraft`. Reserved/unrecognised top properties, invalid items/money/lengths and bad JSON fail502 without saved data. Supplied scalar values become proposed; item interpretations become proposed regardless of model confirmation claims. Literal ambiguous items with null interpretations become unclear. Stage stays unknown, diagram meaning stays null. Valid structured output may still hallucinate a reference/value; proposed status and required human review are safeguards, not semantic detection. Provider errors return generic502/504 without raw message/keys; no automatic retry.
+
+The route writes no job/revision/export. It returns an unsaved draft with `ai_provenance` (Google Gemini, configured model, `workshop-extract-v1`, server UTC proposal time and initial source UUID). This optional JSON metadata survives manual edits/save/reopen/review; it is local provenance, not signed/authenticated evidence. Demo CSV v1 is unchanged and does not add model columns. UI requires an attached image, explicit external-processing acknowledgement and a new empty unsaved draft (including missing review states); it refuses to replace entered/saved values. The operator corrects fields, chooses stage and resolves states before ordinary confirmation/export. Manual entry works without AI configuration.
+
 ### Suggested API boundaries
 
 The implementer may simplify route naming, but must document the final contract here. All are under `/api/v1/workshop`; the HTML page is `/workshop`.
@@ -306,7 +316,7 @@ Allowed statuses: `READY`, `IN_PROGRESS`, `IMPLEMENTED_UNVERIFIED`, `VERIFIED`, 
 | F04 | Manual source/draft review screen | VERIFIED | F01–F03 | Gated page/ordinary JS/CSS; Chrome browser flow and failure retention passed; Python suite 150 passed |
 | F05 | Confirmation, immutable revisions and conflict handling | VERIFIED | F02/F04 | Atomic/idempotent confirmation, bounded read-only history, corrections, source FK and PG mutation guard; local self-reported reviewer |
 | F06 | Reproducible demonstration CSV output | VERIFIED | F05 | Fixed demo mapping, private output identity/checksum, concurrent reuse and browser per-version download/reopen passed |
-| F07 | Optional AI image-to-draft extraction | READY for mocks; real source use conditional | F03–F06 | Provider/permission checks before real uploaded records |
+| F07 | Optional AI image-to-draft extraction | IMPLEMENTED_UNVERIFIED | F03–F06 | Mock API/SDK/UI workflow verified; live provider/model/schema acceptance unverified; private-source use blocked pending Q07 |
 | F08 | Reviewed diagram/shorthand interpretation | WAITING_COMPANY for real labels | F04/F07 | Manual annotation can work now; meaning cannot be fabricated |
 | F09 | Actual destination mapping and export | WAITING_COMPANY | F06 | One destination schema plus checked record chain needed |
 | F10 | Basic lookup of confirmed records | READY | F05 | Filters/keywords first; no vector database |
@@ -625,6 +635,9 @@ If interrupted mid-feature, record what exists, what is broken/unverified, the l
 | 11 October 2026 | F06 mapping/output/PG regression | Explicit local PG URL + `.venv/bin/python -m pytest -q --disable-warnings` | **184 passed, no skips, 117 warnings** | 17 new F06 cases; fixture correctness, not actual accounting compatibility |
 | 11 October 2026 | F06 clean environment/migration/browser | API-only workshop pytest; CLI upgrade/check; isolated Chrome harness | **111 passed, 36 warnings**; head20261011_exports aligned; manual vertical slice including CSV checksum/repeat/old-vs-new/reopen passed | Local fictional data; Chrome only; no company import/provider/pilot |
 
+| 11 October 2026 | F07 regression and clean environment | Explicit local PG URL + full pytest; API-only workshop pytest/pip check | **208 passed/no skips/119 warnings**; clean **135 passed/38 warnings**, no broken requirements | 24 mock extraction cases; no live Gemini call/model-schema acceptance or accuracy measurement |
+| 11 October 2026 | F07 mocked browser workflow | Isolated Chrome harness, browser-only intercepted proposal response | External-processing ack, proposed states, edited-draft refusal, correction/review/CSV and provenance reopen passed | API provider/validation separately mocked in unit tests; browser mock is not extraction quality evidence |
+
 Replace vague “tests pass” with the command, counts, skipped checks and test environment. PostgreSQL integration is skipped without its explicit disposable test URL; do not present a skipped test as passed.
 
 ### Commands to adapt during implementation
@@ -677,11 +690,11 @@ Record a question as resolved only when there is an actual answer. An elapsed wa
 ## 15. Current handoff snapshot
 
 - **Branch/repository:** `main`, remote `origin` is the user's existing GitHub repository. Verify actual remote before pushing on a different machine.
-- **Previous delivery before F06:** `cf01508`, verified review/history. Read Git history for the final F06 commit hash.
+- **Previous delivery before F07:** `7798304`, verified manual milestone/demo CSV. Read Git history for F07 delivery hash.
 - **What exists:** current automotive API/RAG, visit review/planning material, F01 schemas/fictional fixtures and F02 workshop models/migration/draft service/API/tests.
-- **Latest implementation:** F06 completes the manual milestone with deterministic per-revision demo CSV and stored private output identity/checksum. Full suite184 passed with PostgreSQL; isolated API111 passed; browser capture/review/correction/versioned download/repeat/reopen passed.
-- **What does not exist:** confirmed-record lookup/AI extraction, real benchmark/mapping or permitted company pilot.
-- **Next ready feature:** F07 optional mocked extraction; F10 confirmed-record lookup is also independently ready.
+- **Latest implementation:** F07 explicit Gemini image proposal, proposed-only validation, initial-source/model/prompt/time provenance and empty-draft UI.24 mocked cases plus browser mocked proposal→human correction→review→output passed. Full208 tests and clean API135 passed; no live provider call.
+- **What does not exist:** confirmed-record lookup, live extraction evidence, real benchmark/mapping or permitted company pilot.
+- **Next ready feature:** F10 confirmed-record lookup; then F11 synthetic evaluation harness and manual F08 evidence checks. F07 live smoke/company features remain conditional.
 - **Independent work available:** safe source attach/preview, local manual UI, confirmation, demo output and later mocked extraction; lack of company access does not block these.
 - **Unrelated changes to preserve:** root `PROJECT_SUMMARY.md` and `SYSTEM_DESIGN.md` as seen on this machine; verify current status rather than assuming it remains identical.
 - **Open decisions:** real output mapping, model-processing path, operator and expected labels. None should be fabricated.
@@ -693,7 +706,8 @@ Continue the workshop job-sheet project in this repository. Read AGENTS.md,
 CLAUDE.md and car mechanic assistant/WORKSHOP_MASTER_PLAN.md first.
 Treat the master plan as the current implementation ledger. Inspect Git status
 and preserve unrelated user work. F01–F06 manual milestone is verified. Start
-F07 optional image drafting with mocked tests; F10 lookup is independently ready. Use synthetic examples until
+F10 reviewed-record lookup. F07 mocked proposal/API/SDK/UI checks passed; live
+provider use is unverified and private-source AI remains blocked. Use synthetic examples until
 real-data prerequisites are met. Keep company visit files and runtime artifacts
 private. After every implementation part, update the master with actual files,
 behaviour, tests, limitations and next task; commit the intended changes and
@@ -818,3 +832,15 @@ The assessment separates physical/parsable/quality-approved/indexed pages, class
 - **Limits:** fictional mapping only, no destination acceptance/import/accounting credentials, no authentication/AI/real baseline. Signed negatives are spreadsheet-safe textual cells under this mapping; real financial types require approved F09 rules. Process crashes can orphan files; F12 reconciliation/backup remains. Questions Q01–Q10 pending.
 - **Commit/push:** intended code/migration/tests/master/build/readme increment on main; user source/runtime and unrelated root docs excluded.
 - **Next:** F07 one explicit optional image-to-proposed-draft provider path with mock/error/overwrite/permission checks; manual workflow stays primary. F10 lookup is independently ready; F09/company pilot cannot be fabricated.
+
+
+### 11 October 2026 — F07, optional AI proposal implementation
+
+- **Status:** IMPLEMENTED_UNVERIFIED for live provider; mocked API/SDK/UI scope verified. Next F10 lookup.
+- **Files/config:** new `app/services/workshop_extraction.py`, extraction request/AI provenance contracts, router, manual UI, `test_workshop_extraction.py` and browser extension. Root requirements reuse google-genai2.29.0; default-off `WORKSHOP_AI_ENABLED`, explicit `WORKSHOP_AI_MODEL`, existing `GOOGLE_API_KEY`. No migration because optional provenance lives in existing JSON; demo CSV v1 unchanged.
+- **Boundary:** explicitly acknowledged single fictional-source request, checksum check, no job writes, no configured tools/retries,60s/8000-token bound. Server assigns unknown stage/source/origin and proposed states; literal ambiguity stays unclear/null. AI cannot assign diagram meanings or provenance/control fields. Private-source403 cannot be enabled by a setting while Q07 is unresolved. Empty-draft UI protects entered/saved values; provenance persists through correction/reopen/review.
+- **Verification:**24 mock cases passed/9 warnings including SDK call/close/config, no-call gates, invalid JSON/schema/size/floats/forbidden keys, prompt-injection-shaped payload, sanitised timeout/error, proposal states and no persistence. Final **208 passed/no skips/119 warnings** with PostgreSQL; clean API **135 passed/38 warnings**, requirements install/pip check clean. Chrome browser intercepted only the proposal response: ack, proposed/unclear fields, overwrite refusal, human correction/review/output and provenance reload passed. All existing manual checks rerun by same harness.
+- **Evidence limits:** no live provider call or credentials/model configured for a smoke test; SDK schema construction does not prove Gemini accepts this schema or reads handwriting correctly. Valid hallucinated text can pass shape validation but cannot bypass proposed review. Browser/unit mocks are not AI accuracy. Origin is declared by an operator; do not upload real material as fictional. Provenance is not authenticated/signed.
+- **Company prerequisites:** Q07 private processing, Q01 shorthand/labels and Q08 evaluation remain pending. These do not block F10/synthetic evaluation.
+- **Commit/push:** intended feature/config/dependency/tests/docs increment only; private sources/runtime/unrelated root docs excluded.
+- **Next:** F10 bounded latest-reviewed lookup, visible newer-draft status and reopen/history links; F11 synthetic evaluation afterward. Real mapping/pilot remains conditional.

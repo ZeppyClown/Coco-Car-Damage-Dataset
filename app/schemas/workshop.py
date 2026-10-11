@@ -72,10 +72,19 @@ class WorkshopItem(_WorkshopSchema):
         return None if value is None else format(value, ".2f")
 
 
+class WorkshopAIProvenance(_WorkshopSchema):
+    provider: Literal["google_gemini"] = "google_gemini"
+    model: Reference
+    prompt_version: Literal["workshop-extract-v1"] = "workshop-extract-v1"
+    proposed_at: AwareDatetime
+    source_document_id: UUID
+
+
 class WorkshopDraft(_WorkshopSchema):
     data_origin: DataOrigin
     source_document_id: UUID | None = None
     manual_provenance: Description | None = None
+    ai_provenance: WorkshopAIProvenance | None = None
     record_stage: RecordStage = "unknown"
     job_reference: Reference | None = None
     customer_reference: Reference | None = None
@@ -198,3 +207,13 @@ class WorkshopExportResponse(_WorkshopSchema):
     byte_size: int
     created_at: AwareDatetime
     status: Literal["generated"] = "generated"
+
+
+class WorkshopExtractionRequest(_WorkshopSchema):
+    send_to_gemini: bool = Field(strict=True)
+
+    @model_validator(mode="after")
+    def require_external_processing_acknowledgement(self):
+        if not self.send_to_gemini:
+            raise ValueError("Explicit acknowledgement of sending the image to Gemini is required")
+        return self

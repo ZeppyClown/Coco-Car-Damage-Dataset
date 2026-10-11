@@ -29,6 +29,10 @@
       <button id="attach-source" type="button">Attach source</button>
       <p class="hint">One image, up to 8 MiB, 6,000 pixels per side and 20 megapixels. Attaching keeps the original bytes.</p>
       <p id="source-identity">No source attached. Manual entry is available.</p>
+      <label><input id="ai-send-ack" type="checkbox">Allow this fictional image to be sent to Google Gemini for an unverified draft.</label>
+      <button id="extract-source" type="button">Suggest fields with AI</button>
+      <p class="hint">Optional. Use only on a new empty draft. Private-source AI processing awaits company permission.</p>
+      <p id="ai-provenance" class="hint"></p>
       <div class="viewer-tools" aria-label="Image view controls">
         <button type="button" id="zoom-out" aria-label="Zoom out">−</button>
         <output id="zoom-label">100%</output>

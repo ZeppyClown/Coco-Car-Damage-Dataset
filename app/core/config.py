@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     API_VERSION: str = "v1"
     WORKSHOP_ENABLED: bool = False
+    WORKSHOP_AI_ENABLED: bool = False
+    WORKSHOP_AI_MODEL: Optional[str] = None
     WORKSHOP_STORAGE_DIR: Path = Path(__file__).resolve().parents[2] / "car mechanic assistant/runtime/workshop"
 
     # Database

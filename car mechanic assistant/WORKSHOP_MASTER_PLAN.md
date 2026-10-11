@@ -1,6 +1,6 @@
 # Workshop job-sheet project — master plan and implementation ledger
 
-**Last updated:** 12 October 2026. **Current phase:** standalone local capture/review/history/lookup/record export delivered; saving/corrections/access/recovery freshly verified. Usefulness and removal of old financial/GST software are user assumptions. Business-benefit studies/external integrations are optional; invoicing/GST is conditional. Real-source permission/quality/meanings/labels and actual company pilot operation remain unverified. See [actual artifacts and fresh verification](WORKSHOP_VERIFICATION_REPORT.md).
+**Last updated:** 12 October 2026. **Current phase:** standalone local capture/review/history/lookup/record export and F13 SGD invoicing/GST delivered; local saving/corrections/access/recovery and billing verified. Usefulness and removal of old financial/GST software are user assumptions. Business-benefit studies/external integrations are optional. F13 invoice/GST workflow is verified locally; real issuance is disabled pending Q11 supplier configuration/operation. Real-source permission/quality/meanings/labels and actual company pilot operation remain unverified. See [actual artifacts and fresh verification](WORKSHOP_VERIFICATION_REPORT.md).
 
 This is the authoritative implementation/handoff document for the workshop administrative project. Every contributor, including Codex and Claude, must update it for **every feature or implementation part**, including partial work, fixes, migrations, tests, configuration and changed decisions. Do not rely on chat history to resume the work.
 
@@ -8,11 +8,13 @@ The first product is a small local application that turns a permitted paper shee
 
 ## 1. Start here: the actual next task
 
+**Next billing input:** Q11 exact supplier name/address/GST number and InvoiceNow date; user confirmed GST registration and GST-inclusive pricing. Start with the [invoicing guide](WORKSHOP_INVOICING_GUIDE.md) and actual fictional invoice artifacts in [the verification report](WORKSHOP_VERIFICATION_REPORT.md). F13 is implemented and locally verified; normal real issuance remains off.
+
 **Next real-data/operation work depends on technical inputs:** Q01/Q02 meanings/stage, Q06/Q07/Q09 operator/processing/access/operation and independent labels from Q08. Q03/Q04/Q10 external destination mapping is optional under the standalone scope below. F07 has a successful live **printed fictional** Gemini image→unsaved proposed draft→source-checked manual review→demo CSV API smoke. The separate assistant's ignored key was supplied only to an explicitly configured temporary process; workshop credentials are not loaded automatically. Normal demo AI is off, private-source AI blocked and real handwriting accuracy unverified. Job-sheet capture/review is selected; public-reference RAG remains separate research.
 
 **User decision, 12 October:** assume the project is useful to its customer/workshop users. Do not require interviews proving demand, baseline timings, adoption or removed-copying measurements before continuing implementation. Those studies are optional and needed only for actual benefit/outcome claims. This assumption does not establish what a source means, which destination columns exist, extraction accuracy or operating permission. Keep technical correctness and company compatibility checks.
 
-**Further user decision, 12 October:** assume the old financial/GST software is gone. Target a standalone workshop record system; matching the old import format is not a prerequisite. External integration F09 is deferred unless selected later. Invoicing/GST/accounting is a separate conditional extension if needed. The CSV remains a record/demo export, not a tax invoice. Saving, corrections, access and local recovery are freshly verified: [actual record/export and verification report](WORKSHOP_VERIFICATION_REPORT.md),217 tests passed with no skips plus live HTTP/Chrome checks.
+**Further user decision, 12 October:** assume the old financial/GST software is gone. Target a standalone workshop record system; matching the old import format is not a prerequisite. External integration F09 is deferred unless selected later. User requested GST/invoicing on 12 October; F13 is implemented as a separate locally verified billing module, with real issuance off pending company settings. The CSV remains a record/demo export, not a tax invoice. Saving, corrections, access and local recovery are freshly verified: [actual record/export and verification report](WORKSHOP_VERIFICATION_REPORT.md),initial217 tests passed; final F13 full326 passed/no skips plus live HTTP/Chrome billing checks.
 
 Use the [workshop validation worksheet](WORKSHOP_VALIDATION_WORKSHEET.md) for source meaning/independent labels and selected real-data operation. External destination and timing sections are optional. The earlier workbook also covers separate manual-RAG research. No company answer or measured result is prefilled.
 
@@ -38,7 +40,7 @@ This milestone is a local demonstration. It does not claim company deployment, r
 
 The reviewed visit material supports investigating repeated transcription of workshop job information. A useful product must make the record clearer and/or remove an existing copying step. If it produces an additional record but staff still retype every destination, it may increase work.
 
-The scope is standalone job-sheet capture/review, reviewed history, lookup and record export, usable without an AI key. External mapping is optional if later selected. Invoicing/GST/accounting is a separate conditional extension. Measuring task time/usefulness is optional and not a coding prerequisite.
+The scope is standalone job-sheet capture/review, reviewed history, lookup and record export, usable without an AI key. External mapping is optional if later selected. F13 adds standalone invoicing/GST as explicitly requested on 12 October; general accounting remains outside scope. Measuring task time/usefulness is optional and not a coding prerequisite.
 
 **Initial exclusions:** automatic repair diagnosis, automatic pricing, liability/claim decisions, tax/accounting treatment decisions, live financial-system writes, bulk archive scanning, supplier integrations and a new repair-manual RAG system. These are not dependencies of this project. Add them only when the user chooses a concrete new scope supported by evidence.
 
@@ -157,6 +159,9 @@ F01–F06 schema/test/fixture/router/service/UI/export paths below now exist. Ex
 | `tests/unit/test_workshop.py` | Draft/review/export/identity failure checks | F01 onward |
 | `tests/integration/test_workshop_postgres.py` | Real migrations, concurrent draft/review/export transactions, rollback and revision/source constraints | F02/F05/F06 |
 | `tests/fixtures/workshop/` | Clearly labelled fictional inputs and expected records | F01 |
+| `app/schemas/workshop_invoice.py`, `app/services/workshop_invoice.py` | Invoice request/calculation/immutable issue/read/print contract | F13 |
+| `alembic/versions/20261012_workshop_invoices.py` | Add invoice table/immutable PG guard after actual prior head | F13 |
+| `tests/unit/test_workshop_invoice.py` | Money/API/real-config/access/failure/idempotence tests | F13 |
 
 No generic provider/plugin/agent abstraction is required. Add one integration when it is chosen, with a testable call boundary and validated results.
 
@@ -368,7 +373,8 @@ Allowed statuses: `READY`, `IN_PROGRESS`, `IMPLEMENTED_UNVERIFIED`, `VERIFIED`, 
 | F09 | Optional external destination mapping/integration | DEFERRED | F06; explicit integration scope | Old software assumed gone; standalone record export exists in F06; target schema needed only if integration selected |
 | F10 | Basic lookup of confirmed records | VERIFIED | F05 | Latest reviewed per job, literal bounded filters/pagination/newer-draft status; SQLite/PG and Chrome checks passed |
 | F11 | Extraction evaluation; optional benefit measurement | IMPLEMENTED_UNVERIFIED for real accuracy | F06/F07; F09 for destination checks | Synthetic evaluator/CLI verified; independent labels/provider quality pending Q08; baseline timing/adoption optional, usefulness assumed |
-| F12 | Workshop access/recovery/guide and later pilot | VERIFIED locally; company pilot pending | User-assumed usefulness; selected operating scope | Fresh217-test suite/live HTTP/Chrome verify access, saving/corrections and actual disposable recovery; company operation/retention/pilot pending Q06/Q07/Q09 |
+| F12 | Workshop access/recovery/guide and later pilot | VERIFIED locally; company pilot pending | User-assumed usefulness; selected operating scope | Initial217/final full326-test suites plus live HTTP/Chrome verify access, saving/corrections, invoice output and actual disposable recovery; company operation/retention/pilot pending Q06/Q07/Q09 |
+| F13 | Standalone SGD invoicing/GST | VERIFIED locally; real operation pending | F05/F12; explicitly selected12October | Money/API33 passed; PG18 passed including invoice concurrency/recovery; full326 passed; Chrome preview/issue/reopen/print/PDF/access passed; user GST-registered/inclusive answer recorded; Q11 supplier/InvoiceNow pending |
 
 If a feature takes several turns, add subrows such as `F03.a upload validation` and `F03.b preview route`. Each subrow needs its own status and verification notes. Do not wait until the parent feature is finished to record partial work.
 
@@ -474,7 +480,7 @@ Validate all output through the same schemas. A valid JSON shape is not proof of
 
 ### F09 — one real destination mapping
 
-**Current status:** DEFERRED under the user's12October standalone decision. Matching the assumed-removed software is not required. The specification below applies only if an external integration is later selected; F06 record export exists now. Invoicing/GST/accounting would be a separate feature.
+**Current status:** DEFERRED under the user's12October standalone decision. Matching the assumed-removed software is not required. The specification below applies only if an external integration is later selected; F06 record export exists now. F13 supplies the separate standalone invoicing/GST feature; general accounting is outside scope.
 
 **Purpose:** replace an existing entry step rather than add another.
 
@@ -525,6 +531,20 @@ Validate all output through the same schemas. A valid JSON shape is not proof of
 **Completion:** record exactly what environment/access was tested and who approved actual use. Do not infer 24 users, six months' adoption or production deployment from a local trial.
 
 **Delivered local parts:** configured single-account access/origin checks and server-bound attribution, private source/output handling, fictional dump/restore and operating guide are verified. The actual company account policy/hosting/retention/deletion/reconciliation/pilot decisions remain pending; the prototype does not supply approval.
+
+### F13 — standalone SGD invoicing and GST
+
+**Selected:** explicitly requested12October2026. User confirmed GST-registered and prices include GST; exact supplier name/address/GST number and InvoiceNow applicability/date remain Q11. Defaults reflect inclusive pricing; they do not invent company billing identity or prove registration. See [full workflow/rules/questions](WORKSHOP_INVOICING_GUIDE.md).
+
+**Implemented:** separate `InvoiceRequest`/supplier/customer/calculated preview/issued response schemas; money uses the existing strict Decimal boundary. A current reviewed completed-work version, SGD, confirmed prices and full supplier/customer details are required. Sum active line totals, exclude cancelled rows and subtract an explicit discount in the selected price basis. Registered inclusive: GST=round(B×9/109); exclusive: GST=round(B×0.09). Fixed invoice-subtotal rounding uses half-up cents. Non-registered means GST not applicable, distinct from zero-rated. Reject oversized totals/excessive discounts/unknown prices/quotes; issuance uses today's Singapore date. Source written totals/adjustments remain observations and do not silently change billing.
+
+**Persistence/config:** additive `20261012_invoices` after `20261011_auth`; `workshop_invoices` stores job/revision, unique invoice number, immutable calculated/request JSON, exact HTML/SHA-256 and authenticated issuer/server UTC time. Job row lock plus unique job ID allows one invoice per job, with exact-request retries reusing identity/time/bytes and different requests/corrections conflicting409. PG trigger rejects invoice UPDATE/DELETE. Database dump recovers invoice HTML; private source/CSV files still need file backup. No old CSV/review bytes or migration rewritten. Invoice numbers use INV-/DEMO-INV- plus UUID. Settings: `WORKSHOP_REAL_INVOICES_ENABLED=false` and optional validated JSON `WORKSHOP_BILLING_SUPPLIER`; real supplier must match configured profile, missing/disabled configuration fails closed. Synthetic jobs always produce DEMO labels.
+
+**Routes:** protected `GET /billing-settings`; `POST /revisions/{id}/invoice-preview` (no write), `POST /revisions/{id}/invoice` (`invoice` request plus strict true acknowledgement), `GET /jobs/{id}/invoice`, `GET /invoices/{id}`, `GET /invoices/{id}/print`. UI invoice form in completed-work history, preview invalidation, explicit acknowledgement, unsaved-billing retention, immutable invoice reopen and browser Print/Save as PDF. Printable text escaped; no scripts; restrictive CSP/no-store/nosniff and existing account/origin boundary. Exact issued HTML is read rather than regenerated. Responses canonicalise UTC across issue/read/retry/restore.
+
+**Verified locally:**33 money/API tests;18 PG cases including new invoice races/prior-auth-head preservation/immutable guard and extended actual dump/restore;326 full regression tests/no skips; fresh Chrome invoice flow and actual PDF/HTML/reopen/access. The clean fictional artifact has net100.00/GST9.00/payable109.00 inclusive. See [actual artifacts/results](WORKSHOP_VERIFICATION_REPORT.md). Real profile JSON parsing/missing GST number rejection/default-off settings checked; normal demo remains AI-off/real-billing-off/supplier-unset.
+
+**Limits/next:** credit notes/void/replacement billing, payment receipts/receivables, input tax/GST returns/general ledger/InvoiceNow transmission are outside this increment. Issued errors cannot be fixed by editing or duplicate billing; add linked credit notes before those cases. No company deployment, legal certification or representative real-document outcome. Configure Q11 only after actual details/operating decisions arrive; optional external mapping/benefit studies are not gates.
 
 ## 9. Build order and checkpoints
 
@@ -771,6 +791,7 @@ Keep actual answers and documents in the private visit files. Here, record gener
 | Q08 | Independently checked expected values; optional baseline task time | Real accuracy; optional benefit claims | Labels pending; baseline optional |
 | Q09 | Access/retention/backup/hosting decisions | F12 | Pending |
 | Q10 | Correction handling in selected external destination | Selected future F09 only | External handling deferred; local correction/history verified |
+| Q11 | Exact invoice supplier name/address/GST number and InvoiceNow applicability/date | Real F13 billing configuration/operation | User confirmed GST-registered and inclusive prices; identity/number/date pending; real issuance off |
 
 Record a question as resolved only when there is an actual answer. An elapsed wait, a synthetic sample or a plausible inference is not an answer. Continue ready tasks while these are pending.
 
@@ -779,20 +800,20 @@ The [validation worksheet](WORKSHOP_VALIDATION_WORKSHEET.md) provides the fill-i
 ## 15. Current handoff snapshot
 
 - **Branch/repository:** `main`, remote `origin` is the user's existing GitHub repository. Verify actual remote before pushing on a different machine.
-- **Latest code delivery:** `f7b2c8c`, provider-schema fix and printed-fictional live AI/review/output verification, committed and pushed after authenticated access increment `276579c`.
-- **What exists:** existing automotive API/RAG and the separate workshop manual source/draft/review/history/correction/demo-output/lookup workflow, configured local account, mocked optional AI, synthetic evaluator, operating guide and disposable recovery checks.
-- **Latest implementation:** F07 provider schema compatibility and full printed-fictional live API flow. Final290 passed/no skips/132 warnings; clean API217 passed/no skips/51 warnings;15 workshop PG cases ran. Actual initial provider proposal/review/export provenance and browser reopening verified. Authentication/recovery still verified. The latest work log contains exact source/model/time/privacy evidence and remaining requirements.
-- **What does not exist:** real handwriting/independently labelled benchmark, company account/pilot operating policy, production backup/reconciliation/retention or permitted company deployment. External mapping and invoicing/GST/accounting are optional future extensions, not implemented current features.
+- **Latest committed delivery before F13:** `5a38891`, actual record/export and fresh persistence/access/recovery results, pushed to main. F13 code/tests/docs/artifacts are the current increment; read `git log` for its resulting commit ID.
+- **What exists:** existing automotive API/RAG and the separate workshop source/draft/review/history/correction/demo-output/lookup workflow, configured account, optional AI, evaluator, guide/recovery and F13 SGD invoice/GST preview/issue/read/print workflow.
+- **Latest implementation:** F13 SGD invoice/GST schemas/service/migration/UI/print output, fixed subtotal Decimal rounding, immutable invoice snapshots, job-level duplicate protection and canonical UTC responses. Final326 passed/no skips/137 warnings in136.34s, all18 workshop PG cases; fresh Chrome invoice/old-flow checks and restarted invoice JSON/HTML/PDF verified. Prior F07 live printed-fictional integration remains separate evidence; no new provider call.
+- **What does not exist:** real handwriting/independently labelled benchmark, company account/pilot operating policy, production backup/reconciliation/retention or permitted company deployment. External mapping/general accounting remain future scope. F13 SGD invoicing/GST is implemented and verified locally; credit notes/payments/GST returns/InvoiceNow submission are not implemented. Real issuance remains disabled pending Q11 supplier configuration and actual operation.
 - **Latest provider integration:** F07 original schema failed400/endpoint502 without DB writes. Explicit string/null money serialization and provider-only omission of nested maxItems50 retain all local validators. Full printed-fictional live API proposal→source-checked quote review→repeatable CSV/provenance passed on `gemini-3.1-flash-lite`. Final tests/browser/privacy results appear in the newest work-log/result entries.
-- **Next conditional work:** Q01/Q02 meanings/stage; Q06/Q07/Q09 actual operator/provider/access/operation; Q08 independent labels. External mapping Q03/Q04/Q10 is deferred under standalone scope. Saving, corrections, access and local recovery are freshly verified developer checks, not waiting for company validation. Baseline timing/usefulness and old-format compatibility are not required.
+- **Next conditional work:** Q11 billing supplier and InvoiceNow date; Q01/Q02 meanings/stage; Q06/Q07/Q09 actual operator/provider/access/operation; Q08 independent labels. External mapping Q03/Q04/Q10 is deferred under standalone scope. Saving, corrections, access and local recovery are freshly verified developer checks, not waiting for company validation. Baseline timing/usefulness and old-format compatibility are not required.
 - **Usefulness decision:** assumed by user on 12 October. Demand, baseline timing, adoption and removed-copying studies are optional; do not treat them as implementation blockers. Q08 independent labels and the destination/operating rules remain technical inputs.
-- **Independent work delivered:** source handling, manual review/version/export, configured local account/origin/attribution controls, mocked extraction, manual clarification boundaries, lookup, synthetic comparator/protocol, local operating guide and disposable recovery. New company data/rules/identity/approval must not be fabricated to extend these.
+- **Independent work delivered:** source handling, manual review/version/export, account/origin controls, optional extraction, manual clarification, lookup, evaluator/guide/recovery and F13 deterministic billing/immutable output. New company data/rules/identity/approval must not be fabricated to extend these.
 - **Unrelated changes to preserve:** root `PROJECT_SUMMARY.md` and `SYSTEM_DESIGN.md` as seen on this machine; verify current status rather than assuming it remains identical.
-- **Open decisions:** real output mapping, model-processing path, operator and expected labels. None should be fabricated.
+- **Open decisions:** Q11 supplier billing identity/number and InvoiceNow date, model-processing path, operator and expected labels. External mapping is optional. None should be fabricated.
 
 ### Completion audit and the minimum company handoff
 
-The 11 October completion audit checked the F00–F12 acceptance requirements, M1–M5 milestones, current extraction code/tests, saved live-fictional report and private visit/workbook answer sections. The private workflow-plan correction table and focused image questions are still unanswered; the workbook still lists the missing record chain, mapping, operator and processing decisions. No company-labelled JSONL set or destination CSV/spreadsheet was found in `company visit/`. **The local prototype is delivered; the full company project is incomplete.** No further independently ready feature remains in the agreed scope after the live F07 fix.
+The 11 October completion audit checked the F00–F12 acceptance requirements, M1–M5 milestones, current extraction code/tests, saved live-fictional report and private visit/workbook answer sections. The private workflow-plan correction table and focused image questions are still unanswered; the workbook still lists the missing record chain, mapping, operator and processing decisions. No company-labelled JSONL set or destination CSV/spreadsheet was found in `company visit/`. **The local prototype is delivered; the full company project is incomplete.** That11October audit preceded the new12October F13 request. F13 independent implementation is now delivered; company billing configuration/InvoiceNow applicability and actual operation remain input-dependent.
 
 Bring back these specific artifacts rather than another general interview. Keep the completed answers and records private; section 14 remains the question ledger.
 
@@ -813,7 +834,7 @@ CLAUDE.md and car mechanic assistant/WORKSHOP_MASTER_PLAN.md first.
 Treat the master plan as the current implementation ledger. Inspect Git status
 and preserve unrelated user work. F01–F06 manual milestone is verified. Start
 the next branch whose prerequisite is supplied: real F08/F11 labels/quality or selected F12 access/operation.
-Old financial/GST software is assumed gone: target standalone records/export; F09 external mapping is deferred. Invoicing/GST/accounting is a separate conditional extension if needed.
+Old financial/GST software is assumed gone: target standalone records/export; F09 external mapping is deferred. User requested GST/invoicing on 12 October; F13 is implemented as a separate locally verified billing module, with real issuance off pending company settings.
 Usefulness is assumed by the user; baseline timing, demand/adoption and removed-copying studies are optional and must not block coding.
 Local account/origin/attribution and guide/recovery are verified. Manual F08 actual meanings remain pending Q01. F11 synthetic
 harness/F10 lookup are verified. F07 mock and printed-fictional live API integration
@@ -1066,3 +1087,39 @@ The assessment separates physical/parsable/quality-approved/indexed pages, class
 - **Failures corrected before acceptance:** TestClient does not accept constructor `auth`; set its supported `.auth` property. Historical migration fixtures use reflected old tables rather than querying the new ORM before upgrade. Build a reviewed DTO from the validated draft dictionary, not the distinct draft-model class. These fixture failures were not presented as successful security/migration checks.
 - **Local runtime:** only the task-owned API was stopped/restarted and disposable public schema upgraded to `20261011_auth`. Fictional credentials/config live mode0600 under ignored `runtime/workshop-auth/`; values never printed/committed. Demo remains loopback port18041 and requires native Basic login. Password hash setup is interactive in the guide; the test harness accepts a private credential-file path.
 - **Next:** conditional F07 key/model smoke or company Q01–Q10 real semantics/labels/mapping/operating path. This increment does not prove real AI accuracy, staff use, public deployment, employee identity, or résumé history.
+
+### 12 October 2026 — F13 GST/invoicing implementation in progress
+
+- **Scope:** add deterministic SGD billing to the existing app, separate from unchanged historical record CSV. No new dependency, model call or accounting integration. Current user answer: GST-registered and prices include GST; registration number, exact supplier/address and InvoiceNow implementation date pending. This is a user-supplied setting, not independently verified registration.
+- **Delivered part, not yet verified:** invoice contracts/service/config, additive `20261012_invoices` migration and protected preview/issue/read/print routes. Fixed invoice-subtotal GST rounding, inclusive/exclusive calculation, explicit discount, non-registered treatment, completed-work/confirmed-price checks; immutable DB HTML/snapshot and job-level duplicate protection. Real issuance defaults off.
+- **Places reached:** schemas/models/service/router/config/migration; UI, meaningful money/API/PostgreSQL/recovery/browser checks and operating docs next. Old capture/review/export APIs and CSV bytes are preserved. No company documents or user changes staged.
+- **Next:** finish UI and tests, run actual isolated migrations and checks, update results, commit/push code and documentation together. Do not treat this entry as a passed financial feature.
+
+### 12 October 2026 — F13 UI and initial verification
+
+- **Delivered part:** completed-work history actions and invoice form, GST-inclusive default from user answer, explicit supplier/customer/address/registration, local Singapore issue date, discount and calculated preview. Changing details invalidates preview/issuance acknowledgement; saved invoices reopen as print/Save-as-PDF links. Real supplier must match server configuration; all endpoints inherit existing account/origin checks.
+- **Actual targeted results:** `tests/unit/test_workshop_invoice.py`: **33 passed /8 warnings**; full workshop PostgreSQL integration file: **18 passed /34 warnings**, including new same/different-request concurrency, prior-head preservation, immutable issued HTML/rows and extended actual dump/restore recovering invoice identity/bytes/guards. SQLite does not assert production triggers.
+- **Files:** schemas/service/models/config/migration/router plus existing template/JS and new money/API tests; browser harness now includes invoice scenario but has not yet been run against the new server.
+- **Next:** full regression, dev-only additive migration/restart, complete actual Chrome scenario/artifacts, review docs/privacy/diff, then commit/push. Production billing remains disabled; missing supplier number/address/name and InvoiceNow date retained as questions.
+
+### 12 October 2026 — F13 regression and development migration
+
+- Full `.venv` regression with explicit disposable PG URL: **326 passed/no skips/137 warnings in158.41s**, including all18 workshop PG cases. Development-only migration to `20261012_invoices` and `alembic check` passed; original local server restarted with existing private account, AI off, real billing disabled/supplier unset. No company/live DB touched.
+- Initial Chrome run timed out awaiting the preexisting CSV download after repeat confirmation. A fresh settled-page reproduction downloaded the same new fictional version successfully; history was rendered before its newly added invoice lookup completed, and the harness matched a stale confirmation status. Moved the invoice lookup before history-ready rendering and made the harness await the actual repeat-confirm response and re-enabled control. Expanded UI also protects unsaved invoice details when opening/saving/starting another record or navigating.
+- New billing guide documents deterministic rules, routes/settings, real gating, missing Q11 and accounting/credit-note/InvoiceNow limits. Revised Chrome run is pending; do not treat the earlier timeout as a pass. No new provider request.
+
+### 12 October 2026 — F13 Chrome pass and UTC response correction
+
+- Expanded fresh Chrome harness passed old manual/review/history/CSV/mocked-AI/diagram/lookup workflows and new inclusive/exclusive/discount calculations, preview invalidation, cancelled discard retention, mock issuance failure without data loss, deliberate retry, actual saved invoice reopening, literal HTML escaping, anonymous401 and actual browser PDF generation. No provider call.
+- A separate clean fictional showcase's fresh HTTP reread exposed a serialization inconsistency: initial issue used UTC `Z`, PostgreSQL reread used Singapore `+08:00`. The timestamp instant was identical but JSON was not. Invoice responses now normalise UTC like existing review/export responses; PG fresh-session and dump/restore assertions compare JSON, not timezone-insensitive Python datetime equality. Rerun final regression and fresh runtime verification before committing.
+
+### 12 October 2026 — F13 final delivery/verification and handoff
+
+- **Status:** VERIFIED locally; company billing configuration/actual operation pending Q11 and existing F12 decisions. User confirmed registered/inclusive pricing. All F13 schemas/service/models/config/migration/router/UI/meaningful tests and master/run/build/README/worksheet/billing guide are delivered together. Source capture/review/CSV APIs and historical artifacts remain unchanged.
+- **Final verification:** explicit local `YAP_TEST_POSTGRES_URL` + `.venv/bin/python -m pytest -q --disable-warnings tests`: **326 passed/no skips/137 warnings in136.34s** after UTC response correction; all18 workshop PG cases ran. Earlier initial33 billing unit/API and18 PG passed. Dev-only migration to20261012_invoices and metadata check passed. Invoice supplier environment JSON parsed, missing registered-supplier number rejected, real flag remains default-off.
+- **Chrome/runtime:** expanded isolated harness passed old capture/review/history/CSV/mocked-AI/diagram/lookup and invoice inclusive/exclusive/discount/invalidation/unsaved retention/failure-retry/issue/reopen/escaping/print/PDF/anonymous access. Clean fictional completed-work109.00 invoice read/retried after restart with identical canonical UTC JSON and original HTML checksum. Actual one-page Chrome PDF, stored HTML and JSON in `workshop_demo/` are inspectable; all values/company registration placeholder are fictional. No live model call.
+- **Artifact:** `DEMO-INVOICE-001`, net100.00/GST9.00/payable109.00; exact HTML SHA256 `48563a7d09b5494ec6b256b2ea0456c8e557a0dfe8385492e2fde7aa4a1cd49a`. PDF is browser output from that stored HTML; do not infer real company invoice/registration/payment/IRAS submission.
+- **Limits/next:** exact supplier name/address/GST number and InvoiceNow date Q11 are the next billing inputs. Credit notes/replacement/payment receipts/input tax/GST returns/general ledger/InvoiceNow network submission are not implemented. Current normal localhost server is AI-off/real-issuance-off/supplier-unset; no public/company deployment. No usefulness study or old-software schema required. Independent company quality/meanings and actual operation remain separate pending evidence.
+- **Git/privacy:** stage explicit intended files and commit/push existing main after final link/source/secret/diff checks. Preserve unrelated `PROJECT_SUMMARY.md`/`SYSTEM_DESIGN.md` and all private visit/runtime sources. Filled worksheet untouched unless byte-identical to previous public blank; this unfilled copy was safely updated and remains0600/ignored. Final commit hash belongs in chat/next entry, since a commit cannot contain its own hash.
+
+- **Final pre-commit audit:**21 intended public files checked;77 local Markdown links resolve; all18 original company files match recorded SHA256; actual private password/hash/configured-key values absent from intended public bytes. Historical record CSV retains its original SHA256 locally and through the live protected API; invoice HTML retains its recorded SHA256 and fresh JSON equality. JS/harness syntax and intended Git whitespace checks passed. Normal real billing remains disabled/supplier unset.

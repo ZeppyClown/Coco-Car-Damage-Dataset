@@ -4,7 +4,7 @@ Blank template prepared 12 October 2026. This is for the selected **job-sheet ca
 
 **User decision, 12 October:** assume the project is useful to its customer. Demand, baseline timing, adoption and removed-copying studies are optional. Fill the technical sections for source meaning, destination correctness and selected operation; section 6 can be skipped while building. This is a user scope assumption, not a company answer or measured result.
 
-**Further scope decision:** old financial/GST software is assumed gone; target standalone workshop records/history/export. Sections2/4 external destination fields are optional and not required to verify this app. Invoicing/GST/accounting is a separate extension if needed. Saving/corrections/access/local recovery are developer checks, now verified in [the actual record/export report](WORKSHOP_VERIFICATION_REPORT.md).
+**Further scope decision:** old financial/GST software is assumed gone; target standalone workshop records/history/export. Sections2/4 external destination fields are optional and not required to verify this app. F13 invoicing/GST is implemented as a separate module; exact billing settings/InvoiceNow date remain Q11. General accounting remains separate. Saving/corrections/access/local recovery are developer checks, now verified in [the actual record/export report](WORKSHOP_VERIFICATION_REPORT.md).
 
 Start with **one permitted job and a person who can explain it**. One case can establish a candidate mapping; it cannot establish representative AI accuracy or time savings. Use more representative cases for those measurements after the company agrees the task and processing path. You do not need to scan the storeroom archive.
 
@@ -253,3 +253,18 @@ Record zero or not applicable explicitly when a phase is unnecessary. Retain fai
 The master records usefulness and old-software removal as user assumptions, not company validation. External F09 is deferred unless later selected, then requires its checked destination contract. Start real F08/F11 with meanings/labels and permitted processing; select real F07/F12 changes after the processing/operating path is established. Timing and old-software mapping are not required. Partial answers can unlock one branch.
 
 This worksheet does not prove old résumé claims about 24 mechanics, 500+ repair-manual pages, 90% retrieval precision, six-month adoption or internship history. Those remain separate evidence questions. Real accuracy, compatibility and usefulness remain unverified until the corresponding checks actually run.
+
+## 8. Billing profile and operating questions — Q11
+
+Use the [invoicing guide](WORKSHOP_INVOICING_GUIDE.md) for current rules/limitations. Keep all filled details in the private copy. The user has supplied GST-registered/inclusive pricing as the intended settings; confirm the exact profile before configuring real issuance. No value is invented here.
+
+| Billing input | Fill in privately with company evidence |
+|---|---|
+| Exact supplier name and business address on invoices | |
+| GST registration number/status and effective dates | |
+| Prices inclusive/exclusive; any exceptions | |
+| IRAS InvoiceNow implementation date/notification | |
+| Normal numbering, discount and correction/credit-note rules | |
+| Person authorised to issue; when work is billable; selected operating scope | |
+
+Prototype invoice rules are deterministic and verified locally; printed PDFs do not transmit InvoiceNow data. Issued copies cannot be edited or billed again from a corrected job. Credit notes/payments/GST returns require further implementation; do not bypass that by making duplicate jobs.

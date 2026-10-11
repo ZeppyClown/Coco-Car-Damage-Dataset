@@ -2,11 +2,11 @@
 
 Last updated: 12 October 2026. This describes the **local fictional demonstration**, protected by one configured operator account. Company pilot approval, actual access policy, hosting and retention remain pending; external destination mapping is optional under standalone scope. The [master plan](WORKSHOP_MASTER_PLAN.md) records each feature and its exact evidence.
 
-Current user scope: standalone workshop records; old financial/GST software is assumed gone. External mapping is optional, not a setup prerequisite. Invoicing/GST/accounting is a separate conditional extension. [Inspect the saved record/export and fresh verification](WORKSHOP_VERIFICATION_REPORT.md):217 tests passed with actual PostgreSQL recovery plus live HTTP/Chrome checks.
+Current user scope: standalone workshop records; old financial/GST software is assumed gone. External mapping is optional, not a setup prerequisite. F13 invoicing/GST is implemented; use the [billing guide](WORKSHOP_INVOICING_GUIDE.md). Real issuance is disabled pending supplier settings; general accounting is separate. [Inspect the saved record/export and fresh verification](WORKSHOP_VERIFICATION_REPORT.md): initial217 clean workshop tests and final326 full tests passed, with actual invoice/PostgreSQL recovery and live HTTP/Chrome billing checks.
 
 ## What is available
 
-`/workshop` supports JPEG/PNG source attachment, manual drafts, optional proposed AI fields, explicit review, immutable history, corrections, per-version demo CSV and latest-reviewed lookup. Jobs are separate UUID records even when customer/vehicle text matches. Nothing writes to the company's financial software. PDF/archive scanning, automatic diagram meanings and accounting mapping are not implemented.
+`/workshop` supports JPEG/PNG source attachment, manual drafts, optional proposed AI fields, explicit review, immutable history, corrections, per-version demo CSV, latest-reviewed lookup and separate SGD invoice/GST preview/issue/print output. Jobs are separate UUID records even when customer/vehicle text matches. Nothing writes to the company's financial software. PDF/archive scanning, automatic diagram meanings and accounting mapping are not implemented.
 
 The existing automotive API and separate manual RAG assistant are independent applications. Their historical evidence/results must not be relabelled as this new workshop workflow. Company visit records and runtime artifacts stay private and ignored by Git.
 
@@ -39,7 +39,7 @@ export DEBUG=false
 'car mechanic assistant/runtime/workshop-api-venv/bin/python' -m alembic check
 ```
 
-Check the target before migration. Startup does not create tables automatically. Current workshop head is `20261011_auth`, following draft/review-guard/export revisions. The additive authentication migration labels existing snapshots `self_reported` without changing their contents, reviewer, timestamp or CSV bytes. New API confirmations use `authenticated`. Future changes need a new migration. Stop this task's server with Ctrl-C in its terminal.
+Check the target before migration. Startup does not create tables automatically. Current workshop head is `20261012_invoices`, following draft/review-guard/export/authentication revisions. The invoice migration adds immutable billing rows without rewriting existing records/exports. The additive authentication migration labels existing snapshots `self_reported` without changing their contents, reviewer, timestamp or CSV bytes. New API confirmations use `authenticated`. Future changes need a new migration. Stop this task's server with Ctrl-C in its terminal.
 
 Generate a password hash interactively; the password is hidden, entered twice and never passed on the command line:
 
@@ -53,7 +53,7 @@ Use 16–1024 printable ASCII password characters and a printable ASCII account 
 'car mechanic assistant/runtime/workshop-api-venv/bin/python' -m uvicorn app.main:app --env-file 'PATH_TO_PRIVATE_ENV_FILE' --host 127.0.0.1 --port 8000
 ```
 
-Open the **exact configured origin** plus `/workshop` and enter the account/password in the browser's native HTTP Basic prompt. `localhost` and `127.0.0.1` are different hosts. Wrong/missing credentials return401; enabled routes with missing/invalid configuration return503; disabled routes return404. Page, workshop API, preview and CSV download are protected before body parsing. Protected responses use `Cache-Control: no-store`. Requests to a different host/origin or marked cross-site/same-site are rejected403, including authenticated writes; ordinary same-origin browser requests and authenticated CLI calls without Origin are supported. The existing seven automotive endpoints are outside this boundary. `/docs` exposes API schemas with HTTP Basic authorisation, not stored workshop records.
+Open the **exact configured origin** plus `/workshop` and enter the account/password in the browser's native HTTP Basic prompt. `localhost` and `127.0.0.1` are different hosts. Wrong/missing credentials return401; enabled routes with missing/invalid configuration return503; disabled routes return404. Page, workshop API, preview, CSV download and invoice read/print/issuance are protected before body parsing. Protected responses use `Cache-Control: no-store`. Requests to a different host/origin or marked cross-site/same-site are rejected403, including authenticated writes; ordinary same-origin browser requests and authenticated CLI calls without Origin are supported. The existing seven automotive endpoints are outside this boundary. `/docs` exposes API schemas with HTTP Basic authorisation, not stored workshop records.
 
 `WORKSHOP_ENABLED` defaults false and remains a separate feature gate. The single operator can access all workshop records; there are no per-customer permissions or roles. Close the dedicated browser context to clear its cached Basic credentials; there is no application logout/session manager. Rotate the hash and restart to revoke the old password. Keep HTTP restricted to loopback; non-loopback configured origins require HTTPS. Actual TLS/proxy configuration, brute-force/rate limiting, credential custody and company access policy have not been deployed/verified. Do not expose this prototype publicly. A future shared pilot needs those operating decisions and checks first.
 
@@ -130,7 +130,7 @@ YAP_TEST_POSTGRES_URL="$DATABASE_URL" \
   tests/integration/test_workshop_postgres.py::test_disposable_dump_restore_recovers_history_sources_outputs_and_guards
 ```
 
-The test creates a random schema, one fictional source, two reviewed versions and two private CSVs. With no writers to that schema, it takes a custom-format namespace dump and copies source/output files. It renames only its own disposable namespace, restores it using `pg_restore --exit-on-error --no-owner --no-acl`, restores files to a fresh directory and checks draft/history identity, source bytes, repeat export identities/checksums, migration/model alignment, immutable trigger and reviewed-source FK. It explicitly proves a DB-only restore leaves preview unavailable. Temporary schemas are cleaned by the test; pytest may retain its fictional temporary files under its own retention policy. The test does not rename/drop the application's public schema or restore over company records. Connection credentials pass through subprocess environment, not command arguments/logs. Dumps/source copies remain temporary private fixtures.
+The test creates a random schema, one fictional source, two reviewed versions, two private CSVs and one issued fictional invoice. With no writers to that schema, it takes a custom-format namespace dump and copies source/output files. It renames only its own disposable namespace, restores it using `pg_restore --exit-on-error --no-owner --no-acl`, restores files to a fresh directory and checks draft/history identity, source bytes, repeat export identities/checksums, canonical invoice JSON/HTML/retry identity, migration/model alignment, restored invoice/review mutation guards and reviewed-source FK. It explicitly proves a DB-only restore leaves preview unavailable. Temporary schemas are cleaned by the test; pytest may retain its fictional temporary files under its own retention policy. The test does not rename/drop the application's public schema or restore over company records. Connection credentials pass through subprocess environment, not command arguments/logs. Dumps/source copies remain temporary private fixtures.
 
 For a future real backup, agree owner/host/storage/retention/access first. Freeze workshop writes or establish a coordinated database/files snapshot; a database dump and later uncoordinated file copy are not automatically a consistent pair. Back up the actual DB and referenced original source/CSV files, record schema/mapping versions and verify SHA-256. A source UUID/checksum is not a file backup. Keep permitted backups private with agreed access/encryption and verify restore into a fresh isolated target before relying on them. Do not blindly replay `--clean`, drop a DB, rewrite checksums or overwrite existing storage.
 
@@ -138,8 +138,9 @@ The current rehearsal verifies a namespace restore on the same local PostgreSQL 
 
 ## Before company use
 
-Usefulness is assumed by the user as of 12 October; demand interviews, baseline timing and adoption measurements are optional. Remaining technical decisions/evidence from master Q01–Q10:
+Usefulness is assumed by the user as of 12 October; demand interviews, baseline timing and adoption measurements are optional. Remaining technical decisions/evidence from master Q01–Q11:
 
+- Exact invoice supplier name/address/GST number and IRAS InvoiceNow implementation date (Q11); GST-registered/inclusive prices supplied by user.
 - Reviewer meanings, diagram convention, stage and independently checked examples.
 - External destination format/chain/correction rules only if an integration is later selected; not required for standalone capture/export.
 - Operator/decision owner for the selected operating scope.
@@ -147,3 +148,9 @@ Usefulness is assumed by the user as of 12 October; demand interviews, baseline 
 - Named user identity, access/roles, permitted host, origin/session/CSRF controls, storage, retention/deletion, backup/restore and support owner.
 
 No real company pilot has been deployed. The local account/origin boundary, guide and fictional recovery evidence are development parts of F12; company approval, real account policy, hosting and retention remain unresolved. Actual data/use/outcome claims require actual evidence; the résumé targets remain separate from these tests.
+
+## Invoicing/GST extension
+
+Use [WORKSHOP_INVOICING_GUIDE.md](WORKSHOP_INVOICING_GUIDE.md) for the completed-work→preview→issue→print workflow, Decimal rules and private billing profile. Inclusive is the UI default per user answer. Keep real issuance off until exact supplier settings/selected company operation are established. There is no InvoiceNow transmission, payment receipt, credit-note handling or GST-return preparation. Source record CSV v1 remains unchanged.
+
+Final F13 checks are recorded in the master and verification report: full326-test regression including18 workshop PG cases, fresh Chrome invoice/old-workflow checks and actual browser PDF output; the final UTC fix is covered by JSON equality across PostgreSQL issue/read/retry/restore and fresh restarted HTTP verification.

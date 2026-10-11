@@ -1,0 +1,44 @@
+{
+  "notice": "Actual stored fictional DEMO invoice. Not company billing, payment, registration or adoption evidence.",
+  "invoice": {
+    "id": "3f15cb47-5d53-4dec-8899-2e9c672d57c4",
+    "number": "DEMO-INV-3F15CB475D534DEC88992E9C672D57C4",
+    "preview": {
+      "job_id": "7194c3f4-cc2a-4b50-b4ac-f9b76ddf641d",
+      "revision_id": "6a06ded3-8c51-4247-949d-20adea5fc795",
+      "data_origin": "synthetic_demo",
+      "job_reference": "DEMO-INVOICE-001",
+      "vehicle_reference": "DEMO-VEHICLE-A",
+      "request": {
+        "supplier": {
+          "name": "Fictional Workshop (DEMO)",
+          "address": "1 Fictional Street, Singapore (DEMO)",
+          "gst_status": "registered",
+          "gst_registration_number": "FICTIONAL-NOT-A-REGISTRATION"
+        },
+        "customer": {
+          "name": "Fictional Example Person / 示例",
+          "address": "2 Fictional Street (DEMO)"
+        },
+        "invoice_date": "2026-10-12",
+        "pricing_basis": "inclusive",
+        "discount": "0.00"
+      },
+      "lines": [
+        {
+          "description": "Example filter replacement",
+          "amount": "109.00"
+        }
+      ],
+      "subtotal": "109.00",
+      "net": "100.00",
+      "gst": "9.00",
+      "total": "109.00",
+      "gst_rate": "9%",
+      "calculation_version": "sgd-invoice-v1"
+    },
+    "issued_by": "fictional-local-operator",
+    "issued_at": "2026-10-11T19:15:41.743717Z",
+    "checksum": "48563a7d09b5494ec6b256b2ea0456c8e557a0dfe8385492e2fde7aa4a1cd49a"
+  }
+}

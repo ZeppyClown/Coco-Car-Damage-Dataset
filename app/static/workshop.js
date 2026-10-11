@@ -14,6 +14,7 @@ const scalarFields = [
 const rawFields = [["date_note_raw", "Literal date note"], ["diagram_notes_raw", "Literal diagram / panel notes"], ["written_totals_raw", "Literal total / adjustment notes"]];
 let job = null, sourceId = null, aiProvenance = null, dirty = false, zoom = 1, rotation = 0, reviewed = [];
 let lookupParams = new URLSearchParams(), lookupOffset = 0;
+let billingRevision = null, billingPreview = null, billingIssued = null, billingAllowed = false, billingDirty = false;
 
 function element(tag, text) { const node = document.createElement(tag); if (text) node.textContent = text; return node; }
 function control(parent, id, labelText, type = "text", limit = 200) {
@@ -34,6 +35,7 @@ function stateControl(parent, id, labelText) {
 function markDirty() {
   dirty = true; $("dirty-label").textContent = "Unsaved changes";
   $("confirm-record").disabled = true; $("review-ack").checked = false;
+  updateIssueButton();
 }
 function watchValue(input, state) {
   input.addEventListener("input", () => { state.value = input.value.trim() ? "proposed" : "missing"; markDirty(); });
@@ -95,6 +97,7 @@ function showSource() {
   else { image.removeAttribute("src"); $("image-stage").style.height = "0px"; }
 }
 function render(record = { data_origin: "synthetic_demo", items: [] }) {
+  resetBilling();
   $("reviewer").value = reviewerAccount;
   aiProvenance = record.ai_provenance || null; $("ai-send-ack").checked = false;
   $("ai-provenance").textContent = aiProvenance ? `Initial AI proposal: ${aiProvenance.model} · ${aiProvenance.prompt_version} · source ${aiProvenance.source_document_id}. Review every value; this is not an accuracy result.` : "";
@@ -142,6 +145,10 @@ function renderHistory() {
     }));
     details.append(element("p", "Demo output only. Unknown amounts stay empty; cancelled rows contain literal text without interpreted values."));
     details.append(download);
+    if (record.record_stage === "completed_work") {
+      const bill = element("button", `Prepare invoice · version ${revision.version}`); bill.type = "button";
+      bill.addEventListener("click", () => action(() => prepareInvoice(revision))); details.append(bill);
+    }
     container.append(details);
   }
 }
@@ -151,6 +158,7 @@ async function refreshHistory(append = false) {
   let rows;
   try { rows = await request("/jobs/" + job.id + "/revisions?limit=20&offset=" + (append ? reviewed.length : 0)); }
   catch (error) { $("review-state").textContent = "Reviewed history could not load. Reopen the record to retry."; throw error; }
+  if (!append) await loadJobInvoice();
   reviewed = append ? reviewed.concat(rows) : rows; $("more-history").hidden = rows.length < 20; renderHistory();
 }
 async function historyStatus(message) {
@@ -171,21 +179,23 @@ async function action(task) {
   const controls = [...document.querySelectorAll("button,input,select,textarea")].map(node => [node, node.disabled]);
   controls.forEach(([node]) => node.disabled = true);
   try { await task(); } catch (error) { status(error.message || "Request failed. Your draft remains on screen.", true); }
-  finally { controls.forEach(([node, disabled]) => node.disabled = disabled); $("data-origin").disabled = Boolean(job); $("add-item").disabled = $("items").children.length >= 50; $("confirm-record").disabled = !job || dirty; }
+  finally { controls.forEach(([node, disabled]) => node.disabled = disabled); $("data-origin").disabled = Boolean(job); $("add-item").disabled = $("items").children.length >= 50; $("confirm-record").disabled = !job || dirty; $("invoice-gst-status").disabled = billingRevision?.record.data_origin === "private_source"; updateIssueButton(); }
 }
 function draftChanged(event) { if (!event.target.closest(".review-controls")) markDirty(); }
 $("draft-form").addEventListener("input", draftChanged);
 $("draft-form").addEventListener("change", draftChanged);
 $("data-origin").addEventListener("change", markDirty);
 $("add-item").addEventListener("click", () => { addItem(); markDirty(); });
-$("new-record").addEventListener("click", () => { if (!dirty || window.confirm("Discard unsaved changes and start a new record?")) { job = null; render(); refreshHistory(); history.replaceState(null, "", "/workshop"); status("New draft. No saved record was deleted."); } });
+$("new-record").addEventListener("click", () => { if (!(dirty || billingDirty) || window.confirm("Discard unsaved changes and start a new record?")) { job = null; render(); refreshHistory(); history.replaceState(null, "", "/workshop"); status("New draft. No saved record was deleted."); } });
 $("open-record").addEventListener("click", () => {
-  if (dirty && !window.confirm("Discard unsaved changes and open another record?")) return;
+  if ((dirty || billingDirty) && !window.confirm("Discard unsaved changes and open another record?")) return;
   const id = $("open-id").value.trim(); if (!id) return status("Enter a saved job ID.", true);
   action(async () => { const loaded = await request("/jobs/" + encodeURIComponent(id)); job = loaded; render(job.draft); await historyStatus("Loaded editable draft version " + job.draft_version + "."); });
 });
 $("draft-form").addEventListener("submit", event => {
-  event.preventDefault(); const draft = readDraft();
+  event.preventDefault();
+  if (billingDirty && !window.confirm("Discard unsaved invoice details and save the job?")) return;
+  const draft = readDraft();
   action(async () => {
     const payload = job ? { expected_version: job.draft_version, draft } : draft;
     const saved = await request(job ? "/jobs/" + job.id : "/jobs", { method: job ? "PATCH" : "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload) });
@@ -262,8 +272,95 @@ $("zoom-out").addEventListener("click", () => { zoom = Math.max(.25, zoom - .25)
 $("rotate-source").addEventListener("click", () => { rotation = (rotation + 90) % 360; viewImage(); });
 $("source-image").addEventListener("load", viewImage);
 $("source-image").addEventListener("error", () => status("Source preview could not load. The draft remains editable; check its source before review.", true));
+
+function resetBilling() {
+  billingRevision = null; billingPreview = null; billingIssued = null; billingAllowed = false; billingDirty = false;
+  $("invoice-form").hidden = true; $("issued-invoice").replaceChildren(); $("invoice-preview").textContent = "";
+  $("invoice-ack").checked = false;
+  $("billing-state").textContent = "Choose Prepare invoice on a completed-work version in history.";
+  updateIssueButton();
+}
+function updateIssueButton() {
+  $("issue-invoice").disabled = !billingPreview || !billingAllowed || Boolean(billingIssued) || !$("invoice-ack").checked || dirty;
+}
+function showIssuedInvoice(invoice) {
+  billingIssued = invoice; billingPreview = null; billingDirty = false; $("invoice-form").hidden = true;
+  const container = $("issued-invoice"); container.replaceChildren();
+  container.append(element("p", `${invoice.number} · SGD ${invoice.preview.total} payable · GST SGD ${invoice.preview.gst} · issued by ${invoice.issued_by}`));
+  const link = element("a", "Open issued invoice / Print / Save as PDF");
+  link.href = api + "/invoices/" + invoice.id + "/print"; link.target = "_blank"; link.rel = "noopener"; container.append(link);
+  $("billing-state").textContent = invoice.preview.data_origin === "synthetic_demo" ? "Fictional DEMO invoice saved. Not for payment or tax claims." : "Invoice saved. This is not a payment receipt or an IRAS submission.";
+  updateIssueButton();
+}
+async function loadJobInvoice() {
+  if (!job) return;
+  const response = await fetch(api + "/jobs/" + job.id + "/invoice");
+  if (response.status === 404) return;
+  if (!response.ok) throw new Error("Invoice history could not load. Reopen the job before issuing.");
+  showIssuedInvoice(await response.json());
+}
+function singaporeDate() {
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Singapore", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+  const part = type => parts.find(value => value.type === type).value;
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+async function prepareInvoice(revision) {
+  if (dirty) throw new Error("Save and review your current draft before preparing an invoice.");
+  if (billingIssued) { showIssuedInvoice(billingIssued); $("billing-panel").scrollIntoView(); return; }
+  if (revision.version !== job.draft_version) throw new Error("Choose the current saved and reviewed completed-work version.");
+  if (billingDirty && !window.confirm("Discard unsaved invoice details and prepare this version?")) return;
+  const config = await request("/billing-settings");
+  billingRevision = revision; billingPreview = null; billingDirty = false; $("invoice-ack").checked = false;
+  const real = revision.record.data_origin === "private_source";
+  billingAllowed = !real || (config.real_invoices_enabled && Boolean(config.supplier));
+  const supplier = real ? config.supplier : null;
+  $("invoice-supplier-name").value = supplier?.name || "";
+  $("invoice-supplier-address").value = supplier?.address || "";
+  $("invoice-gst-status").value = supplier?.gst_status || "registered";
+  $("invoice-gst-number").value = supplier?.gst_registration_number || "";
+  for (const name of ["name", "address"]) $("invoice-supplier-" + name).readOnly = real;
+  $("invoice-gst-number").readOnly = real; $("invoice-gst-status").disabled = real;
+  $("invoice-customer-name").value = revision.record.customer_reference || "";
+  $("invoice-customer-address").value = ""; $("invoice-date").value = singaporeDate();
+  $("invoice-basis").value = "inclusive"; $("invoice-discount").value = "0.00";
+  $("invoice-preview").textContent = ""; $("invoice-form").hidden = false;
+  $("billing-state").textContent = billingAllowed ? `Billing reviewed version ${revision.version}. Preview first; fictional supplier details must be explicitly entered for a demo.` : "Real issuance is disabled or the company supplier profile is missing. Continue using fictional invoices until configured.";
+  updateIssueButton(); $("billing-panel").scrollIntoView();
+}
+function invoiceRequest() {
+  return { supplier: { name: $("invoice-supplier-name").value.trim(), address: $("invoice-supplier-address").value.trim(),
+    gst_status: $("invoice-gst-status").value, gst_registration_number: $("invoice-gst-number").value.trim() || null },
+    customer: { name: $("invoice-customer-name").value.trim(), address: $("invoice-customer-address").value.trim() },
+    invoice_date: $("invoice-date").value, pricing_basis: $("invoice-basis").value, discount: $("invoice-discount").value.trim() };
+}
+$("invoice-form").addEventListener("input", event => {
+  if (event.target.id !== "invoice-ack") { billingDirty = true; billingPreview = null; $("invoice-preview").textContent = "Billing details changed. Preview again."; $("invoice-ack").checked = false; }
+  updateIssueButton();
+});
+$("invoice-form").addEventListener("change", event => {
+  if (event.target.id !== "invoice-ack") { billingDirty = true; billingPreview = null; $("invoice-ack").checked = false; }
+  updateIssueButton();
+});
+$("invoice-form").addEventListener("submit", event => {
+  event.preventDefault(); if (!billingRevision || billingIssued) return;
+  billingPreview = null; $("invoice-ack").checked = false; updateIssueButton();
+  action(async () => {
+    billingPreview = await request("/revisions/" + billingRevision.id + "/invoice-preview", {
+      method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(invoiceRequest()) });
+    $("invoice-preview").textContent = `DRAFT · SGD\nSubtotal (${billingPreview.request.pricing_basis}): ${billingPreview.subtotal}\nDiscount: ${billingPreview.request.discount}\nTotal excluding GST: ${billingPreview.net}\nGST (${billingPreview.gst_rate}): ${billingPreview.gst}\nTotal payable: ${billingPreview.total}\nCancelled items excluded. Nothing issued yet.`;
+  });
+});
+$("issue-invoice").addEventListener("click", () => {
+  if (!billingPreview || !billingAllowed || billingIssued || dirty || !$("invoice-ack").checked) return;
+  const preview = billingPreview;
+  action(async () => {
+    const invoice = await request("/revisions/" + preview.revision_id + "/invoice", { method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ invoice: preview.request, acknowledged: true }) });
+    showIssuedInvoice(invoice); status("Invoice saved with an immutable copy. Open it to print or save as PDF.");
+  });
+});
 window.addEventListener("resize", viewImage);
-window.addEventListener("beforeunload", event => { if (dirty) { event.preventDefault(); event.returnValue = ""; } });
+window.addEventListener("beforeunload", event => { if (dirty || billingDirty) { event.preventDefault(); event.returnValue = ""; } });
 render();
 renderHistory();
 const initialJob = new URLSearchParams(location.search).get("job");

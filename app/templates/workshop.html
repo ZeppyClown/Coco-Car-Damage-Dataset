@@ -88,6 +88,32 @@
     <p class="hint">CSV uses a fictional demo mapping. It does not match or write to the workshop's financial software. Formula-like cells are escaped for spreadsheet safety; stored values stay unchanged.</p>
     <div id="reviewed-history"></div><button type="button" id="more-history" hidden>Older reviewed versions</button>
   </section>
+  <section class="card history-panel" id="billing-panel" aria-labelledby="billing-heading">
+    <h2 id="billing-heading">Invoicing and GST</h2>
+    <p class="hint">Prepare an invoice from reviewed completed work. Each captured item amount is a line total. Prices include GST by default, as instructed. Check the supplier, customer, price basis and any discount before issuing.</p>
+    <p class="notice">Fictional records produce DEMO invoices. Real issuance requires configured company billing details. Printed invoices do not submit data to IRAS or InvoiceNow.</p>
+    <p id="billing-state" role="status">Choose Prepare invoice on a completed-work version in history.</p>
+    <div id="issued-invoice"></div>
+    <form id="invoice-form" hidden>
+      <div class="form-grid">
+        <label>Supplier name<input id="invoice-supplier-name" maxlength="200" required></label>
+        <label>Supplier address<textarea id="invoice-supplier-address" maxlength="2000" required></textarea></label>
+        <label>Supplier GST status<select id="invoice-gst-status"><option value="registered">GST-registered</option><option value="not_registered">Not GST-registered</option></select></label>
+        <label>Supplier GST registration number<input id="invoice-gst-number" maxlength="200"></label>
+        <label>Customer billing name<input id="invoice-customer-name" maxlength="200" required></label>
+        <label>Customer billing address<textarea id="invoice-customer-address" maxlength="2000" required></textarea></label>
+        <label>Invoice date (Singapore)<input id="invoice-date" type="date" required readonly></label>
+        <label>Captured line prices<select id="invoice-basis"><option value="inclusive">Include GST</option><option value="exclusive">Exclude GST</option></select></label>
+        <label>Invoice discount (same price basis, SGD)<input id="invoice-discount" value="0.00" inputmode="decimal" required></label>
+      </div>
+      <p class="hint">Source written totals and adjustments remain source observations. Billing uses active reviewed line amounts and the explicit discount above; it does not infer a discount from handwriting. Cancelled items are excluded.</p>
+      <button type="submit">Preview invoice totals</button>
+      <pre id="invoice-preview" aria-live="polite"></pre>
+      <label><input id="invoice-ack" type="checkbox">I checked the billing details, completed work, prices, GST basis and discount. This is a current local supply under the displayed GST treatment. Issue one immutable invoice for this job.</label>
+      <button type="button" id="issue-invoice" disabled>Issue invoice</button>
+      <p class="hint">An issued invoice cannot be edited or reissued from a corrected job. Credit notes, payments and GST returns require further scope.</p>
+    </form>
+  </section>
 </main>
 </body>
 </html>

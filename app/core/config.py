@@ -3,6 +3,7 @@ from typing import Optional
 import os
 from pathlib import Path
 from pydantic import SecretStr
+from app.schemas.workshop_invoice import InvoiceSupplier
 
 
 class Settings(BaseSettings):
@@ -19,6 +20,8 @@ class Settings(BaseSettings):
     WORKSHOP_AUTH_USERNAME: Optional[str] = None
     WORKSHOP_AUTH_PASSWORD_HASH: Optional[SecretStr] = None
     WORKSHOP_ORIGIN: Optional[str] = None
+    WORKSHOP_REAL_INVOICES_ENABLED: bool = False
+    WORKSHOP_BILLING_SUPPLIER: Optional[InvoiceSupplier] = None
     WORKSHOP_STORAGE_DIR: Path = Path(__file__).resolve().parents[2] / "car mechanic assistant/runtime/workshop"
 
     # Database

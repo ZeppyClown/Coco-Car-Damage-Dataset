@@ -32,6 +32,10 @@ from app.db.models import WorkshopExport
 from app.services.workshop import generate_export, export_file, lookup_jobs
 from app.services.workshop import demo_csv, DEMO_MAPPING_VERSION
 from app.schemas.workshop import WorkshopRevisionResponse
+from app.db.models import WorkshopInvoice
+from app.schemas.workshop_invoice import InvoiceRequest
+from app.services.workshop_invoice import issue_invoice, get_invoice, invoice_html, invoice_response
+from tests.unit.test_workshop_invoice import billing_request
 
 
 @pytest.fixture
@@ -399,9 +403,12 @@ def test_disposable_dump_restore_recovers_history_sources_outputs_and_guards(wor
         first_output = generate_export(db, first.id)
         draft.source_document_id = None
         draft.job_reference = "DEMO-RECOVERY-CORRECTION"
+        draft.record_stage = "completed_work"
         update_job(db, job_id, WorkshopDraftUpdate(expected_version=1, draft=draft))
         second = confirm_job(db, job_id, WorkshopConfirmRequest(expected_version=2, reviewer="Fictional recovery reviewer", acknowledged=True))
         second_output = generate_export(db, second.id)
+        invoice = issue_invoice(db, second.id, InvoiceRequest.model_validate(billing_request()), "Fictional recovery operator")
+        expected_invoice_html = invoice_html(get_invoice(db, invoice.id))
         expected_job = get_job(db, job_id).draft
         expected_history = [row.model_dump(mode="json") for row in list_revisions(db, job_id)]
         schema = db.scalar(text("SELECT current_schema()"))
@@ -435,6 +442,10 @@ def test_disposable_dump_restore_recovers_history_sources_outputs_and_guards(wor
         with Session(engine) as db:
             assert get_job(db, job_id).draft == expected_job and get_job(db, job_id).draft_version == 2
             assert [row.model_dump(mode="json") for row in list_revisions(db, job_id)] == expected_history
+            restored_invoice = get_invoice(db, invoice.id)
+            assert invoice_response(restored_invoice).model_dump(mode="json") == invoice.model_dump(mode="json")
+            assert invoice_html(restored_invoice) == expected_invoice_html
+            assert issue_invoice(db, second.id, InvoiceRequest.model_validate(billing_request()), "Fictional retry").model_dump(mode="json") == invoice.model_dump(mode="json")
             assert document_file(get_document(db, source.id)).read_bytes() == content
             for expected in (first_output, second_output):
                 assert generate_export(db, expected.revision_id).model_dump() == expected.model_dump()
@@ -450,7 +461,65 @@ def test_disposable_dump_restore_recovers_history_sources_outputs_and_guards(wor
         with pytest.raises(IntegrityError):
             with engine.begin() as connection:
                 connection.execute(WorkshopDocument.__table__.delete().where(WorkshopDocument.id == source.id))
+        with pytest.raises(DBAPIError, match="Issued invoices cannot change"):
+            with engine.begin() as connection:
+                connection.execute(text("UPDATE workshop_invoices SET html='tampered'"))
     finally:
         with admin.begin() as connection:
             connection.execute(text(f'DROP SCHEMA IF EXISTS "{archived}" CASCADE'))
         admin.dispose()
+
+
+@pytest.mark.parametrize("different_requests", [False, True])
+def test_invoice_concurrent_retry_or_conflict(workshop_postgres, different_requests):
+    engine = workshop_postgres
+    migrate(engine)
+    draft = reviewed_fixture()
+    draft.record_stage = "completed_work"
+    with Session(engine) as db:
+        job_id = create_job(db, draft).id
+        revision = confirm_job(db, job_id, WorkshopConfirmRequest(expected_version=1, reviewer="Fictional", acknowledged=True))
+    barrier = Barrier(2)
+    def bill(index):
+        with Session(engine) as db:
+            request = InvoiceRequest.model_validate(billing_request(discount="1.00" if different_requests and index else "0.00"))
+            barrier.wait(timeout=10)
+            try:
+                invoice = issue_invoice(db, revision.id, request, "Fictional concurrent operator")
+                return 200, invoice.id
+            except HTTPException as error:
+                return error.status_code, None
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(bill, range(2)))
+    assert sorted(status for status, _ in results) == ([200, 409] if different_requests else [200, 200])
+    if not different_requests:
+        assert results[0][1] == results[1][1]
+    with Session(engine) as db:
+        invoice = db.scalar(select(WorkshopInvoice))
+        assert len(db.scalars(select(WorkshopInvoice)).all()) == 1
+        assert invoice_html(invoice).startswith("<!doctype html>")
+
+
+def test_invoice_migration_preserves_auth_head_reviews_and_exports(workshop_postgres, tmp_path, monkeypatch):
+    engine = workshop_postgres
+    migrate(engine, "20261011_auth")
+    monkeypatch.setattr(settings, "WORKSHOP_STORAGE_DIR", tmp_path)
+    draft = reviewed_fixture()
+    draft.record_stage = "completed_work"
+    with Session(engine) as db:
+        job_id = create_job(db, draft).id
+        review = confirm_job(db, job_id, WorkshopConfirmRequest(expected_version=1, reviewer="Fictional", acknowledged=True), authenticated=True)
+        output = generate_export(db, review.id)
+        original = export_file(get_export(db, output.id)).read_bytes()
+    migrate(engine)
+    with Session(engine) as db:
+        assert list_revisions(db, job_id)[0].model_dump() == review.model_dump()
+        assert generate_export(db, review.id).model_dump() == output.model_dump()
+        assert export_file(get_export(db, output.id)).read_bytes() == original
+        invoice = issue_invoice(db, review.id, InvoiceRequest.model_validate(billing_request()), "Fictional operator")
+    with Session(engine) as db:
+        assert invoice_response(get_invoice(db, invoice.id)).model_dump(mode="json") == invoice.model_dump(mode="json")
+    for sql in ("UPDATE workshop_invoices SET issued_by='forged'", "DELETE FROM workshop_invoices"):
+        with pytest.raises(DBAPIError, match="Issued invoices cannot change"):
+            with engine.begin() as connection:
+                connection.execute(text(sql))

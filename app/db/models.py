@@ -348,3 +348,17 @@ class WorkshopExport(Base):
     storage_key = Column(String(120), nullable=False, unique=True)
     byte_size = Column(Integer, nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class WorkshopInvoice(Base):
+    __tablename__ = "workshop_invoices"
+
+    id = Column(Uuid, primary_key=True, default=uuid4)
+    job_id = Column(Uuid, ForeignKey("workshop_jobs.id"), nullable=False, unique=True)
+    revision_id = Column(Uuid, ForeignKey("workshop_job_revisions.id"), nullable=False)
+    number = Column(String(200), nullable=False, unique=True)
+    snapshot = Column(JSON, nullable=False)
+    issued_by = Column(String(200), nullable=False)
+    issued_at = Column(DateTime(timezone=True), nullable=False)
+    html = Column(Text, nullable=False)
+    checksum = Column(String(64), nullable=False)

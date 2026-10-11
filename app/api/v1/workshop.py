@@ -2,7 +2,7 @@ from uuid import UUID
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -11,6 +11,8 @@ from app.db.session import get_db
 from app.schemas.workshop import WorkshopDraft, WorkshopDraftUpdate, WorkshopJobResponse, WorkshopDocumentResponse, DataOrigin, RecordStage, WorkshopConfirmRequest, WorkshopRevisionResponse, WorkshopExportResponse, WorkshopExtractionRequest, WorkshopLookupResponse
 from app.services.workshop_extraction import extract_source
 from app.services.workshop import create_job, get_job, update_job, attach_document, get_document, document_file, MAX_UPLOAD_BYTES, confirm_job, list_revisions, generate_export, get_export, export_file, lookup_jobs
+from app.schemas.workshop_invoice import InvoiceRequest, InvoiceIssueRequest, InvoicePreview, InvoiceResponse, InvoiceSettingsResponse
+from app.services.workshop_invoice import preview_invoice, issue_invoice, get_invoice, job_invoice, invoice_response, invoice_html
 
 
 def require_workshop_enabled(request: Request):
@@ -93,3 +95,37 @@ def download_demo_export(export_id: UUID, db: Session = Depends(get_db)):
         export_file(export), media_type="text/csv; charset=utf-8", filename=f"workshop-demo-{export.id}.csv",
         headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
     )
+
+
+@router.get("/billing-settings", response_model=InvoiceSettingsResponse)
+def billing_settings():
+    return InvoiceSettingsResponse(real_invoices_enabled=settings.WORKSHOP_REAL_INVOICES_ENABLED,
+                                   supplier=settings.WORKSHOP_BILLING_SUPPLIER)
+
+
+@router.post("/revisions/{revision_id}/invoice-preview", response_model=InvoicePreview)
+def calculate_bill(revision_id: UUID, request: InvoiceRequest, db: Session = Depends(get_db)):
+    return preview_invoice(db, revision_id, request)
+
+
+@router.post("/revisions/{revision_id}/invoice", response_model=InvoiceResponse)
+def issue_bill(revision_id: UUID, request: InvoiceIssueRequest, db: Session = Depends(get_db), actor: str = Depends(require_workshop_enabled)):
+    return issue_invoice(db, revision_id, request.invoice, actor)
+
+
+@router.get("/jobs/{job_id}/invoice", response_model=InvoiceResponse)
+def read_job_bill(job_id: UUID, db: Session = Depends(get_db)):
+    return job_invoice(db, job_id)
+
+
+@router.get("/invoices/{invoice_id}", response_model=InvoiceResponse)
+def read_bill(invoice_id: UUID, db: Session = Depends(get_db)):
+    return invoice_response(get_invoice(db, invoice_id))
+
+
+@router.get("/invoices/{invoice_id}/print", response_class=HTMLResponse)
+def print_bill(invoice_id: UUID, db: Session = Depends(get_db)):
+    return HTMLResponse(invoice_html(get_invoice(db, invoice_id)), headers={
+        "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff",
+        "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'",
+    })

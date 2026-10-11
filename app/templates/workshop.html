@@ -63,7 +63,8 @@
       <h2>Editable draft</h2>
       <p class="hint">Missing means unknown, including amounts. Confirm only values you have checked. Editing a confirmed value makes it proposed again.</p>
       <label>Record stage<select id="record-stage" aria-label="Record stage"><option value="unknown">Unknown</option><option value="quote">Quote</option><option value="approved_scope">Approved scope</option><option value="completed_work">Completed work</option></select></label>
-      <label>Manual provenance / clarification<textarea id="manual-provenance" maxlength="2000" placeholder="Required for later review if no source is attached"></textarea></label>
+      <label>Manual provenance / clarification<textarea id="manual-provenance" maxlength="2000" placeholder="Required if no source is attached or diagram meaning is supplied"></textarea></label>
+      <p class="hint">For diagram meaning, state who clarified it, what was established and the vehicle left/right convention if relevant. A marked area alone does not authorise a repair.</p>
       <h3>References</h3><div id="scalar-fields" class="form-grid"></div>
       <h3>Items</h3><p class="hint">Keep crossed-out rows and mark them cancelled. Leave unclear interpretations or amounts unresolved.</p>
       <div id="items"></div><button type="button" id="add-item">Add item</button>

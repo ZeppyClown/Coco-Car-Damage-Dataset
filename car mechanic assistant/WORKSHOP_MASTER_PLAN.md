@@ -1,6 +1,6 @@
 # Workshop job-sheet project — master plan and implementation ledger
 
-**Last updated:** 11 October 2026. **Current phase:** F01–F06 and F10 VERIFIED; F07/F11 mocked/synthetic development checks verified, live/provider/company evaluation pending. Manual workflow, lookup and field-comparison harness work. Next: F08 manual clarification provenance, then local operating/backup rehearsal.
+**Last updated:** 11 October 2026. **Current phase:** manual F01–F06/F08/F10 and synthetic F07/F11 checks verified; real/provider/company prerequisites pending. Next independent part: F12 local operating guide and disposable recovery rehearsal.
 
 This is the authoritative implementation/handoff document for the workshop administrative project. Every contributor, including Codex and Claude, must update it for **every feature or implementation part**, including partial work, fixes, migrations, tests, configuration and changed decisions. Do not rely on chat history to resume the work.
 
@@ -8,7 +8,7 @@ The first product is a small local application that turns a permitted paper shee
 
 ## 1. Start here: the actual next task
 
-**Next ready task: F08 manual clarification provenance/checks, then F12 local operating guide and disposable backup/restore rehearsal.** F01–F06, F10 and mocked/synthetic F07/F11 checks are verified. Live Gemini acceptance/accuracy still needs explicit model configuration and a synthetic smoke test; private-source processing remains blocked. The user explicitly selected job-sheet capture/review; public-reference RAG remains separate research.
+**Next ready task: F12 local operating guide and disposable backup/restore rehearsal.** F01–F06, F10 and mocked/synthetic F07/F11 checks are verified. Live Gemini acceptance/accuracy still needs explicit model configuration and a synthetic smoke test; private-source processing remains blocked. The user explicitly selected job-sheet capture/review; public-reference RAG remains separate research.
 
 Do not start by scanning an archive, training a model, building a vector database or integrating the accounting system. None is required to demonstrate the core review workflow.
 
@@ -24,8 +24,8 @@ This milestone is a local demonstration. It does not claim company deployment, r
 2. Run `git status --short` and identify unrelated user work. On 11 October, `PROJECT_SUMMARY.md` is modified and `SYSTEM_DESIGN.md` is untracked; preserve both unless the user explicitly includes them in the task.
 3. Read the existing schema/session/router/test fixtures listed in section 5. Confirm actual paths before adding code.
 4. Check whether the private visit files exist locally. Their absence does not block a synthetic/manual prototype. Do not obtain company files from public search as replacements for actual evidence.
-5. Mark the next ready feature (currently F08 manual scope) `IN_PROGRESS` and state the exact scope in the ledger below.
-6. Verify the manual diagram/shorthand boundary: area-only marks cannot become active repair work, clarified meanings need stated context, literal/cancelled notes and reviewer attribution survive history/output. Real vocabulary/meaning remains pending Q01. Then document and rehearse local backup/restore without deploying a company pilot.
+5. Mark the next ready feature (currently F12 local guide/rehearsal) `IN_PROGRESS` and state the exact scope in the ledger below.
+6. Rehearse PostgreSQL dump/restore and source/output recovery only in a disposable local test schema/storage. Document startup, review/correction/output, failed/conflicted requests, backup consistency and unresolved pilot access/retention/provider decisions. No public/live deployment is authorised.
 7. Update the ledger, verification table, next task and work log **before** committing. Commit only the intended files, then push as previously authorised by the user.
 
 ## 2. Business problem and scope
@@ -300,6 +300,12 @@ Labels/predictions must cover the same unique opaque IDs. Labels carry nonblank 
 
 Public cases are authored **contract fixtures**, not handwriting/image ground truth or real provider output. The deliberately imperfect mock set includes3 cases, one timeout,22 resolved comparison values (identity5, amount2, description3, date0, literal8, cancellation4),3 proposed values where labels say unknown and2 cancelled interpretations excluded. These counts verify the evaluator, not AI quality. The guide specifies independent company labels/held-out data and complete existing/manual/AI workflow timing, including remaining copying/clarification/rework. No company label set, live model metric or business baseline exists yet.
 
+### Implemented F08 manual annotation boundary (real meanings pending)
+
+Raw diagram/shorthand text is stored/displayed literally; no panel recognition, screen-coordinate left/right conversion or inferred repair operation exists. The AI proposal route cannot supply `diagram_notes`. Manual clarified meaning uses the explicit diagram review state; **new confirmation** additionally requires nonblank `manual_provenance` stating clarification context. The UI asks who clarified meaning, what was established and vehicle convention when relevant. Text presence cannot prove that explanation is correct or enforce a real panel vocabulary; Q01 remains unresolved.
+
+An area-only mark without an active interpreted item cannot confirm as work. Cancelled rows retain raw text but unreviewed interpretations stay out of active CSV values. Reviewer identity/time and clarified/raw/context text survive history/output while the quote stays a quote. Older snapshots lacking context remain readable/exportable and get an explicit history notice; the stronger new-confirmation rule does not rewrite or invalidate immutable historical records. Repeat confirmation of an already-reviewed version still returns its original snapshot. Add context to a new draft/review to supersede it.
+
 ### Suggested API boundaries
 
 The implementer may simplify route naming, but must document the final contract here. All are under `/api/v1/workshop`; the HTML page is `/workshop`.
@@ -333,7 +339,7 @@ Allowed statuses: `READY`, `IN_PROGRESS`, `IMPLEMENTED_UNVERIFIED`, `VERIFIED`, 
 | F05 | Confirmation, immutable revisions and conflict handling | VERIFIED | F02/F04 | Atomic/idempotent confirmation, bounded read-only history, corrections, source FK and PG mutation guard; local self-reported reviewer |
 | F06 | Reproducible demonstration CSV output | VERIFIED | F05 | Fixed demo mapping, private output identity/checksum, concurrent reuse and browser per-version download/reopen passed |
 | F07 | Optional AI image-to-draft extraction | IMPLEMENTED_UNVERIFIED | F03–F06 | Mock API/SDK/UI workflow verified; live provider/model/schema acceptance unverified; private-source use blocked pending Q07 |
-| F08 | Reviewed diagram/shorthand interpretation | WAITING_COMPANY for real labels | F04/F07 | Manual annotation can work now; meaning cannot be fabricated |
+| F08 | Reviewed diagram/shorthand interpretation | IMPLEMENTED_UNVERIFIED | F04/F07 | Manual clarification/context/raw/cancelled/history/output checks verified; actual company meanings/vocabulary pending Q01 |
 | F09 | Actual destination mapping and export | WAITING_COMPANY | F06 | One destination schema plus checked record chain needed |
 | F10 | Basic lookup of confirmed records | VERIFIED | F05 | Latest reviewed per job, literal bounded filters/pagination/newer-draft status; SQLite/PG and Chrome checks passed |
 | F11 | Extraction and end-to-end evaluation | IMPLEMENTED_UNVERIFIED | F06/F07/F09 | Synthetic evaluator/CLI/protocol verified; real independent labels/provider metrics/workflow baseline pending Q08 |
@@ -662,6 +668,9 @@ If interrupted mid-feature, record what exists, what is broken/unverified, the l
 | 11 October 2026 | F11 comparison/CLI regression | Targeted evaluator pytest; explicit PG full suite; clean API workshop tests | **17 targeted passed/7 warnings;244 full passed/no skips/127 warnings;171 clean passed/46 warnings** |3 authored contract cases and deliberately bad mock predictions; no live AI/business measurement |
 | 11 October 2026 | F11 CLI fixture report | `python -m scripts.evaluate_workshop ... --prediction-kind mocked` |3 cases/22 resolved values; one timeout;3 unknown-value candidates;2 cancelled fields excluded; exact expected error counts checked | Does not validate handwriting, reviewer authority, retrieval precision or actual company outcomes |
 
+| 11 October 2026 | F08 manual annotation regression | Targeted schema/review/diagram checks, PG whole suite, clean API workshop suite | **248 passed/no skips/127 warnings**; clean **175 passed/46 warnings** |4 new area/context/cancelled/provenance/legacy cases; fictional semantics only |
+| 11 October 2026 | F08 browser confirmation boundary | Full isolated Chrome harness + missing diagram context, correction/save/rereview | Passed; input retained on422, explicit context allows new review | Does not verify actual workshop conventions or authorised repair meanings |
+
 Replace vague “tests pass” with the command, counts, skipped checks and test environment. PostgreSQL integration is skipped without its explicit disposable test URL; do not present a skipped test as passed.
 
 ### Commands to adapt during implementation
@@ -714,11 +723,11 @@ Record a question as resolved only when there is an actual answer. An elapsed wa
 ## 15. Current handoff snapshot
 
 - **Branch/repository:** `main`, remote `origin` is the user's existing GitHub repository. Verify actual remote before pushing on a different machine.
-- **Previous delivery before F11:** `d084c2b`, reviewed lookup. Read Git history for F11 delivery hash.
+- **Previous delivery before F08:** `709d08a`, synthetic evaluator. Read Git history for F08 delivery hash.
 - **What exists:** current automotive API/RAG, visit review/planning material, F01 schemas/fictional fixtures and F02 workshop models/migration/draft service/API/tests.
-- **Latest implementation:** F11 no-network field comparator with separate labels/predictions, explicit unknown/cancelled/failure denominators and company trial guide.17 evaluator cases passed; full244/clean API171 passed. Browser code unchanged since verified F10.
+- **Latest implementation:** F08 new-confirmation diagram context guard/UI hint, legacy-history notice and4 fictional boundary/preservation cases. Full248/clean API175 passed; full Chrome flow plus missing-context correction passed.
 - **What does not exist:** live extraction evidence, independently labelled real benchmark, actual destination mapping or permitted company pilot.
-- **Next ready feature:** F08 manual clarification guard/checks, then F12 local guide/backup rehearsal. F07 live smoke and real F08/F09/F11/F12 remain conditional.
+- **Next ready feature:** F12 local operating guide and disposable recovery rehearsal. F07 live smoke and real F08/F09/F11/F12 remain conditional.
 - **Independent work available:** safe source attach/preview, local manual UI, confirmation, demo output and later mocked extraction; lack of company access does not block these.
 - **Unrelated changes to preserve:** root `PROJECT_SUMMARY.md` and `SYSTEM_DESIGN.md` as seen on this machine; verify current status rather than assuming it remains identical.
 - **Open decisions:** real output mapping, model-processing path, operator and expected labels. None should be fabricated.
@@ -730,7 +739,8 @@ Continue the workshop job-sheet project in this repository. Read AGENTS.md,
 CLAUDE.md and car mechanic assistant/WORKSHOP_MASTER_PLAN.md first.
 Treat the master plan as the current implementation ledger. Inspect Git status
 and preserve unrelated user work. F01–F06 manual milestone is verified. Start
-F08 manual clarification guard/checks and local F12 guide/rehearsal. F11 synthetic
+F12 local guide/recovery rehearsal. Manual F08 is verified; actual meanings remain
+pending Q01. F11 synthetic
 harness/F10 lookup are verified. F07 mocked checks passed; live
 provider use is unverified and private-source AI remains blocked. Use synthetic examples until
 real-data prerequisites are met. Keep company visit files and runtime artifacts
@@ -892,3 +902,15 @@ The assessment separates physical/parsable/quality-approved/indexed pages, class
 - **Limits:** public sources are authored contract cases, not handwriting ground truth; predictions deliberately mocked, not live Gemini results. Zero category denominator returns null. Row order is the alignment rule, no fuzzy merging. Private-source declarations do not prove independent company review. Q01/Q02/Q07/Q08/F09 prerequisites remain pending for real semantic/e2e/business results; no90% retrieval claim or time/adoption inference.
 - **Commit/push:** intended evaluator/fixtures/tests/guide/master/build/readme only; private data/runtime and unrelated root docs preserved.
 - **Next:** F08 preserve manual clarification context/unknown diagram boundaries and prove cancelled/raw provenance across review/output. F12 local guide and disposable backup/restore rehearsal can then proceed without pretending a company pilot is approved.
+
+
+### 11 October 2026 — F08, manual clarification context and preservation
+
+- **Status:** IMPLEMENTED_UNVERIFIED for company semantics; manual freeform boundary verified. Next F12 local guide/recovery rehearsal.
+- **Files:** confirmation service, manual HTML/JS,4 `test_workshop_diagram.py` cases and browser extension. No new vocabulary/model/schema/migration/dependency.
+- **Behaviour:** area-only annotation cannot create active repair work; diagram meaning on a new confirmation needs stated clarification context even with an image. UI requests speaker/established meaning/vehicle direction convention. Raw/cancelled notes, clarified meaning, context and reviewer survive snapshot/output without quote-stage promotion. Older snapshots without the newer context rule remain readable/exportable with a notice; no immutable history mutation/retroactive schema invalidation.
+- **Verification:** initial targeted61 cases passed/14 warnings; after legacy-case addition final **248 passed/no skips/127 warnings** with PostgreSQL; clean API **175 passed/46 warnings**.4 boundary/preservation cases include area-only block, image+meaning-without-context block, manual raw/cancelled/reviewer/quote/output retention and previous-shape history/export compatibility. Full Chrome flow passed missing-context422 with value retention, added context→save/rereview. AI still cannot supply diagram meaning.
+- **Decision:** apply the stronger rule only at new confirmation rather than the persisted DTO schema, so previously legitimate immutable snapshots continue to load. Existing reviewed-version repeat is still idempotent.
+- **Limits/questions:** freeform text cannot validate the truth of a convention/repair action or authenticate its speaker. No real panel glossary, shorthand labels, automated diagram interpretation or company reviewer approval. Q01/Q02 remain pending; no screenshot-coordinate conversion or guessed operation is introduced.
+- **Commit/push:** intended small guard/UI/tests/docs increment; public tests fictional, private originals/runtime/unrelated root docs unchanged/excluded.
+- **Next:** local F12 operating guide and actual disposable-schema/source/output recovery rehearsal; real access/pilot/retention/mapping still require company answers.

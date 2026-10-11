@@ -117,6 +117,7 @@ function renderHistory() {
     details.append(element("summary", `Reviewed version ${revision.version} · ${stages[record.record_stage]} · ${record.job_reference}`));
     details.append(element("p", `Reviewer: ${revision.reviewer} (self-reported) · ${new Date(revision.reviewed_at).toLocaleString()}`));
     if (record.ai_provenance) details.append(element("p", `Initial AI proposal: ${record.ai_provenance.model} · ${record.ai_provenance.prompt_version} · source ${record.ai_provenance.source_document_id}`));
+    if (record.diagram_notes && !record.manual_provenance) details.append(element("p", "This older version has no stated diagram clarification context. Add it to a new draft and review again."));
     for (const [name, label] of scalarFields) if (record[name] != null) details.append(element("p", label + ": " + record[name]));
     for (const [name, label] of rawFields) if (record[name]) details.append(element("pre", label + ": " + record[name]));
     for (const item of record.items) {

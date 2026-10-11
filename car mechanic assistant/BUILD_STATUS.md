@@ -213,3 +213,10 @@ Verification: **227 passed/no skips/127 warnings** with PostgreSQL14.20; clean A
 Added no-network field comparison with separately supplied labels/predictions and declared prediction kind, exact canonical values, visible unknown/cancelled/failure/row/critical-error counts and separate origins. Proposed gold labels, empty/missing/duplicate/unmatched inputs fail; failed responses cannot earn abstention. Aggregate output omits identifying values/IDs. Evaluation guide documents held-out independent company labels and complete current/manual/AI task timing; those observations do not exist yet.
 
 Verification:17 targeted evaluator/CLI checks; final **244 passed/no skips/127 warnings** with PostgreSQL; clean API **171 passed/46 warnings**. CLI ran on3 deliberately imperfect authored contract cases with22 resolved values,1 simulated timeout,3 unknown-value candidates and2 cancelled exclusions. Empty literal/missing-row denominator handling corrected before final run. No live model/handwriting/company accuracy or business/adoption result. Next manual F08 provenance boundary then local F12 guide/recovery rehearsal; master and README updated.
+
+
+## Workshop F08 — manual clarification boundary verified,11October2026
+
+New confirmations with interpreted diagram notes now require stated clarification context; UI requests speaker/established meaning/vehicle direction convention. Area-only marks cannot become active work. Literal/cancelled/context/reviewer data survive history/demo output with stage unchanged. Earlier immutable snapshots remain readable/exportable and get a missing-context history notice; the stronger rule applies at new confirmation, not retroactive DTO validation.
+
+Verification: **248 passed/no skips/127 warnings** with PostgreSQL; clean API **175 passed/46 warnings**.4 new fictional boundary/preservation/legacy cases; browser full regression plus missing-context422 retained values and successful clarification/rereview passed. No actual company panel vocabulary/shorthand semantic validation or automated diagram recognition; Q01/Q02 pending. F12 local guide/recovery rehearsal is next.

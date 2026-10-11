@@ -275,6 +275,8 @@ def confirm_job(db: Session, job_id: UUID, request: WorkshopConfirmRequest):
                 {"loc": ["draft", *issue["loc"]], "msg": issue["msg"], "type": issue["type"]}
                 for issue in error.errors()
             ]) from None
+        if record.diagram_notes is not None and record.manual_provenance is None:
+            raise HTTPException(status_code=422, detail="Review of diagram meaning requires stated clarification context in manual provenance")
         _validate_source(db, record)
         if record.source_document_id is not None:
             document_file(get_document(db, record.source_document_id))

@@ -1,0 +1,87 @@
+// Run against an explicitly provisioned local demo DB; creates fictional jobs.
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const { chromium } = require(path.resolve(process.argv[2]));
+const base = process.argv[3] || "http://127.0.0.1:18041";
+assert(["127.0.0.1", "localhost"].includes(new URL(base).hostname), "Local demo only");
+const artifactDir = path.resolve("car mechanic assistant/runtime/workshop-browser-tests");
+fs.mkdirSync(artifactDir, { recursive: true });
+
+(async () => {
+  const browser = await chromium.launch({ channel: "chrome", headless: true });
+  try {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+    const page = await context.newPage();
+    const errors = [];
+    page.on("pageerror", error => errors.push(error.message));
+    await page.goto(base + "/workshop");
+    await page.locator("#source-file").setInputFiles("tests/fixtures/workshop/synthetic-sheet.png");
+    await page.locator("#attach-source").click();
+    await page.waitForFunction(() => document.getElementById("source-identity").textContent.startsWith("Source ID:"));
+    await page.locator("#job_reference").fill("DEMO-BROWSER-" + Date.now());
+    await page.locator("#job_reference-state").selectOption("confirmed");
+    await page.locator("#record-stage").selectOption("quote");
+    await page.locator("#currency").fill("SGD");
+    await page.locator("#currency-state").selectOption("confirmed");
+    await page.locator("#add-item").click();
+    const item = page.locator("#items .item").first();
+    await item.getByLabel("Literal item description", { exact: true }).fill("示例 / Example inspect door");
+    await item.getByLabel("Clarified description", { exact: true }).fill("Fictional door inspection / 示例");
+    await item.getByLabel("Description review state", { exact: true }).selectOption("confirmed");
+    const amount = item.getByLabel("Parsed amount (empty means unknown)", { exact: true });
+    await amount.fill("abc");
+    await page.locator("#save-draft").click();
+    await page.waitForFunction(() => document.getElementById("status").classList.contains("error"));
+    assert.equal(await amount.inputValue(), "abc", "Invalid value must remain editable");
+    await amount.fill("25.10");
+    await item.getByLabel("Amount review state", { exact: true }).selectOption("confirmed");
+    const createdPromise = page.waitForResponse(response => response.url() === base + "/api/v1/workshop/jobs" && response.status() === 201);
+    await page.locator("#save-draft").click();
+    const job = await (await createdPromise).json();
+    await page.waitForFunction(id => document.getElementById("record-identity").textContent.includes(id), job.id);
+    assert.equal(job.draft.items[0].amount, "25.10");
+    await page.reload();
+    await page.waitForFunction(id => document.getElementById("record-identity").textContent.includes(id), job.id);
+    assert.equal(await page.locator("#items .item").getByLabel("Clarified description", { exact: true }).inputValue(), "Fictional door inspection / 示例");
+    await page.waitForFunction(() => document.getElementById("source-image").naturalWidth > 0);
+    await page.locator("#zoom-in").click();
+    assert.equal(await page.locator("#zoom-label").textContent(), "125%");
+    await page.locator("#rotate-source").click();
+    assert((await page.locator("#source-image").getAttribute("style")).includes("90deg"));
+    const preview = await context.request.get(base + "/api/v1/workshop/documents/" + job.draft.source_document_id + "/preview");
+    assert.deepEqual(await preview.body(), fs.readFileSync("tests/fixtures/workshop/synthetic-sheet.png"));
+    await page.locator("#job_reference").focus();
+    await page.keyboard.press("Tab");
+    assert.equal(await page.evaluate(() => document.activeElement.id), "job_reference-state");
+    await page.screenshot({ path: path.join(artifactDir, "manual-desktop.png"), fullPage: true });
+
+    const untrustedNote = '</textarea><img src=x onerror="window.workshopXss=true">';
+    const changed = await context.request.patch(base + "/api/v1/workshop/jobs/" + job.id, { data: { expected_version: 1, draft: { ...job.draft, diagram_notes_raw: untrustedNote } } });
+    assert.equal(changed.status(), 200);
+    await page.locator("#optional-details summary").click();
+    await page.locator("#diagram_notes_raw").fill("MUST RETAIN UNSAVED / 示例");
+    await page.locator("#save-draft").click();
+    await page.waitForFunction(() => document.getElementById("status").textContent.includes("Draft changed"));
+    assert.equal(await page.locator("#diagram_notes_raw").inputValue(), "MUST RETAIN UNSAVED / 示例");
+    assert.equal(await page.locator("#dirty-label").textContent(), "Unsaved changes");
+    await page.route(base + "/api/v1/workshop/jobs/" + job.id, route => route.fulfill({ status: 503, json: { detail: "Fictional test failure" } }));
+    await page.locator("#save-draft").click();
+    await page.waitForFunction(() => document.getElementById("status").textContent.includes("Fictional test failure"));
+    assert.equal(await page.locator("#diagram_notes_raw").inputValue(), "MUST RETAIN UNSAVED / 示例");
+    await page.unroute(base + "/api/v1/workshop/jobs/" + job.id);
+    await page.setViewportSize({ width: 390, height: 844 });
+    assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 2), "Mobile page must not overflow horizontally");
+    await page.screenshot({ path: path.join(artifactDir, "manual-mobile.png"), fullPage: true });
+    const reopened = await context.newPage();
+    await reopened.goto(base + "/workshop?job=" + job.id);
+    await reopened.waitForFunction(id => document.getElementById("record-identity").textContent.includes(id), job.id);
+    await reopened.locator("#optional-details summary").click();
+    assert.equal(await reopened.locator("#diagram_notes_raw").inputValue(), untrustedNote);
+    assert.equal(await reopened.evaluate(() => window.workshopXss), undefined);
+    assert.deepEqual(errors, []);
+    console.log("Browser checks passed: attach, validation retention, save/reload, Unicode/money, unchanged zoom/rotation source, keyboard focus, stale/503 retention, mobile layout and untrusted note rendering.");
+  } finally {
+    await browser.close();
+  }
+})().catch(error => { console.error(error); process.exitCode = 1; });

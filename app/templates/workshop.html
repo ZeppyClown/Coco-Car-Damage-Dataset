@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="workshop-api" content="{{workshop_api}}">
+  <title>Workshop job sheets</title>
+  <link rel="stylesheet" href="/static/workshop.css">
+  <script src="/static/workshop.js" defer></script>
+</head>
+<body>
+<header><a href="/">Automotive assistant</a><h1>Workshop job sheets</h1>
+  <p>Capture what is written. Keep unclear values visible. Review before reuse.</p>
+  <p class="notice">Local demonstration. Use fictional records until company processing is agreed. A saved draft is not reviewed work or an invoice.</p>
+</header>
+<main>
+  <section class="card record-actions" aria-label="Record controls">
+    <button type="button" id="new-record">New record</button>
+    <label>Job ID to reopen<input id="open-id" autocomplete="off" placeholder="Paste the saved job ID"></label>
+    <button type="button" id="open-record">Open record</button>
+    <p id="record-identity">New, unsaved draft</p>
+  </section>
+  <p id="status" role="status" aria-live="polite">Enter a draft manually or attach a JPEG/PNG sheet.</p>
+  <div class="workspace">
+    <section class="card source-panel" aria-labelledby="source-heading">
+      <h2 id="source-heading">Source sheet</h2>
+      <label>Record origin<select id="data-origin" aria-label="Record origin"><option value="synthetic_demo">Fictional demonstration</option><option value="private_source">Permitted private source</option></select></label>
+      <label>JPEG/PNG image<input id="source-file" type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png"></label>
+      <button id="attach-source" type="button">Attach source</button>
+      <p class="hint">One image, up to 8 MiB, 6,000 pixels per side and 20 megapixels. Attaching keeps the original bytes.</p>
+      <p id="source-identity">No source attached. Manual entry is available.</p>
+      <div class="viewer-tools" aria-label="Image view controls">
+        <button type="button" id="zoom-out" aria-label="Zoom out">−</button>
+        <output id="zoom-label">100%</output>
+        <button type="button" id="zoom-in" aria-label="Zoom in">+</button>
+        <button type="button" id="rotate-source">Rotate view</button>
+        <button type="button" id="detach-source">Detach from draft</button>
+      </div>
+      <div class="viewer"><div id="image-stage"><img id="source-image" alt="Attached job sheet for comparison with the draft" hidden></div></div>
+    </section>
+    <form id="draft-form" class="card">
+      <h2>Editable draft</h2>
+      <p class="hint">Missing means unknown, including amounts. Confirm only values you have checked. Editing a confirmed value makes it proposed again.</p>
+      <label>Record stage<select id="record-stage" aria-label="Record stage"><option value="unknown">Unknown</option><option value="quote">Quote</option><option value="approved_scope">Approved scope</option><option value="completed_work">Completed work</option></select></label>
+      <label>Manual provenance / clarification<textarea id="manual-provenance" maxlength="2000" placeholder="Required for later review if no source is attached"></textarea></label>
+      <h3>References</h3><div id="scalar-fields" class="form-grid"></div>
+      <h3>Items</h3><p class="hint">Keep crossed-out rows and mark them cancelled. Leave unclear interpretations or amounts unresolved.</p>
+      <div id="items"></div><button type="button" id="add-item">Add item</button>
+      <details id="optional-details"><summary>Vehicle details, dates, notes and written totals</summary>
+        <div id="optional-fields" class="form-grid"></div>
+        <h3>Literal notes</h3><div id="raw-fields"></div>
+      </details>
+      <div class="save-bar"><button type="submit" id="save-draft">Save draft</button><span id="dirty-label">No unsaved changes</span></div>
+    </form>
+  </div>
+</main>
+</body>
+</html>

@@ -1,8 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
+from html import escape
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from sqlalchemy.exc import SQLAlchemyError
 from pathlib import Path
@@ -95,6 +96,13 @@ app.include_router(paint_code.router, prefix=f"/api/{settings.API_VERSION}", tag
 app.include_router(specifications.router, prefix=f"/api/{settings.API_VERSION}", tags=["Specifications"])
 app.include_router(diagnostics.router, prefix=f"/api/{settings.API_VERSION}", tags=["Diagnostics"])
 app.include_router(workshop.router, prefix=f"/api/{settings.API_VERSION}", tags=["Workshop demo"])
+
+
+@app.get("/workshop", dependencies=[Depends(workshop.require_workshop_enabled)], include_in_schema=False)
+def workshop_page():
+    page = (Path(__file__).parent / "templates/workshop.html").read_text(encoding="utf-8")
+    page = page.replace("{{workshop_api}}", escape(f"/api/{settings.API_VERSION}/workshop", quote=True))
+    return HTMLResponse(page, headers={"Cache-Control": "no-store"})
 
 @app.on_event("startup")
 async def startup_event():

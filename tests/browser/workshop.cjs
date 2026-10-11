@@ -190,9 +190,32 @@ fs.mkdirSync(artifactDir, { recursive: true });
     await aiPage.reload();
     await aiPage.waitForFunction(() => document.getElementById("review-state").textContent.includes("has been reviewed"));
     assert((await aiPage.locator("#ai-provenance").textContent()).includes("fictional-browser-mock"));
+    await afterExport.locator("#lookup-panel summary").click();
+    await afterExport.locator("#lookup-reference").fill(job.draft.job_reference);
+    await afterExport.locator("#lookup-form").getByRole("button", { name: "Search reviewed records", exact: true }).click();
+    await afterExport.waitForFunction(() => document.getElementById("lookup-state").textContent.startsWith("Showing"));
+    assert.equal(await afterExport.locator(".lookup-result").count(), 1);
+    assert((await afterExport.locator(".lookup-result").textContent()).includes("Reviewed version 4"));
+    assert((await afterExport.locator(".lookup-result").textContent()).includes("Customer: Unknown"));
+    // Search still displays the prior reviewed version when a newer draft is unreviewed.
+    const currentDraft = await (await context.request.get(base + "/api/v1/workshop/jobs/" + job.id)).json();
+    assert.equal((await context.request.patch(base + "/api/v1/workshop/jobs/" + job.id, { data: { expected_version: 4, draft: { ...currentDraft.draft, job_reference: "DEMO-NEW-UNREVIEWED-" + Date.now(), field_states: { ...currentDraft.draft.field_states, job_reference: "proposed" } } } })).status(), 200);
+    await afterExport.locator("#lookup-form").getByRole("button", { name: "Search reviewed records", exact: true }).click();
+    await afterExport.waitForFunction(() => document.getElementById("lookup-results").textContent.includes("newer unreviewed changes"));
+    await afterExport.locator(".lookup-result").getByRole("button", { name: "Open job and history", exact: true }).click();
+    await afterExport.waitForFunction(() => document.getElementById("record-identity").textContent.includes("version 5"));
+    await afterExport.waitForFunction(() => document.getElementById("review-state").textContent.includes("has not been reviewed"));
+    assert.equal(await afterExport.locator("#reviewed-history details").count(), 2);
+    await afterExport.route(base + "/api/v1/workshop/jobs?*", route => route.fulfill({ status: 503, json: { detail: "Fictional lookup failure" } }));
+    await afterExport.locator("#lookup-q").fill("Different failed criteria");
+    await afterExport.locator("#lookup-form").getByRole("button", { name: "Search reviewed records", exact: true }).click();
+    await afterExport.waitForFunction(() => document.getElementById("lookup-state").textContent.startsWith("Search failed"));
+    assert.equal(await afterExport.locator(".lookup-result").count(), 1);
+    await afterExport.unroute(base + "/api/v1/workshop/jobs?*");
+    await afterExport.screenshot({ path: path.join(artifactDir, "reviewed-lookup.png"), fullPage: true });
     await reopened.screenshot({ path: path.join(artifactDir, "reviewed-history.png"), fullPage: true });
     assert.deepEqual(errors, []);
-    console.log("Browser checks passed: manual capture/review/history/CSV/reopen; mocked AI acknowledgement, proposed-only values, edited-draft preservation, human correction/review/output and provenance reopen. No live provider call.");
+    console.log("Browser checks passed: manual capture/review/history/CSV; mocked AI correction/output/provenance; reviewed lookup, newer-draft distinction, reopen/history and labelled previous results on failed search. No live provider call.");
   } finally {
     await browser.close();
   }

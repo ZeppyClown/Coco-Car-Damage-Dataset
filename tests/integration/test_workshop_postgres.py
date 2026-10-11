@@ -25,7 +25,7 @@ from app.services.workshop import attach_document, confirm_job, list_revisions
 from app.core.config import settings
 from app.db.models import WorkshopDocument
 from app.db.models import WorkshopExport
-from app.services.workshop import generate_export, export_file
+from app.services.workshop import generate_export, export_file, lookup_jobs
 
 
 @pytest.fixture
@@ -295,3 +295,30 @@ def test_export_migration_and_simultaneous_generation(workshop_postgres, tmp_pat
         assert len(exports) == 1 and len(list(tmp_path.iterdir())) == 1
         assert export_file(exports[0]).read_bytes().startswith(b"\xef\xbb\xbf")
         assert list_revisions(db, job_id)[0].model_dump() == revision.model_dump()
+
+
+def test_postgres_latest_review_lookup_literal_json_and_pagination(workshop_postgres):
+    engine = workshop_postgres
+    migrate(engine)
+    draft = reviewed_fixture()
+    draft.customer_reference = "Fictional Same % Name"
+    with Session(engine) as db:
+        first = create_job(db, draft)
+        first_id = first.id
+        first_review = confirm_job(db, first_id, WorkshopConfirmRequest(expected_version=1, reviewer="Fictional", acknowledged=True))
+        draft.job_reference = "DEMO-SECOND"
+        second_id = create_job(db, draft).id
+        confirm_job(db, second_id, WorkshopConfirmRequest(expected_version=1, reviewer="Fictional", acknowledged=True))
+        create_job(db, WorkshopDraft(data_origin="synthetic_demo", job_reference="DRAFT-ONLY"))
+        draft.customer_reference = "Fictional corrected name"
+        update_job(db, first_id, WorkshopDraftUpdate(expected_version=1, draft=draft))
+        matches = lookup_jobs(db, customer="%", q="filter", limit=1)
+        assert matches.has_more and len(matches.results) == 1
+        all_results = lookup_jobs(db, customer="%", limit=100).results
+        assert {r.job_id for r in all_results} == {first_id, second_id}
+        assert next(r for r in all_results if r.job_id == first_id).has_unreviewed_changes
+        confirm_job(db, first_id, WorkshopConfirmRequest(expected_version=2, reviewer="Fictional", acknowledged=True))
+        assert [r.job_id for r in lookup_jobs(db, customer="%").results] == [second_id]
+        assert lookup_jobs(db, q="' OR 1=1 --").results == []
+        day = first_review.reviewed_at.date()
+        assert len(lookup_jobs(db, reviewed_from=day, reviewed_to=day).results) == 2

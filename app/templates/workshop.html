@@ -20,6 +20,23 @@
     <button type="button" id="open-record">Open record</button>
     <p id="record-identity">New, unsaved draft</p>
   </section>
+  <details class="card" id="lookup-panel"><summary>Find reviewed records</summary>
+    <p class="hint">Search the latest reviewed version of each job. Draft-only records are excluded. Review-date filters use UTC.</p>
+    <form id="lookup-form">
+      <div class="form-grid">
+        <label>Keyword<input id="lookup-q" maxlength="200"></label>
+        <label>Customer reference contains<input id="lookup-customer" maxlength="200"></label>
+        <label>Vehicle reference contains<input id="lookup-vehicle" maxlength="200"></label>
+        <label>Job reference contains<input id="lookup-reference" maxlength="200"></label>
+        <label>Reviewed stage<select id="lookup-stage"><option value="">Any stage</option><option value="quote">Quote</option><option value="approved_scope">Approved scope</option><option value="completed_work">Completed work</option></select></label>
+        <label>Reviewed from (UTC)<input id="lookup-reviewed_from" type="date"></label>
+        <label>Reviewed to (UTC)<input id="lookup-reviewed_to" type="date"></label>
+      </div>
+      <button type="submit">Search reviewed records</button>
+    </form>
+    <p id="lookup-state" role="status">No search run yet.</p><div id="lookup-results"></div>
+    <button type="button" id="lookup-previous" hidden>Previous results</button><button type="button" id="lookup-next" hidden>More results</button>
+  </details>
   <p id="status" role="status" aria-live="polite">Enter a draft manually or attach a JPEG/PNG sheet.</p>
   <div class="workspace">
     <section class="card source-panel" aria-labelledby="source-heading">

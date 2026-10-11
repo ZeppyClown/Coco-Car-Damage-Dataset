@@ -1,4 +1,5 @@
 from uuid import UUID
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
 from fastapi.responses import FileResponse
@@ -6,9 +7,9 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.session import get_db
-from app.schemas.workshop import WorkshopDraft, WorkshopDraftUpdate, WorkshopJobResponse, WorkshopDocumentResponse, DataOrigin, WorkshopConfirmRequest, WorkshopRevisionResponse, WorkshopExportResponse, WorkshopExtractionRequest
+from app.schemas.workshop import WorkshopDraft, WorkshopDraftUpdate, WorkshopJobResponse, WorkshopDocumentResponse, DataOrigin, RecordStage, WorkshopConfirmRequest, WorkshopRevisionResponse, WorkshopExportResponse, WorkshopExtractionRequest, WorkshopLookupResponse
 from app.services.workshop_extraction import extract_source
-from app.services.workshop import create_job, get_job, update_job, attach_document, get_document, document_file, MAX_UPLOAD_BYTES, confirm_job, list_revisions, generate_export, get_export, export_file
+from app.services.workshop import create_job, get_job, update_job, attach_document, get_document, document_file, MAX_UPLOAD_BYTES, confirm_job, list_revisions, generate_export, get_export, export_file, lookup_jobs
 
 
 def require_workshop_enabled():
@@ -43,6 +44,18 @@ def propose_source_fields(document_id: UUID, request: WorkshopExtractionRequest,
 @router.post("/jobs", response_model=WorkshopJobResponse, status_code=201)
 def create_draft(draft: WorkshopDraft, db: Session = Depends(get_db)):
     return create_job(db, draft)
+
+
+@router.get("/jobs", response_model=WorkshopLookupResponse)
+def find_reviewed_jobs(
+    q: str | None = Query(None, max_length=200), job_id: UUID | None = None,
+    customer: str | None = Query(None, max_length=200), vehicle: str | None = Query(None, max_length=200),
+    reference: str | None = Query(None, max_length=200), stage: RecordStage | None = None,
+    reviewed_from: date | None = None, reviewed_to: date | None = None,
+    limit: int = Query(20, ge=1, le=100), offset: int = Query(0, ge=0), db: Session = Depends(get_db),
+):
+    return lookup_jobs(db, q=q, job_id=job_id, customer=customer, vehicle=vehicle, reference=reference,
+                       stage=stage, reviewed_from=reviewed_from, reviewed_to=reviewed_to, limit=limit, offset=offset)
 
 
 @router.get("/jobs/{job_id}", response_model=WorkshopJobResponse)

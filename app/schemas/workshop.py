@@ -217,3 +217,15 @@ class WorkshopExtractionRequest(_WorkshopSchema):
         if not self.send_to_gemini:
             raise ValueError("Explicit acknowledgement of sending the image to Gemini is required")
         return self
+
+
+class WorkshopLookupResult(WorkshopRevisionResponse):
+    draft_version: int
+    has_unreviewed_changes: bool
+
+
+class WorkshopLookupResponse(_WorkshopSchema):
+    results: list[WorkshopLookupResult]
+    limit: int
+    offset: int
+    has_more: bool

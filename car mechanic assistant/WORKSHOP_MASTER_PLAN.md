@@ -1,6 +1,6 @@
 # Workshop job-sheet project — master plan and implementation ledger
 
-**Last updated:** 11 October 2026. **Current phase:** F01–F06 VERIFIED; F07 mocked AI boundary/UI verified, live provider unverified. The full manual workflow works at `/workshop`. Next independent work: F10 reviewed-record lookup.
+**Last updated:** 11 October 2026. **Current phase:** F01–F06 and F10 VERIFIED; F07 mocked AI workflow verified, live provider unverified. Manual capture/review/correction/demo export and latest-reviewed lookup work. Next: F11 synthetic evaluation harness.
 
 This is the authoritative implementation/handoff document for the workshop administrative project. Every contributor, including Codex and Claude, must update it for **every feature or implementation part**, including partial work, fixes, migrations, tests, configuration and changed decisions. Do not rely on chat history to resume the work.
 
@@ -8,7 +8,7 @@ The first product is a small local application that turns a permitted paper shee
 
 ## 1. Start here: the actual next task
 
-**Next ready task: F10 — bounded lookup over reviewed records.** F01–F06 manual milestone and F07 mocked AI workflow are verified. Live Gemini acceptance/accuracy still needs explicit model configuration and a synthetic smoke test; private-source processing remains blocked. The user explicitly selected job-sheet capture/review; public-reference RAG remains separate research.
+**Next ready task: F11 — explicit synthetic comparison/evaluation harness.** F01–F06, F10 and F07 mocked AI workflow are verified. Live Gemini acceptance/accuracy still needs explicit model configuration and a synthetic smoke test; private-source processing remains blocked. The user explicitly selected job-sheet capture/review; public-reference RAG remains separate research.
 
 Do not start by scanning an archive, training a model, building a vector database or integrating the accounting system. None is required to demonstrate the core review workflow.
 
@@ -24,8 +24,8 @@ This milestone is a local demonstration. It does not claim company deployment, r
 2. Run `git status --short` and identify unrelated user work. On 11 October, `PROJECT_SUMMARY.md` is modified and `SYSTEM_DESIGN.md` is untracked; preserve both unless the user explicitly includes them in the task.
 3. Read the existing schema/session/router/test fixtures listed in section 5. Confirm actual paths before adding code.
 4. Check whether the private visit files exist locally. Their absence does not block a synthetic/manual prototype. Do not obtain company files from public search as replacements for actual evidence.
-5. Mark the next ready feature (currently F10) `IN_PROGRESS` and state the exact scope in the ledger below.
-6. Add bounded lookup over the latest reviewed revision of each job, with literal escaped filters, pagination, source/history links and a clear indication when the editable draft is newer. Preserve manual/AI capture behaviour.
+5. Mark the next ready feature (currently F11) `IN_PROGRESS` and state the exact scope in the ledger below.
+6. Add a small deterministic evaluator with separate expected labels and supplied predictions, visible denominators/unknown/cancelled/error counts and explicit synthetic origin. Do not count mocks or missing labels as company accuracy. Record a protocol for later baseline/AI workflow timing.
 7. Update the ledger, verification table, next task and work log **before** committing. Commit only the intended files, then push as previously authorised by the user.
 
 ## 2. Business problem and scope
@@ -284,6 +284,14 @@ Response JSON is bounded 100000 characters and validated using the same `Worksho
 
 The route writes no job/revision/export. It returns an unsaved draft with `ai_provenance` (Google Gemini, configured model, `workshop-extract-v1`, server UTC proposal time and initial source UUID). This optional JSON metadata survives manual edits/save/reopen/review; it is local provenance, not signed/authenticated evidence. Demo CSV v1 is unchanged and does not add model columns. UI requires an attached image, explicit external-processing acknowledgement and a new empty unsaved draft (including missing review states); it refuses to replace entered/saved values. The operator corrects fields, chooses stage and resolves states before ordinary confirmation/export. Manual entry works without AI configuration.
 
+### Implemented F10 lookup boundary
+
+`GET /api/v1/workshop/jobs` returns `results`, `limit`, `offset` and `has_more`. Results are the **latest reviewed snapshot per distinct job UUID**, chosen before filtering. Jobs with only drafts are excluded; older revisions remain in history rather than duplicated in search. Each result includes reviewed snapshot identity/source/stage, current `draft_version` and `has_unreviewed_changes`. Draft values never replace reviewed result values.
+
+Parameters: optional `q`, `job_id`, literal substring `customer`, `vehicle`, `reference`, exact `stage`, inclusive UTC review-date `reviewed_from`/`reviewed_to`, default20/max100 `limit`, nonnegative `offset`. Text bounds200 characters; reversed/invalid dates rejected. Keyword checks reference/vehicle/diagram/date-note values and individual item description/literal/amount-text values. Raw/unknown/cancelled text may match, but remains visibly raw/unknown/cancelled when opened; search does not establish its meaning. SQLAlchemy bound parameters and automatic LIKE escaping preserve literal percent/underscore/backslash. PostgreSQL `json_array_elements` and SQLite test `json_each` search item values, excluding JSON property names. Stable order uses review time descending then job UUID; offset pages can move if a new review occurs between requests.
+
+UI under **Find reviewed records** shows unknown identifiers, reviewed version/stage, newer-unreviewed-draft notice, original-source and open-job/history controls. Same customer/vehicle text never merges records. Failed search labels retained previous results and keeps their pagination query. Keyword search is bounded but scans JSON values; no index/RAG/performance claim over an actual archive. PostgreSQL remains the supported runtime; SQLite is unit-test persistence. No schema/dependency/config change.
+
 ### Suggested API boundaries
 
 The implementer may simplify route naming, but must document the final contract here. All are under `/api/v1/workshop`; the HTML page is `/workshop`.
@@ -319,7 +327,7 @@ Allowed statuses: `READY`, `IN_PROGRESS`, `IMPLEMENTED_UNVERIFIED`, `VERIFIED`, 
 | F07 | Optional AI image-to-draft extraction | IMPLEMENTED_UNVERIFIED | F03–F06 | Mock API/SDK/UI workflow verified; live provider/model/schema acceptance unverified; private-source use blocked pending Q07 |
 | F08 | Reviewed diagram/shorthand interpretation | WAITING_COMPANY for real labels | F04/F07 | Manual annotation can work now; meaning cannot be fabricated |
 | F09 | Actual destination mapping and export | WAITING_COMPANY | F06 | One destination schema plus checked record chain needed |
-| F10 | Basic lookup of confirmed records | READY | F05 | Filters/keywords first; no vector database |
+| F10 | Basic lookup of confirmed records | VERIFIED | F05 | Latest reviewed per job, literal bounded filters/pagination/newer-draft status; SQLite/PG and Chrome checks passed |
 | F11 | Extraction and end-to-end evaluation | READY for synthetic harness; real metrics conditional | F06/F07/F09 | Independent labels and operator baseline needed for company results |
 | F12 | Workshop pilot access, backup and operating guide | WAITING_COMPANY for deployment | Demonstrated useful flow | Authentication/storage/retention/host/operator decisions required |
 
@@ -446,6 +454,8 @@ Validate all output through the same schemas. A valid JSON shape is not proof of
 **Checks:** same-name customers remain separate; one vehicle can have multiple jobs; missing identifiers stay visible; draft data is not shown as confirmed; pagination/limits work; corrected record links to version history; untrusted search text cannot execute SQL/HTML.
 
 **Completion:** an operator can find and reopen the intended fictional reviewed job. This does not prove fast lookup over the actual storeroom archive.
+
+**Delivered:** VERIFIED on11October2026: latest-only/literal filters, same-name separation, UTC dates, pagination and browser search→newer-draft/open/history checked. No archive-speed or staff-acceptance result.
 
 ### F11 — evaluation and baseline comparison
 
@@ -638,6 +648,9 @@ If interrupted mid-feature, record what exists, what is broken/unverified, the l
 | 11 October 2026 | F07 regression and clean environment | Explicit local PG URL + full pytest; API-only workshop pytest/pip check | **208 passed/no skips/119 warnings**; clean **135 passed/38 warnings**, no broken requirements | 24 mock extraction cases; no live Gemini call/model-schema acceptance or accuracy measurement |
 | 11 October 2026 | F07 mocked browser workflow | Isolated Chrome harness, browser-only intercepted proposal response | External-processing ack, proposed states, edited-draft refusal, correction/review/CSV and provenance reopen passed | API provider/validation separately mocked in unit tests; browser mock is not extraction quality evidence |
 
+| 11 October 2026 | F10 lookup regression | Explicit local PG URL + full pytest; clean API workshop pytest | **227 passed/no skips/127 warnings**; clean **154 passed/46 warnings** | 19 added cases; JSON value/literal escaping/latest snapshot checks run on SQLite and PG14.20 |
+| 11 October 2026 | F10 browser lookup/open/error state | Isolated Chrome harness | Reviewed search, unknown refs, newer-draft notice, open/history and labelled previous results on503 passed | First browser assertion ran before history loaded; explicit async wait fixed; no archive performance/operator trial |
+
 Replace vague “tests pass” with the command, counts, skipped checks and test environment. PostgreSQL integration is skipped without its explicit disposable test URL; do not present a skipped test as passed.
 
 ### Commands to adapt during implementation
@@ -690,11 +703,11 @@ Record a question as resolved only when there is an actual answer. An elapsed wa
 ## 15. Current handoff snapshot
 
 - **Branch/repository:** `main`, remote `origin` is the user's existing GitHub repository. Verify actual remote before pushing on a different machine.
-- **Previous delivery before F07:** `7798304`, verified manual milestone/demo CSV. Read Git history for F07 delivery hash.
+- **Previous delivery before F10:** `94fb5f9`, mocked AI proposal path. Read Git history for F10 delivery hash.
 - **What exists:** current automotive API/RAG, visit review/planning material, F01 schemas/fictional fixtures and F02 workshop models/migration/draft service/API/tests.
-- **Latest implementation:** F07 explicit Gemini image proposal, proposed-only validation, initial-source/model/prompt/time provenance and empty-draft UI.24 mocked cases plus browser mocked proposal→human correction→review→output passed. Full208 tests and clean API135 passed; no live provider call.
-- **What does not exist:** confirmed-record lookup, live extraction evidence, real benchmark/mapping or permitted company pilot.
-- **Next ready feature:** F10 confirmed-record lookup; then F11 synthetic evaluation harness and manual F08 evidence checks. F07 live smoke/company features remain conditional.
+- **Latest implementation:** F10 latest-reviewed lookup with customer/vehicle/reference/keyword/stage/UTC date filters and pagination; newer editable drafts explicitly distinguished. Full227 passed with PG; clean API154 passed. Browser lookup/open/history/failed-search retention passed.
+- **What does not exist:** extraction evaluation harness, live extraction evidence, real benchmark/mapping or permitted company pilot.
+- **Next ready feature:** F11 synthetic evaluation harness and manual F08 scope/evidence checks. F07 live smoke/company mapping/pilot remain conditional.
 - **Independent work available:** safe source attach/preview, local manual UI, confirmation, demo output and later mocked extraction; lack of company access does not block these.
 - **Unrelated changes to preserve:** root `PROJECT_SUMMARY.md` and `SYSTEM_DESIGN.md` as seen on this machine; verify current status rather than assuming it remains identical.
 - **Open decisions:** real output mapping, model-processing path, operator and expected labels. None should be fabricated.
@@ -706,7 +719,7 @@ Continue the workshop job-sheet project in this repository. Read AGENTS.md,
 CLAUDE.md and car mechanic assistant/WORKSHOP_MASTER_PLAN.md first.
 Treat the master plan as the current implementation ledger. Inspect Git status
 and preserve unrelated user work. F01–F06 manual milestone is verified. Start
-F10 reviewed-record lookup. F07 mocked proposal/API/SDK/UI checks passed; live
+F11 synthetic comparison harness. F10 lookup is verified. F07 mocked checks passed; live
 provider use is unverified and private-source AI remains blocked. Use synthetic examples until
 real-data prerequisites are met. Keep company visit files and runtime artifacts
 private. After every implementation part, update the master with actual files,
@@ -844,3 +857,15 @@ The assessment separates physical/parsable/quality-approved/indexed pages, class
 - **Company prerequisites:** Q07 private processing, Q01 shorthand/labels and Q08 evaluation remain pending. These do not block F10/synthetic evaluation.
 - **Commit/push:** intended feature/config/dependency/tests/docs increment only; private sources/runtime/unrelated root docs excluded.
 - **Next:** F10 bounded latest-reviewed lookup, visible newer-draft status and reopen/history links; F11 synthetic evaluation afterward. Real mapping/pilot remains conditional.
+
+
+### 11 October 2026 — F10, reviewed-record lookup
+
+- **Status:** VERIFIED; F11 synthetic evaluator next.
+- **Files/route:** schema/service/router, manual HTML/JS/CSS, new `test_workshop_lookup.py`, PG keyword/filter/latest case and browser checks. GET jobs lookup; no migration/config/dependency.
+- **Behaviour:** latest reviewed snapshot selected before filtering; draft-only jobs excluded; newer draft version flagged but draft values not used in reviewed result. Literal bounded reference/name/vehicle/keyword filters, stage, inclusive UTC review dates, max100/page/offset/has_more; stable ordering. Keywords search individual scalar/item values rather than JSON keys; retained raw/cancelled text can match without claiming interpretation. UI shows unknowns and original source, opens current editable job with history; failed search clearly labels old results and retains their old pagination query.
+- **Verification:** targeted31 cases passed/33 warnings; whole suite **227 passed/no skips/127 warnings** with PG14.20; clean API **154 passed/46 warnings**. Same names/vehicles remain separate; draft/correction/latest-stage gates, null refs, dates/limits, Unicode/percent/underscore/backslash/SQL/HTML-like literal text checked. Browser full regression plus reviewed result→newer unreviewed notice→open version5/history,503 retained-results label passed. The first browser assertion checked before async history loaded; it now explicitly waits for final history state.
+- **Failures resolved:** initial unknown-reference fixture had invalid confirmed-null states; fixture fixed. Initial serialized-items search matched JSON underscore keys; replaced with value extraction on PG/SQLite and retested literal underscore case.
+- **Limits:** JSON substring scan, no indexing/vector search or measured archive performance. Offset pages may move if reviews occur between requests. Local gate/self-reported identity; Q01–Q10 remain pending. F07 live provider still unverified.
+- **Commit/push:** intended code/tests/docs only; user private sources/runtime/unrelated changes preserved.
+- **Next:** F11 deterministic synthetic evaluator with independently supplied labels/predictions, explicit unknown/cancelled/critical errors and baseline protocol; audit manual F08 coverage separately from unresolved real semantics.

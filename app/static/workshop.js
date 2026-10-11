@@ -12,6 +12,7 @@ const scalarFields = [
 ];
 const rawFields = [["date_note_raw", "Literal date note"], ["diagram_notes_raw", "Literal diagram / panel notes"], ["written_totals_raw", "Literal total / adjustment notes"]];
 let job = null, sourceId = null, aiProvenance = null, dirty = false, zoom = 1, rotation = 0, reviewed = [];
+let lookupParams = new URLSearchParams(), lookupOffset = 0;
 
 function element(tag, text) { const node = document.createElement(tag); if (text) node.textContent = text; return node; }
 function control(parent, id, labelText, type = "text", limit = 200) {
@@ -220,6 +221,39 @@ $("confirm-record").addEventListener("click", () => {
   });
 });
 $("more-history").addEventListener("click", () => action(() => refreshHistory(true)));
+async function runLookup(offset, filters = lookupParams) {
+  const params = new URLSearchParams(filters); params.set("limit", "20"); params.set("offset", offset);
+  let data;
+  try { data = await request("/jobs?" + params); }
+  catch (error) { $("lookup-state").textContent = "Search failed. Any results below belong to the previous successful search."; throw error; }
+  lookupParams = new URLSearchParams(filters); lookupOffset = offset;
+  const container = $("lookup-results"); container.replaceChildren();
+  $("lookup-state").textContent = data.results.length ? `Showing ${offset + 1}–${offset + data.results.length} reviewed jobs.` : "No reviewed records match.";
+  $("lookup-previous").hidden = offset === 0; $("lookup-next").hidden = !data.has_more;
+  for (const result of data.results) {
+    const card = element("section"); card.className = "lookup-result";
+    card.append(element("h3", result.record.job_reference));
+    card.append(element("p", `Customer: ${result.record.customer_reference || "Unknown"} · Vehicle: ${result.record.vehicle_reference || "Unknown"}`));
+    card.append(element("p", `Reviewed version ${result.version} · ${result.record.record_stage} · ${new Date(result.reviewed_at).toLocaleString()}`));
+    card.append(element("p", result.has_unreviewed_changes ? `Editable draft version ${result.draft_version} has newer unreviewed changes.` : "Editable draft matches this reviewed version."));
+    const open = element("button", "Open job and history"); open.type = "button";
+    open.addEventListener("click", () => { $("open-id").value = result.job_id; $("open-record").click(); }); card.append(open);
+    if (result.record.source_document_id) {
+      const source = element("a", "Open reviewed source"); source.href = api + "/documents/" + result.record.source_document_id + "/preview";
+      source.target = "_blank"; source.rel = "noopener"; card.append(source);
+    }
+    container.append(card);
+  }
+}
+$("lookup-form").addEventListener("submit", event => {
+  event.preventDefault(); const filters = new URLSearchParams();
+  for (const name of ["q", "customer", "vehicle", "reference", "stage", "reviewed_from", "reviewed_to"]) {
+    const value = $("lookup-" + name).value.trim(); if (value) filters.set(name, value);
+  }
+  action(() => runLookup(0, filters));
+});
+$("lookup-next").addEventListener("click", () => action(() => runLookup(lookupOffset + 20)));
+$("lookup-previous").addEventListener("click", () => action(() => runLookup(Math.max(0, lookupOffset - 20))));
 $("zoom-in").addEventListener("click", () => { zoom = Math.min(3, zoom + .25); viewImage(); });
 $("zoom-out").addEventListener("click", () => { zoom = Math.max(.25, zoom - .25); viewImage(); });
 $("rotate-source").addEventListener("click", () => { rotation = (rotation + 90) % 360; viewImage(); });

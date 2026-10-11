@@ -4,11 +4,11 @@ from hashlib import sha256
 from io import BytesIO, StringIO
 import csv
 import os
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timezone
 from pathlib import Path
 
 from fastapi import HTTPException
-from sqlalchemy import update, func, select
+from sqlalchemy import update, func, select, or_
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from sqlalchemy.orm import Session
 from PIL import Image, UnidentifiedImageError
@@ -20,6 +20,7 @@ from app.schemas.workshop import (
     WorkshopDraft, WorkshopDraftUpdate, WorkshopDocumentResponse, DataOrigin,
     WorkshopConfirmRequest, WorkshopReviewedDraft, WorkshopRevisionResponse,
     WorkshopExportResponse,
+    WorkshopLookupResult, WorkshopLookupResponse,
 )
 
 
@@ -207,6 +208,50 @@ def list_revisions(db: Session, job_id: UUID, limit: int = 20, offset: int = 0):
     revisions = db.scalars(select(WorkshopJobRevision).where(WorkshopJobRevision.job_id == job_id)
                            .order_by(WorkshopJobRevision.version.desc()).limit(limit).offset(offset))
     return [_revision_response(revision) for revision in revisions]
+
+
+def lookup_jobs(db: Session, *, q: str | None = None, job_id: UUID | None = None,
+                customer: str | None = None, vehicle: str | None = None, reference: str | None = None,
+                stage: str | None = None, reviewed_from: date | None = None, reviewed_to: date | None = None,
+                limit: int = 20, offset: int = 0):
+    if reviewed_from and reviewed_to and reviewed_from > reviewed_to:
+        raise HTTPException(status_code=422, detail="Reviewed-from date must not be after reviewed-to date")
+    latest = select(WorkshopJobRevision.job_id, func.max(WorkshopJobRevision.version).label("version")).group_by(WorkshopJobRevision.job_id).subquery()
+    query = select(WorkshopJobRevision, WorkshopJob.draft_version).join(
+        latest, (WorkshopJobRevision.job_id == latest.c.job_id) & (WorkshopJobRevision.version == latest.c.version)
+    ).join(WorkshopJob, WorkshopJob.id == WorkshopJobRevision.job_id)
+    record = WorkshopJobRevision.record
+    if job_id is not None:
+        query = query.where(WorkshopJobRevision.job_id == job_id)
+    for key, value in (("customer_reference", customer), ("vehicle_reference", vehicle), ("job_reference", reference)):
+        if value and value.strip():
+            query = query.where(record[key].as_string().icontains(value.strip(), autoescape=True))
+    if stage:
+        query = query.where(record["record_stage"].as_string() == stage)
+    if reviewed_from:
+        query = query.where(WorkshopJobRevision.reviewed_at >= datetime.combine(reviewed_from, time.min, tzinfo=timezone.utc))
+    if reviewed_to:
+        query = query.where(WorkshopJobRevision.reviewed_at <= datetime.combine(reviewed_to, time.max, tzinfo=timezone.utc))
+    if q and q.strip():
+        fields = [record[name].as_string() for name in (
+            "job_reference", "customer_reference", "vehicle_reference", "make", "model", "diagram_notes", "diagram_notes_raw", "date_note_raw",
+        )]
+        if db.get_bind().dialect.name == "postgresql":
+            items = func.json_array_elements(record["items"]).table_valued("value")
+            item_fields = [items.c.value.op("->>")(name) for name in ("description", "description_raw", "amount_raw")]
+        else:
+            items = func.json_each(record["items"]).table_valued("value")
+            item_fields = [func.json_extract(items.c.value, "$." + name) for name in ("description", "description_raw", "amount_raw")]
+        item_match = select(1).select_from(items).where(or_(*(
+            field.icontains(q.strip(), autoescape=True) for field in item_fields
+        ))).correlate(WorkshopJobRevision).exists()
+        query = query.where(or_(*(field.icontains(q.strip(), autoescape=True) for field in fields), item_match))
+    matches = db.execute(query.order_by(WorkshopJobRevision.reviewed_at.desc(), WorkshopJobRevision.job_id)
+                         .offset(offset).limit(limit + 1)).all()
+    results = [WorkshopLookupResult(**_revision_response(revision).model_dump(), draft_version=draft_version,
+                                   has_unreviewed_changes=draft_version > revision.version)
+               for revision, draft_version in matches[:limit]]
+    return WorkshopLookupResponse(results=results, limit=limit, offset=offset, has_more=len(matches) > limit)
 
 
 def confirm_job(db: Session, job_id: UUID, request: WorkshopConfirmRequest):

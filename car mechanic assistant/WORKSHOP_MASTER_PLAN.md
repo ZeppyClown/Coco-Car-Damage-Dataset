@@ -1,6 +1,6 @@
 # Workshop job-sheet project — master plan and implementation ledger
 
-**Last updated:** 11 October 2026. **Current phase:** planning complete; new job-sheet application features not implemented.
+**Last updated:** 11 October 2026. **Current phase:** F01 schemas and fictional fixtures verified; next is F02 persistence. No workshop UI/API/storage exists yet.
 
 This is the authoritative implementation/handoff document for the workshop administrative project. Every contributor, including Codex and Claude, must update it for **every feature or implementation part**, including partial work, fixes, migrations, tests, configuration and changed decisions. Do not rely on chat history to resume the work.
 
@@ -8,7 +8,7 @@ The first product is a small local application that turns a permitted paper shee
 
 ## 1. Start here: the actual next task
 
-**Next ready task: F01 — define and validate the draft record contract using synthetic examples.** Then implement F02–F06 to produce the first complete manual workflow before adding AI.
+**Next ready task: F02 — add isolated workshop persistence and an additive migration.** F01 schemas/fictional fixtures are verified. Implement F02–F06 to produce the first complete manual workflow before adding AI. The user explicitly selected job-sheet capture/review; public-reference RAG remains separate research.
 
 Do not start by scanning an archive, training a model, building a vector database or integrating the accounting system. None is required to demonstrate the core review workflow.
 
@@ -24,8 +24,8 @@ This milestone is a local demonstration. It does not claim company deployment, r
 2. Run `git status --short` and identify unrelated user work. On 11 October, `PROJECT_SUMMARY.md` is modified and `SYSTEM_DESIGN.md` is untracked; preserve both unless the user explicitly includes them in the task.
 3. Read the existing schema/session/router/test fixtures listed in section 5. Confirm actual paths before adding code.
 4. Check whether the private visit files exist locally. Their absence does not block a synthetic/manual prototype. Do not obtain company files from public search as replacements for actual evidence.
-5. Mark F01 `IN_PROGRESS` and state the exact scope in the ledger below.
-6. Implement the draft/confirmed schemas, validation and fictional examples, with the small tests specified for F01.
+5. Mark the next ready feature (currently F02) `IN_PROGRESS` and state the exact scope in the ledger below.
+6. Reuse the verified F01 schemas and fictional fixtures. Inspect the current migration head and implement F02 in isolated development/test storage, with its actual acceptance checks.
 7. Update the ledger, verification table, next task and work log **before** committing. Commit only the intended files, then push as previously authorised by the user.
 
 ## 2. Business problem and scope
@@ -136,11 +136,11 @@ The existing `Vehicle` model expects fields not necessarily present in a job she
 
 ### Proposed new code files
 
-Paths are proposed, not already implemented. If existing code offers a smaller correct arrangement, change the list and explain the decision in this master file before continuing.
+F01 schema/test/fixture paths below now exist. The remaining paths are proposed. If existing code offers a smaller correct arrangement, change the list and explain the decision in this master file before continuing.
 
 | Path | Purpose | First feature |
 |---|---|---|
-| `app/schemas/workshop.py` | Draft, reviewed revision, item and export request/response validation | F01 |
+| `app/schemas/workshop.py` | Implemented draft, reviewed-draft, item and revision validation; export schemas deferred until F06 | F01 |
 | `app/services/workshop.py` | Draft updates, review/version rules and deterministic output logic | F02/F05/F06 |
 | `app/api/v1/workshop.py` | HTTP input boundary and workshop operations | F02/F03 |
 | `app/static/workshop.html` | Source/draft review page | F04 |
@@ -188,6 +188,19 @@ Amounts use `Decimal`, not binary floating-point arithmetic. Use an explicitly d
 Use a small documented set of field states: `missing`, `unclear`, `proposed`, `confirmed`. A manual entry can be confirmed by the reviewer; a model-generated value starts proposed. The application should not require a complex field-object wrapper around every scalar if a compact payload plus review metadata expresses the same rules reliably. Choose and test the simplest representation during F01.
 
 Do not treat a language model's self-reported confidence as a calibrated probability. Source availability, parse validity and explicit review are the usable controls initially.
+
+### Implemented F01 payload rules
+
+Code: [workshop schemas](../app/schemas/workshop.py). Examples: [five fictional JSON records](../tests/fixtures/workshop/examples.json) and [printed demo sheet](../tests/fixtures/workshop/synthetic-sheet.png). Checks: [schema tests](../tests/unit/test_workshop.py). No company image or wording is used in the fixture image. It matches `clean_manual_quote`; it is not a handwriting benchmark.
+
+- `WorkshopItem` separates literal description/amount text from interpreted values, has explicit description/amount states and retains a `cancelled` flag. Active reviewed items need confirmed descriptions; any supplied amount must be confirmed. Cancelled rows are retained and excluded from active-work requirements; later exports must apply the same rule.
+- `WorkshopDraft` holds the fields above and a compact `field_states` map for interpreted scalar fields. An omitted scalar state resolves to `missing` for null, otherwise `proposed`. Item states default to `missing`, so supplied item values must also include their state. `missing` cannot accompany a value; `proposed`/`confirmed` require one. `unclear` may retain a candidate or null.
+- `WorkshopReviewedDraft` validates a chosen stage, job reference, source UUID or explicit manual provenance, at least one active confirmed description and resolution of every interpreted scalar/active-item amount. Optional genuinely missing values stay null. Raw notes remain literal and do not create interpreted dates, diagram actions, tax rules or amounts. Currency is required when active/written amounts exist.
+- `WorkshopReviewedRevision` adds a job UUID, positive strict integer version, nonblank reviewer and timezone-aware review timestamp. F02/F05 must generate/check identities/timestamps, verify source ownership/existence and enforce version immutability in persistence. A UUID or typed reviewer in F01 is only a validated shape.
+- Money accepts decimal strings, `Decimal` or whole integers, rejecting float/bool, nonfinite values and more than two decimal places. JSON serialises supplied money as fixed two-decimal strings. Values are bounded to ten integer digits plus two decimals (absolute value below 10,000,000,000); ordinary amounts/totals are nonnegative, written adjustments may be signed. No totals are inferred or reconciled yet.
+- Currency is three uppercase letters, not a verified currency-registry membership check. Interpreted references cap at 200 characters, descriptions/manual provenance at 2,000, raw notes at 10,000, raw amount text at 200 and items at 50. Unknown keys and unsupported states/stages/origins are rejected; bilingual strings remain intact.
+
+F01 schemas have no routes, database models, uploads, authentication or provider calls. They do not prove a source was consulted or a reviewer was authorised. Future extraction must set generated values to proposed rather than trusting a provider-supplied confirmed state.
 
 ### Persistence design
 
@@ -237,8 +250,8 @@ Allowed statuses: `READY`, `IN_PROGRESS`, `IMPLEMENTED_UNVERIFIED`, `VERIFIED`, 
 | ID | Part | Status now | Dependencies | Evidence / next action |
 |---|---|---|---|---|
 | F00 | Master plan, handoff and private-source boundary | VERIFIED | None | Documentation/link/exclusion/staged-scope checks for this change; no app implementation |
-| F01 | Draft/review contract and fictional fixtures | READY | F00 | Next task: schemas, examples and validation tests |
-| F02 | Workshop storage, models and migration | READY | F01 | Dedicated development DB; no company writes |
+| F01 | Draft/review contract and fictional fixtures | VERIFIED | F00 | Four Pydantic schemas, five fictional JSON cases and one printed demo PNG; 45 targeted checks passed; no runtime routes/storage yet |
+| F02 | Workshop storage, models and migration | READY — next | F01 | Add three models and an additive migration; verify on a dedicated PostgreSQL test DB |
 | F03 | Safe image attach/preview and duplicate warning | READY | F02 | JPEG/PNG initially; immutable original bytes |
 | F04 | Manual source/draft review screen | READY | F01–F03 | First usable UI; no AI dependency |
 | F05 | Confirmation, immutable revisions and conflict handling | READY | F02/F04 | Separate review state from repair stage |
@@ -263,6 +276,8 @@ If a feature takes several turns, add subrows such as `F03.a upload validation` 
 **Checks:** decimal values round-trip; missing amount stays null; unclear descriptions cannot pass required confirmation; unknown stage cannot become completed work; invalid/oversized fields fail predictably; Unicode text is preserved.
 
 **Completion:** documented payload examples and passing schema tests. Update section 6 with the actual representation and section 13 with exact commands/results.
+
+**Delivered:** VERIFIED on 11 October 2026. The four schema classes, five JSON cases and labelled PNG listed in section 6 exist. All 45 targeted checks passed; broader regression results are in section 13. No persistence/review endpoint or UI has been implemented.
 
 ### F02 — persistence and migration
 
@@ -466,6 +481,10 @@ If interrupted mid-feature, record what exists, what is broken/unverified, the l
 |---|---|---|---|---|
 | Previous audit, 9 October 2026 | Existing automotive API/RAG | See BUILD_STATUS audit entries | Previously recorded 73 tests passed with PostgreSQL integration and additional live checks | Historical baseline; not rerun for this plan and not a job-sheet test result |
 | 11 October 2026 | F00 documentation | Local links, feature-ledger coverage, handoff/ignore scope and Markdown whitespace | Checked for this documentation change | No workshop application feature exists yet |
+| 11 October 2026 | Pre-F01 application baseline | `.venv/bin/python -m pytest -q tests` | 72 passed, 1 skipped, 76 warnings | PostgreSQL test skipped: no disposable test URL; mocked/local fixtures only |
+| 11 October 2026 | F01 schema/review rules | `.venv/bin/python -m pytest -q tests/unit/test_workshop.py --disable-warnings` | 45 passed, 7 warnings | Fictional contracts only; initial large-integer boundary failure fixed and retested |
+| 11 October 2026 | F01 broader regression | `.venv/bin/python -m pytest -q tests` | 117 passed, 1 skipped, 76 warnings | Existing PostgreSQL integration skipped without `YAP_TEST_POSTGRES_URL`; dependency/deprecation warnings remain |
+| 11 October 2026 | Fictional image and public/private boundary | Visual PNG inspection, fixture decode/record check, document links, original checksums, ignore/staged scope and `git diff --check` | Checked; image labelled fictional, 18 original source hashes unchanged | No browser UI, provider processing, handwriting or company-outcome test |
 
 Replace vague “tests pass” with the command, counts, skipped checks and test environment. PostgreSQL integration is skipped without its explicit disposable test URL; do not present a skipped test as passed.
 
@@ -479,7 +498,7 @@ git status --short
 .venv/bin/python -m pytest -q tests/unit/test_workshop.py
 ```
 
-`test_workshop.py` is a proposed future file. Do not report this command as executed successfully before it exists.
+`test_workshop.py` now exists and its 45 F01 checks passed. These checks validate schemas, not runtime storage, UI, source existence or authenticated review.
 
 After changes to shared routes/models/dependencies:
 
@@ -519,12 +538,12 @@ Record a question as resolved only when there is an actual answer. An elapsed wa
 ## 15. Current handoff snapshot
 
 - **Branch/repository:** `main`, remote `origin` is the user's existing GitHub repository. Verify actual remote before pushing on a different machine.
-- **Previous delivery before this plan:** `fe3a0ec`, generic status entry for the private image review.
-- **What exists:** current automotive API/RAG code, visit review/planning documents and private uploaded examples.
-- **What this task adds:** this master plan, persistent contributor instructions, README discovery link, portable ignore rules and a build-status entry.
+- **Previous delivery before F01:** `7252480`, public-corpus résumé assessment. Read Git history for the final F01 commit hash.
+- **What exists:** current automotive API/RAG code, visit review/planning documents, private uploaded examples and verified F01 schemas/tests/fictional fixtures.
+- **Latest implementation:** F01 adds four validation schemas, five fictional payload examples, one labelled printed-sheet PNG and 45 targeted checks; master/README/build status updated together.
 - **What does not exist:** workshop upload/review/confirmation/export/search application features, real extraction benchmark, real destination mapping or authorised company pilot.
-- **Next ready feature:** F01, then the F02–F06 manual milestone.
-- **Independent work available:** fictional schemas, fixtures, local UI and mocked extraction; lack of company access is not a reason to stop those.
+- **Next ready feature:** F02 persistence/migration, followed by F03–F06 to finish the manual milestone.
+- **Independent work available:** isolated persistence, local manual UI, demo output and later mocked extraction; lack of company access does not block these.
 - **Unrelated changes to preserve:** root `PROJECT_SUMMARY.md` and `SYSTEM_DESIGN.md` as seen on this machine; verify current status rather than assuming it remains identical.
 - **Open decisions:** real output mapping, model-processing path, operator and expected labels. None should be fabricated.
 
@@ -534,8 +553,8 @@ Record a question as resolved only when there is an actual answer. An elapsed wa
 Continue the workshop job-sheet project in this repository. Read AGENTS.md,
 CLAUDE.md and car mechanic assistant/WORKSHOP_MASTER_PLAN.md first.
 Treat the master plan as the current implementation ledger. Inspect Git status
-and preserve unrelated user work. Start with the next ready feature; initially
-F01 and then the manual F02–F06 vertical slice. Use synthetic examples until
+and preserve unrelated user work. F01 is verified. Start with the next ready
+feature, F02, then finish the manual F03–F06 vertical slice. Use synthetic examples until
 real-data prerequisites are met. Keep company visit files and runtime artifacts
 private. After every implementation part, update the master with actual files,
 behaviour, tests, limitations and next task; commit the intended changes and
@@ -583,3 +602,17 @@ Status: **research verified; ingestion not implemented**. No application code or
 Created [RAG_CORPUS_RESUME_ASSESSMENT.md](RAG_CORPUS_RESUME_ASSESSMENT.md) as the detailed companion verdict for the RAG résumé wording. Downloaded the second PDF and independently verified 581 physical pages with pypdf and PyMuPDF. Both full-document text scans and exact-normalised-text deduplication completed; the unmodified document processor produced 2,794 candidate chunks in a local dry run. All default to unknown applicability scope, which current retrieval rejects; source language metadata is also too coarse for mixed-language content. No embeddings, model calls, new serving collection or application changes were made.
 
 The assessment separates physical/parsable/quality-approved/indexed pages, classifies source types, evaluates each résumé assertion, records parser/filter/evaluator limitations, links publisher terms and gives conditional build/evidence gates and accurate wording. Source availability is verified; the original production/user/precision/multilingual/history claims remain unsupported. Raw files/page metrics/renders stay ignored in runtime storage. This is completed assessment work, not a new implemented corpus feature or scope change; F01 remains the next workshop task.
+
+
+### 11 October 2026 — F01, job-sheet schemas and fictional fixtures
+
+- **Status:** VERIFIED for the data contract/fixtures only. User selected job-sheet capture/review over the separate public-reference RAG direction.
+- **Delivered:** `WorkshopItem`, `WorkshopDraft`, `WorkshopReviewedDraft` and `WorkshopReviewedRevision`; explicit raw/parsed values and field states, cancelled-row preservation, review validation, literal stage/origin/provenance and decimal-string JSON amounts. Missing amounts stay null. No automatic calculation, pricing or transaction-stage inference.
+- **Files:** `app/schemas/workshop.py`, `tests/unit/test_workshop.py`, `tests/fixtures/workshop/examples.json`, `tests/fixtures/workshop/synthetic-sheet.png`; this master, README and BUILD_STATUS updated together. No routes, database tables, migration, dependency or config changes. No existing caller imports these schemas yet.
+- **Fixture origin:** five authored fictional cases covering clean quote, cancelled/unclear amounts, missing description, bilingual/unknown-date notes and distinct jobs sharing customer text. One printed demo PNG matches the clean example and is visibly labelled synthetic; it does not imitate or reuse private company sheets.
+- **Verification:** targeted 45 passed/7 warnings; full existing/new suite 117 passed/1 skipped/76 warnings. Commands/results and skipped PostgreSQL prerequisite are in section 13. Initial whole-number money-bound failure was fixed with explicit signed bounds; boundary, source-linked and mutated-instance checks pass. No further failing checks remain in this scope.
+- **Manual/static checks:** PNG visually inspected; fixture image decodes and matches its example labels; links and whitespace checked; private-source checksums/exclusions/staged scope checked. No UI/server/provider operation was exercised for F01.
+- **Limits:** schema validation cannot authenticate a reviewer, prove a source exists, freeze a persisted revision or establish semantic correctness. DB concurrency/immutability belongs to F02/F05. Currency syntax is validated but registry membership is not. Raw unknown notes can remain uninterpreted; an operator must not claim that review resolved their meaning.
+- **Company prerequisites:** Q01–Q10 remain pending for real interpretation, mapping, evaluation and pilot use. No company answer is needed to implement F02 in isolated storage.
+- **Commit/push:** intended code/tests/fixtures/docs form one increment on `main`; read Git history/remote for its final hash and delivery status. Unrelated PROJECT_SUMMARY.md and SYSTEM_DESIGN.md are preserved.
+- **Next smallest ready task:** F02: add three workshop models and one additive Alembic migration; implement draft persistence/version checks and verify both fresh/previous-head upgrade on a disposable PostgreSQL database. Then F03–F06 complete the manual workflow. Do not mark the application usable based on schema tests alone.

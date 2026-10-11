@@ -2,7 +2,7 @@
 
 Two applications share this repository: a structured FastAPI/PostgreSQL service and a Gemini/ChromaDB manual assistant. The current rebuild is dated October 2026; internship history and business-use claims require separate evidence.
 
-The new workshop job-sheet capture/review project is specified in the [master plan and implementation ledger](car%20mechanic%20assistant/WORKSHOP_MASTER_PLAN.md). It gives the build order, feature acceptance checks, missing company prerequisites and Claude handoff. Every implementation part must update that ledger; its application features are currently planned, not implemented.
+The new workshop job-sheet capture/review project is specified in the [master plan and implementation ledger](car%20mechanic%20assistant/WORKSHOP_MASTER_PLAN.md). It gives the build order, feature acceptance checks, missing company prerequisites and Claude handoff. Every implementation part must update that ledger. F01 data/review schemas and fictional fixtures are verified; F02 persistence is next. The workshop UI, routes, storage and AI extraction are still pending.
 
 ## Run the automotive API
 

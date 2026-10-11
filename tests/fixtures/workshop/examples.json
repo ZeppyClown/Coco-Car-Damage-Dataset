@@ -1,0 +1,124 @@
+{
+  "notice": "All names, vehicles, jobs and amounts are fictional. These are schema/UI fixtures, not handwriting, accuracy or company-use evidence.",
+  "examples": [
+    {
+      "id": "clean_manual_quote",
+      "reviewable": true,
+      "record": {
+        "data_origin": "synthetic_demo",
+        "manual_provenance": "Authored fictional example, not a company document.",
+        "record_stage": "quote",
+        "job_reference": "DEMO-JOB-001",
+        "customer_reference": "Fictional Example Person",
+        "vehicle_reference": "DEMO-VEHICLE-A",
+        "currency": "SGD",
+        "items": [
+          {
+            "description_raw": "Example filter replacement",
+            "description": "Example filter replacement",
+            "description_state": "confirmed",
+            "amount_raw": "25.10",
+            "amount": "25.10",
+            "amount_state": "confirmed"
+          }
+        ],
+        "field_states": {
+          "job_reference": "confirmed",
+          "customer_reference": "confirmed",
+          "vehicle_reference": "confirmed",
+          "currency": "confirmed"
+        }
+      }
+    },
+    {
+      "id": "unclear_and_cancelled_amount",
+      "reviewable": false,
+      "record": {
+        "data_origin": "synthetic_demo",
+        "record_stage": "quote",
+        "job_reference": "DEMO-JOB-002",
+        "items": [
+          {
+            "description_raw": "Example panel task",
+            "description": "Example panel task",
+            "description_state": "proposed",
+            "amount_raw": "80 crossed out",
+            "amount": "80.00",
+            "amount_state": "proposed",
+            "cancelled": true
+          },
+          {
+            "description_raw": "Replacement note unclear",
+            "description_state": "unclear",
+            "amount_raw": "8?",
+            "amount_state": "unclear"
+          }
+        ]
+      }
+    },
+    {
+      "id": "missing_description",
+      "reviewable": false,
+      "record": {
+        "data_origin": "synthetic_demo",
+        "manual_provenance": "Authored fictional example with missing work details.",
+        "record_stage": "quote",
+        "job_reference": "DEMO-JOB-003",
+        "items": [
+          {
+            "amount_raw": "0",
+            "amount": "0.00",
+            "amount_state": "proposed"
+          }
+        ]
+      }
+    },
+    {
+      "id": "mixed_language_unknown_amount",
+      "reviewable": true,
+      "record": {
+        "data_origin": "synthetic_demo",
+        "manual_provenance": "Fictional bilingual example; interpretation supplied by test author.",
+        "record_stage": "approved_scope",
+        "job_reference": "DEMO-JOB-004",
+        "date_note_raw": "Friday afternoon; year/date not supplied",
+        "diagram_notes_raw": "车门 / door — action not specified",
+        "items": [
+          {
+            "description_raw": "示例：检查车门 / Example: inspect door",
+            "description": "Example door inspection / 示例车门检查",
+            "description_state": "confirmed"
+          }
+        ],
+        "field_states": {
+          "job_reference": "confirmed"
+        }
+      }
+    },
+    {
+      "id": "same_name_separate_job",
+      "reviewable": true,
+      "record": {
+        "data_origin": "synthetic_demo",
+        "manual_provenance": "Another authored fictional job; matching customer text does not merge identity.",
+        "record_stage": "completed_work",
+        "job_reference": "DEMO-JOB-005",
+        "customer_reference": "Fictional Example Person",
+        "vehicle_reference": "DEMO-VEHICLE-B",
+        "items": [
+          {
+            "description_raw": "Example visual inspection",
+            "description": "Example visual inspection",
+            "description_state": "confirmed"
+          }
+        ],
+        "field_states": {
+          "job_reference": "confirmed",
+          "customer_reference": "confirmed",
+          "vehicle_reference": "confirmed"
+        }
+      }
+    }
+  ],
+  "preview_image": "synthetic-sheet.png"
+}

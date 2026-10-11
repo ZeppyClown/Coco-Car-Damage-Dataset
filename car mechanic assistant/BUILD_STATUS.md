@@ -146,3 +146,12 @@ Researched official manufacturer downloads in response to the user's corpus ques
 ## RAG résumé corpus sufficiency assessment — 11 October 2026
 
 Added [RAG_CORPUS_RESUME_ASSESSMENT.md](RAG_CORPUS_RESUME_ASSESSMENT.md) and updated the master ledger with a deeper local audit: two official PDFs, 581 pages independently counted by pypdf/PyMuPDF, full nonempty-text/script/exact-duplicate checks and 2,794 in-memory chunks from the unmodified document processor. Default scope remains unknown and the current applicability filter rejects it; no source was embedded or added to a serving release. Five representative renders were visually inspected. Publisher terms, source types, language limits, current ingestion/applicability/evaluation code and every RAG résumé assertion are assessed separately. Evidence artifacts remain private/ignored. No application changes, model-provider calls or new retrieval-performance results; application regression tests were not rerun.
+
+
+## Workshop F01 — verified schemas and fictional fixtures, 11 October 2026
+
+The user selected the job-sheet capture/review project. Implemented four Pydantic schemas for raw/parsed item values, editable drafts, review validation and revision metadata. Review requires an explicit stage/reference/provenance and confirmed active descriptions; supplied interpreted values must be resolved, while genuinely missing amounts stay null. Decimal-string amounts reject floats, invalid precision and out-of-range/nonfinite values. Cancelled rows and bilingual raw notes remain available. Five fictional JSON cases and one visibly labelled printed demo PNG contain no company data.
+
+Verification: `.venv/bin/python -m pytest -q tests/unit/test_workshop.py --disable-warnings` returned **45 passed, 7 warnings**. The broader `.venv/bin/python -m pytest -q tests` returned **117 passed, 1 skipped, 76 warnings**; the existing PostgreSQL integration was skipped because no disposable `YAP_TEST_POSTGRES_URL` is configured. An initial whole-number amount-bound issue was fixed and the checks passed afterward. Fixture image, links, private exclusions/source integrity and Git scope/whitespace were checked.
+
+[WORKSHOP_MASTER_PLAN.md](WORKSHOP_MASTER_PLAN.md) records the exact fields, limits and handoff. **F02 persistence/migration is next.** No workshop routes, UI, database models, uploads, persisted immutable revisions, CSV output or AI extraction exist yet. These schema checks do not establish handwriting accuracy, company compatibility, reviewer identity or staff adoption.

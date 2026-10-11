@@ -756,7 +756,7 @@ Record a question as resolved only when there is an actual answer. An elapsed wa
 ## 15. Current handoff snapshot
 
 - **Branch/repository:** `main`, remote `origin` is the user's existing GitHub repository. Verify actual remote before pushing on a different machine.
-- **Previous delivery:** `276579c`, authenticated workshop access/review attribution. Read Git history for the final provider-schema/live-smoke increment hash.
+- **Latest code delivery:** `f7b2c8c`, provider-schema fix and printed-fictional live AI/review/output verification, committed and pushed after authenticated access increment `276579c`.
 - **What exists:** existing automotive API/RAG and the separate workshop manual source/draft/review/history/correction/demo-output/lookup workflow, configured local account, mocked optional AI, synthetic evaluator, operating guide and disposable recovery checks.
 - **Latest implementation:** F07 provider schema compatibility and full printed-fictional live API flow. Final290 passed/no skips/132 warnings; clean API217 passed/no skips/51 warnings;15 workshop PG cases ran. Actual initial provider proposal/review/export provenance and browser reopening verified. Authentication/recovery still verified. The latest work log contains exact source/model/time/privacy evidence and remaining requirements.
 - **What does not exist:** real handwriting/independently labelled benchmark, actual destination mapping, company account/pilot operating policy, production backup/reconciliation/retention or permitted company deployment.
@@ -765,6 +765,21 @@ Record a question as resolved only when there is an actual answer. An elapsed wa
 - **Independent work delivered:** source handling, manual review/version/export, configured local account/origin/attribution controls, mocked extraction, manual clarification boundaries, lookup, synthetic comparator/protocol, local operating guide and disposable recovery. New company data/rules/identity/approval must not be fabricated to extend these.
 - **Unrelated changes to preserve:** root `PROJECT_SUMMARY.md` and `SYSTEM_DESIGN.md` as seen on this machine; verify current status rather than assuming it remains identical.
 - **Open decisions:** real output mapping, model-processing path, operator and expected labels. None should be fabricated.
+
+### Completion audit and the minimum company handoff
+
+The 11 October completion audit checked the F00–F12 acceptance requirements, M1–M5 milestones, current extraction code/tests, saved live-fictional report and private visit/workbook answer sections. The private workflow-plan correction table and focused image questions are still unanswered; the workbook still lists the missing record chain, mapping, operator and processing decisions. No company-labelled JSONL set or destination CSV/spreadsheet was found in `company visit/`. **The local prototype is delivered; the full company project is incomplete.** No further independently ready feature remains in the agreed scope after the live F07 fix.
+
+Bring back these specific artifacts rather than another general interview. Keep the completed answers and records private; section 14 remains the question ledger.
+
+| Remaining work | Minimum input to return | What the next implementer can then do | Evidence needed before completion |
+|---|---|---|---|
+| F08: actual meanings/stage (Q01/Q02) | A reviewer explains one permitted sheet, each raw note/amount/cancellation/diagram mark and whether it is a quote, approved work or completed work; unresolved values remain unknown | Save independently reviewed expected values and any approved vocabulary without guessing from the photograph | Reviewer checks that captured meaning and stage match that source |
+| F09/M3: real reuse (Q03/Q04/Q05/Q10) | The same job's redacted source, final invoice/software record and relevant spreadsheet row; destination columns/import example; approved required fields/conversions and correction procedure; identify the copying step to remove | Implement one deterministic, versioned destination mapping using the existing reviewed-record/export path | Checked representative output and permitted destination acceptance; an operator confirms any entry step actually removed |
+| Real F07/F11/M4: quality/usefulness (Q06/Q07/Q08) | Permitted processing/storage path, representative source cases with independently checked labels, named reviewer/operator and observed current-task baseline | Select the approved extraction path, retain failures, compare held-out values and time existing/manual/AI workflows end to end | Recorded sample/denominator/error/review-time results; a fictional smoke or developer correction is insufficient |
+| Real F12/M5: workshop operation (Q06/Q07/Q09) | Decision owner and intended users/host; agreed access, provider, retention/deletion, backup and support rules; actual pilot decision | Implement only the selected operational gaps and verify them on the agreed host before any separately authorised deployment | Access and recovery checks in that environment plus actual operating approval; the current single-account local drill is insufficient |
+
+Existing verification remains **290 full tests and 217 clean API tests passed**, plus the recorded live printed-fictional flow/browser reopen. Those are prior implementation results, not new company evidence or a new test run. This documentation-only audit does not change code, models, fixtures, configuration, CSV mapping or runtime. Résumé adoption, retrieval-precision, corpus-size and internship-history claims remain unverified separately.
 
 ### Copyable Claude handoff prompt
 
@@ -787,6 +802,14 @@ remain recorded and unanswered.
 ```
 
 ## 16. Work log
+
+### 11 October 2026 — completion audit and company handoff
+
+- Rechecked the entire feature/milestone ledger against the private visit review, workflow-plan answer/correction sections, image-review questions and completed working workbook. Relevant answers remain blank/pending; the visit directory contains the existing review Markdown/transcripts, with no independent label set or destination CSV/spreadsheet.
+- Read the actual F07 provider/validation boundary and prior live report: successful printed-fictional proposal did not write a record automatically, and the manually checked review/output is explicitly not a company benchmark. Inspected relevant extraction, evaluator, authentication and PostgreSQL test coverage without rerunning unchanged tests or making another provider request.
+- Added the minimum artifact/next-action/completion-evidence table above and pinned the delivered code hash `f7b2c8c`. No independently ready feature remains under the agreed plan; company-dependent F08/F09/F11/F12 and real extraction quality/use remain unfinished. Status documentation is not implementation progress or project completion.
+- Documentation-only increment: check Markdown whitespace/local links and explicit staged scope, then commit/push this master update. Preserve unrelated root documents, private answers/sources and runtime artifacts. Application tests and browser/provider checks are not rerun because executable behavior is unchanged.
+- Next task: start the first remaining branch whose actual company prerequisite arrives. Do not add guessed mappings, manufacture labels/approval or repeat fictional generation as a substitute for those inputs.
 
 ### 11 October 2026 — F07 provider schema fixed and printed-fictional live smoke verified
 

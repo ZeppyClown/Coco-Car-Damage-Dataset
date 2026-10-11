@@ -1,6 +1,6 @@
 # Workshop job-sheet project — master plan and implementation ledger
 
-**Last updated:** 11 October 2026. **Current phase:** local manual workflow/lookup, configured-account access, mocked and printed-fictional live AI integration, synthetic evaluation and disposable recovery checks delivered. **Company-dependent work remains incomplete:** real-source permission/quality, meanings/labels/mapping, permitted pilot and measured outcomes.
+**Last updated:** 12 October 2026. **Current phase:** local manual workflow/lookup, configured-account access, mocked and printed-fictional live AI integration, synthetic evaluation and disposable recovery checks delivered. A focused company validation worksheet is ready to fill privately. **Company-dependent work remains incomplete:** real-source permission/quality, meanings/labels/mapping, permitted pilot and measured outcomes.
 
 This is the authoritative implementation/handoff document for the workshop administrative project. Every contributor, including Codex and Claude, must update it for **every feature or implementation part**, including partial work, fixes, migrations, tests, configuration and changed decisions. Do not rely on chat history to resume the work.
 
@@ -9,6 +9,8 @@ The first product is a small local application that turns a permitted paper shee
 ## 1. Start here: the actual next task
 
 **Next task depends on company inputs:** Q01/Q02 meanings/stage, Q03/Q04/Q10 checked destination/correction mapping, Q06/Q07/Q09 operator/processing/access/operation and Q08 independent labels/baseline. F07 now has a successful live **printed fictional** Gemini image→unsaved proposed draft→source-checked manual review→demo CSV API smoke. Reinspection found the existing manual assistant's ignored local key; it was supplied only to an explicitly configured temporary process. The workshop does not automatically load another application's credentials. Root/manual demo AI remains default-off, private-source processing blocked and real handwriting/company accuracy unverified. The selected project is job-sheet capture/review; public-reference RAG remains separate research.
+
+Use the [workshop validation worksheet](WORKSHOP_VALIDATION_WORKSHEET.md) for the next company discussion. Make a private copy, then follow one job through source meaning, actual destination, independent labels, permission and complete-task timing. It is tailored to this project; the earlier visit workbook also covers the separate manual-RAG investigation. No company answer or validation result is prefilled.
 
 Do not start by scanning an archive, training a model, building a vector database or integrating the accounting system. None is required to demonstrate the core review workflow.
 
@@ -349,7 +351,7 @@ Allowed statuses: `READY`, `IN_PROGRESS`, `IMPLEMENTED_UNVERIFIED`, `VERIFIED`, 
 
 | ID | Part | Status now | Dependencies | Evidence / next action |
 |---|---|---|---|---|
-| F00 | Master plan, handoff and private-source boundary | VERIFIED | None | Documentation/link/exclusion/staged-scope checks for this change; no app implementation |
+| F00 | Master plan, handoff, private-source boundary and validation worksheet | VERIFIED | None | Documentation/link/exclusion checks; 12 October worksheet covers 24 contract fields/all stages, 27 local links resolve and blank private copy is 0600/ignored; no company answers or new app feature |
 | F01 | Draft/review contract and fictional fixtures | VERIFIED | F00 | Four record/review schemas, five fictional JSON cases and one printed demo PNG; 45 targeted checks passed |
 | F02 | Workshop storage, models and migration | VERIFIED | F01 | Three tables, migration 20261011_workshop and create/read/replace routes; 133 total tests passed with real PostgreSQL; live app restart preserved draft |
 | F03 | Safe image attach/preview and duplicate warning | VERIFIED | F02 | 16 new cases plus live upload/preview/duplicate/chunked-limit checks; full suite 149 passed |
@@ -753,6 +755,8 @@ Keep actual answers and documents in the private visit files. Here, record gener
 
 Record a question as resolved only when there is an actual answer. An elapsed wait, a synthetic sample or a plausible inference is not an answer. Continue ready tasks while these are pending.
 
+The [validation worksheet](WORKSHOP_VALIDATION_WORKSHEET.md) provides the fill-in evidence tables for these questions. Completed answers and attachments remain private; returning a checked mapping or reviewed label set can unlock that branch before every other question is answered.
+
 ## 15. Current handoff snapshot
 
 - **Branch/repository:** `main`, remote `origin` is the user's existing GitHub repository. Verify actual remote before pushing on a different machine.
@@ -802,6 +806,15 @@ remain recorded and unanswered.
 ```
 
 ## 16. Work log
+
+### 12 October 2026 — focused validation worksheet prepared
+
+- User asked what must be validated, then requested continuation. Rechecked current Git/visit/master state: no new company answers, labelled cases, destination CSV/spreadsheet or operating decisions are supplied. Code remains `f7b2c8c`; master audit increment `a057b79` is pushed. Preserve unrelated root documents.
+- Added `WORKSHOP_VALIDATION_WORKSHEET.md`, a blank public template with a non-overwriting private-copy command, one-job record chain, every current interpreted field/raw note/item and independent-review provenance, exact destination mapping/correction checks, separate permission/operation decisions and per-run complete-task timing/results.
+- Read the actual draft/evaluator contracts before writing tables. Stage values/field names match the implementation; unknown money/partial dates stay unknown, cancelled rows retain order, uncertain cancellation must not default to false, and gold labels cannot be model-derived. The comparator does not establish stage/permission/company outcomes. Real-source AI remains blocked; no permission, interpretation, mapping or outcome is invented.
+- Linked the worksheet from the master/evaluation guide. This supports collecting the missing evidence; it does not implement F09, validate handwriting, establish time savings or complete the company project. No application behavior, schema, fixture, dependency or model request changes.
+- Verification for this documentation increment: actual schema/evaluator inspection and asserts confirm 24 contract fields/all stage values and independent/unknown/private-AI boundaries; 27 local links resolve. Created a blank private copy at `runtime/workshop-validation-private.md` using exclusive creation, verified identical template bytes and mode 0600, and confirmed it is ignored. Existing copies would be preserved. Whitespace/staged-scope checks pass. Application tests/browser/provider checks are not rerun because executable behavior is unchanged; prior 290 full/217 clean results remain historical implementation evidence.
+- Commit/push only the worksheet and companion master/evaluation links. Next implementation remains the first branch whose real company prerequisite arrives; do not create substitute company labels/mappings or claim a completed validation from a blank form.
 
 ### 11 October 2026 — completion audit and company handoff
 

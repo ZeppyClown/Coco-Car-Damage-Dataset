@@ -1,6 +1,6 @@
 # Workshop evaluation guide
 
-Last updated: 11 October 2026. Current evidence: evaluator and fictional workflow tests only. There is no measured company extraction accuracy, staff time saving, accounting compatibility or adoption result. The [master plan](WORKSHOP_MASTER_PLAN.md) is the implementation ledger.
+Last updated: 12 October 2026. Current evidence: evaluator and fictional workflow tests only. There is no measured company extraction accuracy, staff time saving, accounting compatibility or adoption result. The [master plan](WORKSHOP_MASTER_PLAN.md) is the implementation ledger.
 
 ## Run the development comparison
 
@@ -86,6 +86,8 @@ Cancelled interpretations do not earn active-work correctness; literal cancelled
 Aggregate output does not echo case IDs, reviewer names, customer values, raw notes or images. Invalid CLI input produces a generic error and no report. Examine sensitive inputs locally rather than attaching full validation tracebacks to a public issue.
 
 ## Company trial prerequisites and protocol
+
+Use the [workshop validation worksheet](WORKSHOP_VALIDATION_WORKSHEET.md) as a private fill-in copy for the reviewer/operator. It captures one job chain, independently checked values, destination rules, separate permissions and per-run full-task timings. The developer can translate checked tables to the [JSONL input contract](#input-files); the reviewer must verify that translation. The blank worksheet is not a dataset, company approval or trial result.
 
 Before any real AI call, resolve Q07 processing permission. Before calling a result meaningful, resolve Q01/Q02/Q08: a workshop reviewer supplies meanings, stage and expected labels independently, and an operator agrees to a task comparison. F09 also needs the real source→final invoice/software→spreadsheet chain and destination mapping. The demo CSV is not that destination.
 

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
@@ -9,6 +9,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from pathlib import Path
 
 from app.core.config import settings
+from app.core.workshop_auth import WorkshopAccessMiddleware
 from app.core.logging import get_logger
 from app.core.middleware import (
     error_handling_middleware,
@@ -45,6 +46,7 @@ app.add_middleware(
 
 # Error handling middleware
 app.add_middleware(WorkshopUploadLimitMiddleware)
+app.add_middleware(WorkshopAccessMiddleware)
 app.middleware("http")(error_handling_middleware)
 
 # Serve static files (HTML, CSS, JS)
@@ -99,9 +101,10 @@ app.include_router(workshop.router, prefix=f"/api/{settings.API_VERSION}", tags=
 
 
 @app.get("/workshop", dependencies=[Depends(workshop.require_workshop_enabled)], include_in_schema=False)
-def workshop_page():
+def workshop_page(request: Request):
     page = (Path(__file__).parent / "templates/workshop.html").read_text(encoding="utf-8")
     page = page.replace("{{workshop_api}}", escape(f"/api/{settings.API_VERSION}/workshop", quote=True))
+    page = page.replace("{{workshop_user}}", escape(request.state.workshop_user, quote=True))
     return HTMLResponse(page, headers={"Cache-Control": "no-store"})
 
 @app.on_event("startup")

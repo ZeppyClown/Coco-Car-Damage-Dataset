@@ -1,6 +1,7 @@
 """Real migrations/transactions, only in random schemas of a local yap_test DB."""
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
+from hashlib import sha256
 import os
 from pathlib import Path
 import shutil
@@ -29,6 +30,8 @@ from app.core.config import settings
 from app.db.models import WorkshopDocument
 from app.db.models import WorkshopExport
 from app.services.workshop import generate_export, export_file, lookup_jobs
+from app.services.workshop import demo_csv, DEMO_MAPPING_VERSION
+from app.schemas.workshop import WorkshopRevisionResponse
 
 
 @pytest.fixture
@@ -283,8 +286,14 @@ def test_export_migration_and_simultaneous_generation(workshop_postgres, tmp_pat
     monkeypatch.setattr(settings, "WORKSHOP_STORAGE_DIR", tmp_path)
     with Session(engine) as db:
         job_id = create_job(db, reviewed_fixture()).id
-        revision = confirm_job(db, job_id, WorkshopConfirmRequest(expected_version=1, reviewer="Fictional", acknowledged=True))
+    revision_id = uuid4()
+    previous = Table("workshop_job_revisions", MetaData(), autoload_with=engine)
+    with engine.begin() as connection:
+        connection.execute(previous.insert().values(id=revision_id, job_id=job_id, version=1,
+            record=reviewed_fixture().model_dump(mode="json"), reviewer="Fictional", reviewed_at=datetime.now(timezone.utc)))
     migrate(engine)
+    with Session(engine) as db:
+        revision = list_revisions(db, job_id)[0]
     barrier = Barrier(2)
     def generate(_):
         with Session(engine) as db:
@@ -298,6 +307,50 @@ def test_export_migration_and_simultaneous_generation(workshop_postgres, tmp_pat
         assert len(exports) == 1 and len(list(tmp_path.iterdir())) == 1
         assert export_file(exports[0]).read_bytes().startswith(b"\xef\xbb\xbf")
         assert list_revisions(db, job_id)[0].model_dump() == revision.model_dump()
+
+
+def test_auth_upgrade_preserves_legacy_review_and_existing_csv(workshop_postgres, tmp_path, monkeypatch):
+    engine = workshop_postgres
+    migrate(engine, "20261011_exports")
+    monkeypatch.setattr(settings, "WORKSHOP_STORAGE_DIR", tmp_path)
+    draft = reviewed_fixture()
+    with Session(engine) as db:
+        job_id = create_job(db, draft).id
+    legacy = WorkshopRevisionResponse(id=uuid4(), job_id=job_id, version=1, record=draft.model_dump(mode="json"),
+        reviewer="Fictional old self-reported reviewer", reviewed_at=datetime.now(timezone.utc))
+    previous = Table("workshop_job_revisions", MetaData(), autoload_with=engine)
+    with engine.begin() as connection:
+        connection.execute(previous.insert().values(id=legacy.id, job_id=job_id, version=1,
+            record=draft.model_dump(mode="json"), reviewer=legacy.reviewer, reviewed_at=legacy.reviewed_at))
+    content = demo_csv(legacy)
+    export_id = uuid4()
+    output = tmp_path / (export_id.hex + ".csv")
+    output.write_bytes(content)
+    output.chmod(0o600)
+    with Session(engine) as db:
+        db.add(WorkshopExport(id=export_id, revision_id=legacy.id, mapping_version=DEMO_MAPPING_VERSION,
+            checksum=sha256(content).hexdigest(), byte_size=len(content), storage_key=output.name))
+        db.commit()
+    migrate(engine)
+    with Session(engine) as db:
+        restored = list_revisions(db, job_id)[0]
+        assert restored.model_dump() == legacy.model_dump() and restored.reviewer_identity == "self_reported"
+        repeated = confirm_job(db, job_id, WorkshopConfirmRequest(expected_version=1, reviewer="fictional-operator", acknowledged=True), authenticated=True)
+        assert repeated.model_dump() == legacy.model_dump()
+        assert generate_export(db, legacy.id).id == export_id
+        assert export_file(get_export(db, export_id)).read_bytes() == content
+        draft.job_reference = "DEMO-AUTH-CORRECTED"
+        update_job(db, job_id, WorkshopDraftUpdate(expected_version=1, draft=draft))
+        new = confirm_job(db, job_id, WorkshopConfirmRequest(expected_version=2, reviewer="fictional-operator", acknowledged=True), authenticated=True)
+        assert new.reviewer_identity == "authenticated"
+        assert list_revisions(db, job_id)[1].model_dump() == legacy.model_dump()
+    with pytest.raises(DBAPIError):
+        with engine.begin() as connection:
+            connection.execute(text("UPDATE workshop_job_revisions SET reviewer_identity='authenticated'"))
+    with pytest.raises(IntegrityError):
+        with engine.begin() as connection:
+            connection.execute(WorkshopJobRevision.__table__.insert().values(id=uuid4(), job_id=job_id, version=3,
+                record=draft.model_dump(mode="json"), reviewer="fictional", reviewer_identity="forged", reviewed_at=datetime.now(timezone.utc)))
 
 
 def test_postgres_latest_review_lookup_literal_json_and_pagination(workshop_postgres):

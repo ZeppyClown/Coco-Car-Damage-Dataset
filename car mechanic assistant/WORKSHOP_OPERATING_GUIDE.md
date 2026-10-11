@@ -1,6 +1,6 @@
 # Workshop local operating and recovery guide
 
-Last updated: 11 October 2026. This describes the tested **local fictional demonstration**. Company pilot approval, authenticated access, hosting, retention and actual destination mapping remain pending. The [master plan](WORKSHOP_MASTER_PLAN.md) records each feature and its exact evidence.
+Last updated: 11 October 2026. This describes the **local fictional demonstration**, now protected by one configured operator account. Company pilot approval, actual access policy, hosting, retention and destination mapping remain pending. The [master plan](WORKSHOP_MASTER_PLAN.md) records each feature and its exact evidence.
 
 ## What is available
 
@@ -27,18 +27,33 @@ Set the **actual separately provisioned local** connection. Replace these role/p
 ```sh
 export DATABASE_URL='postgresql://YOUR_LOCAL_ROLE@127.0.0.1:5432/yap_test_workshop'
 export WORKSHOP_ENABLED=true
+export WORKSHOP_AUTH_USERNAME='fictional-local-operator'
+export WORKSHOP_ORIGIN='http://127.0.0.1:8000'
 export WORKSHOP_AI_ENABLED=false
 export USE_GOOGLE_CSE=false
 export USE_EBAY_API=false
 export DEBUG=false
 'car mechanic assistant/runtime/workshop-api-venv/bin/python' -m alembic upgrade head
 'car mechanic assistant/runtime/workshop-api-venv/bin/python' -m alembic check
-'car mechanic assistant/runtime/workshop-api-venv/bin/python' -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-Check the target before migration. Startup does not create tables automatically. Current workshop head is `20261011_exports`, following draft and review-guard revisions. Future changes must add a new migration and update this guide/master rather than rewrite delivered revisions. Stop this task's server with Ctrl-C in its terminal.
+Check the target before migration. Startup does not create tables automatically. Current workshop head is `20261011_auth`, following draft/review-guard/export revisions. The additive authentication migration labels existing snapshots `self_reported` without changing their contents, reviewer, timestamp or CSV bytes. New API confirmations use `authenticated`. Future changes need a new migration. Stop this task's server with Ctrl-C in its terminal.
 
-Open `http://127.0.0.1:8000/workshop`; `/docs` describes API request contracts. Keep the demo bound to localhost. `WORKSHOP_ENABLED` defaults false and is a feature gate, not authentication. Existing CORS/security placeholders do not establish a pilot boundary. Do not enable these routes on a shared/public host before F12 access decisions and implementation.
+Generate a password hash interactively; the password is hidden, entered twice and never passed on the command line:
+
+```sh
+'car mechanic assistant/runtime/workshop-api-venv/bin/python' -m scripts.workshop_password
+```
+
+Use 16–1024 printable ASCII password characters and a printable ASCII account name (no colon, surrounding whitespace or more than200 characters). This is an account identifier, not evidence of a person's legal name. Store the resulting hash in `WORKSHOP_AUTH_PASSWORD_HASH` in an ignored permitted private environment file with mode0600. Use single quotes around the hash when setting it in a shell: its `$` characters are literal. Do not commit the hash/password or paste it into chat. The hash uses a random16-byte salt and standard-library scrypt; no plaintext password is configured in the application. Then start Uvicorn with your private environment file:
+
+```sh
+'car mechanic assistant/runtime/workshop-api-venv/bin/python' -m uvicorn app.main:app --env-file 'PATH_TO_PRIVATE_ENV_FILE' --host 127.0.0.1 --port 8000
+```
+
+Open the **exact configured origin** plus `/workshop` and enter the account/password in the browser's native HTTP Basic prompt. `localhost` and `127.0.0.1` are different hosts. Wrong/missing credentials return401; enabled routes with missing/invalid configuration return503; disabled routes return404. Page, workshop API, preview and CSV download are protected before body parsing. Protected responses use `Cache-Control: no-store`. Requests to a different host/origin or marked cross-site/same-site are rejected403, including authenticated writes; ordinary same-origin browser requests and authenticated CLI calls without Origin are supported. The existing seven automotive endpoints are outside this boundary. `/docs` exposes API schemas with HTTP Basic authorisation, not stored workshop records.
+
+`WORKSHOP_ENABLED` defaults false and remains a separate feature gate. The single operator can access all workshop records; there are no per-customer permissions or roles. Close the dedicated browser context to clear its cached Basic credentials; there is no application logout/session manager. Rotate the hash and restart to revoke the old password. Keep HTTP restricted to loopback; non-loopback configured origins require HTTPS. Actual TLS/proxy configuration, brute-force/rate limiting, credential custody and company access policy have not been deployed/verified. Do not expose this prototype publicly. A future shared pilot needs those operating decisions and checks first.
 
 ## Complete one fictional job
 
@@ -46,7 +61,7 @@ Open `http://127.0.0.1:8000/workshop`; `/docs` describes API request contracts. 
 2. Enter a unique fictional job reference, explicit stage and work items. Copy literal wording and amount notes separately from clarified values. A missing amount remains empty/null; enter 0.00 only if zero is known. Do not infer currency, year, repairs or totals from context.
 3. Keep crossed-out rows and mark them cancelled. Raw diagram/shorthand notes can remain uninterpreted. An area alone does not define an active repair item. For clarified diagram meaning, state the source of clarification and applicable vehicle direction convention in manual provenance; the software checks text presence, not its truth.
 4. Choose review states deliberately. Editing an interpreted value makes it proposed again. Optional truly missing fields can stay missing. Ambiguous interpretations remain unclear until someone establishes meaning. Unresolved interpretations block confirmation but do not prevent saving a draft.
-5. Save. Copy the job UUID/bookmark URL. Enter the self-reported demo reviewer name, explicitly acknowledge checking values and confirm. The server uses its current UTC clock; clients cannot backdate reviews. A reviewed quote remains a quote.
+5. Save. Copy the job UUID/bookmark URL. Check the displayed read-only signed-in account, explicitly acknowledge checking values and confirm. The server binds the reviewer to that account regardless of a client-supplied name and uses its current UTC clock; clients cannot backdate reviews. A reviewed quote remains a quote. History distinguishes authenticated attribution from older self-reported identities; it does not retroactively verify them.
 6. Expand a reviewed version in history and download its demo CSV. `workshop-demo-v1` is not a company import mapping. It repeats snapshot fields per line, preserves unknown/zero distinction and marks cancelled literal rows without interpreted values. Formula-like cells get an apostrophe prefix; signed negatives are textual under this demo rule. Stored values remain unchanged.
 7. Reopen/search the job. Lookup returns latest reviewed records, excludes draft-only jobs, shows unknown references and flags newer unreviewed changes. Search raw/unknown/cancelled text does not establish its meaning. Date filters use inclusive UTC review dates; results open the current editable draft plus immutable history.
 8. To correct, edit/save a new draft version, resolve proposed fields and confirm again. Earlier snapshots/CSVs stay unchanged. Repeated unchanged confirmation/export returns the original identity/time. Reuse downstream still needs F09 mapping/correction agreement.
@@ -67,6 +82,8 @@ There is one 60-second attempt, no automatic retry and no configured tools. Inva
 
 | Result | Operator action | What is preserved |
 |---|---|---|
+|401 missing/wrong account | Re-enter the configured account in the dedicated browser; preserve unsaved work, then retry deliberately | No request reaches the workshop parser/service; form values remain visible |
+|403 origin rejected /503 account misconfigured | Use the exact configured origin or have the local operator fix configuration; do not disable the boundary | No workshop write occurs |
 |422 invalid draft/review | Correct the indicated value/state/context; save/review deliberately | Current form values and earlier stored versions |
 |409 stale version | Keep current unsaved values visible, reopen/compare the latest job in a separate view if needed, then apply intended corrections to the current version | Other person's save is not overwritten; no automatic merge |
 |503 source/output missing or corrupt | Investigate storage/restore the corresponding verified file; retry explicitly | Database identity/history; broken bytes are not silently regenerated/reused |
@@ -92,10 +109,10 @@ For an installed Chrome and Node, the isolated browser harness creates fictional
 
 ```sh
 npm install --prefix 'car mechanic assistant/runtime/workshop-browser-tests' playwright@1.64.0
-node tests/browser/workshop.cjs 'car mechanic assistant/runtime/workshop-browser-tests/node_modules/playwright' http://127.0.0.1:8000
+node tests/browser/workshop.cjs 'car mechanic assistant/runtime/workshop-browser-tests/node_modules/playwright' http://127.0.0.1:8000 'PATH_TO_PRIVATE_FICTIONAL_CREDENTIAL_JSON'
 ```
 
-It uses a fresh browser context, never the user's profile. Screenshots/downloads stay ignored under runtime. API provider checks and browser AI proposal responses are mocked; no live AI request occurs. See the [evaluation guide](WORKSHOP_EVALUATION_GUIDE.md) for the no-network comparator and future actual trial protocol.
+The private mode0600 JSON file contains `username` and `password` for the fictional local account only. Keep it under ignored runtime, never Git. It is a test-harness convenience, not approved company credential storage. The harness uses a fresh authenticated browser context, never the user's profile, and checks anonymous page/upload rejection. Screenshots/downloads stay ignored under runtime. API provider checks and browser AI proposal responses are mocked; no live AI request occurs. See the [evaluation guide](WORKSHOP_EVALUATION_GUIDE.md) for the no-network comparator and future actual trial protocol.
 
 ## Local recovery rehearsal and its limits
 
@@ -123,4 +140,4 @@ The master Q01–Q10 ledger remains unresolved. Required decisions/evidence:
 - Source/external-provider permission and independently labelled cases/baseline task times.
 - Named user identity, access/roles, permitted host, origin/session/CSRF controls, storage, retention/deletion, backup/restore and support owner.
 
-No real authenticated pilot has been built/deployed. The default-disabled local gate and reviewer textbox are insufficient for that purpose. This guide and fictional recovery evidence complete a local development part of F12, not company authorisation or production readiness. Actual data/use/outcome claims require actual evidence; the résumé targets remain separate from these tests.
+No real company pilot has been deployed. The local account/origin boundary, guide and fictional recovery evidence are development parts of F12; company approval, real account policy, hosting and retention remain unresolved. Actual data/use/outcome claims require actual evidence; the résumé targets remain separate from these tests.

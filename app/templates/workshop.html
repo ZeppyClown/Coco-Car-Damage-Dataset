@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="workshop-api" content="{{workshop_api}}">
+  <meta name="workshop-user" content="{{workshop_user}}">
   <title>Workshop job sheets</title>
   <link rel="stylesheet" href="/static/workshop.css">
   <script src="/static/workshop.js" defer></script>
@@ -76,7 +77,7 @@
       <section class="review-controls" aria-labelledby="review-heading">
         <h3 id="review-heading">Confirm a saved version</h3>
         <p class="hint">Save first. Check the source and every interpreted value, including its review state. Confirming a quote keeps it a quote.</p>
-        <label>Reviewer name (self-reported demo identity)<input id="reviewer" maxlength="200" autocomplete="off"></label>
+        <label>Authenticated reviewer account<input id="reviewer" maxlength="200" readonly></label>
         <label><input id="review-ack" type="checkbox">I checked the interpreted values against the source or stated clarification.</label>
         <button type="button" id="confirm-record" disabled>Confirm saved draft</button>
       </section>

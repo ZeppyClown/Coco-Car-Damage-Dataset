@@ -1,6 +1,6 @@
 # Workshop job-sheet project — master plan and implementation ledger
 
-**Last updated:** 11 October 2026. **Current phase:** local manual workflow/lookup, mocked AI, synthetic evaluation and disposable recovery checks delivered. **Company-dependent project work remains incomplete:** live AI, real meanings/labels/mapping, authenticated permitted pilot and measured outcomes.
+**Last updated:** 11 October 2026. **Current phase:** local manual workflow/lookup, configured-account access, mocked AI, synthetic evaluation and disposable recovery checks delivered. **Company-dependent project work remains incomplete:** live AI, real meanings/labels/mapping, permitted company pilot and measured outcomes.
 
 This is the authoritative implementation/handoff document for the workshop administrative project. Every contributor, including Codex and Claude, must update it for **every feature or implementation part**, including partial work, fixes, migrations, tests, configuration and changed decisions. Do not rely on chat history to resume the work.
 
@@ -8,7 +8,7 @@ The first product is a small local application that turns a permitted paper shee
 
 ## 1. Start here: the actual next task
 
-**Next task is conditional on missing inputs:** configure an authorised Gemini key/explicit model for a fictional smoke test (F07), or obtain Q01–Q10 company answers for real mapping/labels/pilot work. The independent local guide/recovery rehearsal is verified. F01–F06, F10 and mocked/synthetic/manual F07/F08/F11 checks are verified. Live Gemini acceptance/accuracy still needs explicit model configuration and a synthetic smoke test; private-source processing remains blocked. The user explicitly selected job-sheet capture/review; public-reference RAG remains separate research.
+**Next task is conditional on missing inputs:** configure an authorised Gemini key/explicit model for a fictional smoke test (F07), or obtain Q01–Q10 company answers for real mapping/labels/pilot work. Independent local account/origin controls, authenticated review attribution and guide/recovery rehearsal are verified with fictional records. F01–F06, F10 and mocked/synthetic/manual F07/F08/F11 checks are verified. Live Gemini acceptance/accuracy still needs explicit model configuration and a synthetic smoke test; private-source processing remains blocked. The user explicitly selected job-sheet capture/review; public-reference RAG remains separate research.
 
 Do not start by scanning an archive, training a model, building a vector database or integrating the accounting system. None is required to demonstrate the core review workflow.
 
@@ -25,7 +25,7 @@ This milestone is a local demonstration. It does not claim company deployment, r
 3. Read the existing schema/session/router/test fixtures listed in section 5. Confirm actual paths before adding code.
 4. Check whether the private visit files exist locally. Their absence does not block a synthetic/manual prototype. Do not obtain company files from public search as replacements for actual evidence.
 5. Mark the next ready feature (currently the input-dependent F07/F09/F12 branch) `IN_PROGRESS` and state the exact scope in the ledger below.
-6. Choose only a branch whose prerequisite is actually available. F07 live smoke needs a locally configured key/model; F09 needs one checked record chain/accepted destination schema; real F08/F11 need reviewer labels/baseline; F12 auth/operation needs owner/access/host/retention decisions. Do not build or claim guessed company rules. The operating guide/recovery test is delivered; no public/live deployment is authorised.
+6. Choose only a branch whose prerequisite is actually available. F07 live smoke needs a locally configured key/model; F09 needs one checked record chain/accepted destination schema; real F08/F11 need reviewer labels/baseline; real F12 operation needs owner/access/host/retention decisions. The single-account authentication prototype can be checked with a fictional operator without inventing company policy. Do not build or claim guessed company rules. No public/live deployment is authorised.
 7. Update the ledger, verification table, next task and work log **before** committing. Commit only the intended files, then push as previously authorised by the user.
 
 ## 2. Business problem and scope
@@ -230,7 +230,7 @@ F06 added **WorkshopExport**: reviewed-revision FK, mapping version, checksum/ou
 
 Revision storage has job/source FKs, a positive version check and unique `(job_id, version)`. F05 adds the confirmation writer and PostgreSQL UPDATE/DELETE rejection trigger; F12 still supplies real user access controls. F03 supplies actual source storage. Historical F02 checks alone did not establish these later features.
 
-The [router](../app/api/v1/workshop.py) uses the shared `get_db` session and [service](../app/services/workshop.py), gated by `WORKSHOP_ENABLED=false` by default. Disabled routes return 404. Enable only in a local isolated demonstration; the flag is not authentication.
+The [router](../app/api/v1/workshop.py) uses the shared `get_db` session and [service](../app/services/workshop.py), gated by `WORKSHOP_ENABLED=false` by default. Disabled routes return404. F12 now additionally requires configured account/origin authentication; the flag alone cannot open the workshop. See the operating guide for setup.
 
 | Operation now | Actual route | Input/result |
 |---|---|---|
@@ -256,11 +256,11 @@ Known limit: a process crash between file creation and DB commit can leave an un
 
 ### Implemented F05 review and correction
 
-`POST /api/v1/workshop/jobs/{id}/confirm` requires strict positive `expected_version`, a nonblank self-reported `reviewer` and strict `acknowledged: true`; client timestamps/extra properties are rejected. It locks and refreshes the persisted job, rejects stale versions with 409, validates the full reviewed contract and verifies an attached source's hash/availability. It writes one snapshot with a server UTC timestamp. Repeat confirmation returns the original snapshot/reviewer/time. Confirmation does not increment the draft version or convert a quote to completed work.
+`POST /api/v1/workshop/jobs/{id}/confirm` requires strict positive `expected_version`, a nonblank `reviewer` compatibility field and strict `acknowledged: true`; client timestamps/extra properties are rejected. The authenticated API replaces that compatibility field with the verified account name. It locks and refreshes the persisted job, rejects stale versions with409, validates the full reviewed contract and verifies an attached source's hash/availability. It writes one snapshot with a server UTC timestamp. Repeat confirmation returns the original snapshot/reviewer/time/identity kind, including legacy reviews. Confirmation does not increment the draft version or convert a quote to completed work.
 
 `GET /jobs/{id}/revisions` returns newest-first snapshots with default 20, maximum 100 and nonnegative offset. The UI shows read-only records, literal/cancelled rows and original-source links, with older-history pagination. Edits invalidate interpreted confirmation state, require saving a new draft version and then rereview; previous records remain unchanged. Failed validation/confirmation keeps the draft; a history read failure after a successful save is reported separately from the known save result.
 
-Additive revision `20261011_review_guard` follows `20261011_workshop`: source FK/backfill plus a PostgreSQL trigger rejecting snapshot UPDATE/DELETE. This source link prevents deleting the source row even after a newer draft detaches it. SQLite unit tests do not provide that DB trigger guarantee; actual PostgreSQL integration verifies it. A privileged DB administrator can change schema/disable triggers; local reviewer names are not authenticated identities. No production audit/adoption claim follows from these controls.
+Additive revision `20261011_review_guard` follows `20261011_workshop`: source FK/backfill plus a PostgreSQL trigger rejecting snapshot UPDATE/DELETE. This source link prevents deleting the source row even after a newer draft detaches it. SQLite unit tests do not provide that DB trigger guarantee; actual PostgreSQL integration verifies it. A privileged DB administrator can change schema/disable triggers. F12 distinguishes new authenticated account attribution from legacy self-reported names; it cannot retroactively authenticate them. No production audit/adoption claim follows from these controls.
 
 ### Implemented F06 demo output contract
 
@@ -331,6 +331,16 @@ The implementer may simplify route naming, but must document the final contract 
 
 The first build should not add background workers. A bounded synchronous extraction request is sufficient for a local demo if its latency/failure behaviour is acceptable. Reconsider only after real use shows a queue is needed.
 
+### Implemented F12 configured-account prototype (company policy pending)
+
+[WorkshopAccessMiddleware](../app/core/workshop_auth.py) protects `/workshop` and the entire workshop API namespace, including source previews, proposals and CSV downloads, before the upload-limit/multipart parser. It requires one configured printable ASCII operator identifier, a salted hash and exact canonical origin. The native HTTP Basic401 challenge is supported; enabled invalid/missing configuration fails closed503. Configured non-loopback origins require HTTPS. Origin/host mismatches and browser cross-site/same-site requests fail403, even with credentials. No Origin header is required for ordinary authenticated CLI calls. Every protected response uses `Cache-Control: no-store`. Static JS/CSS have no records and remain public; the page is outside the static mount. Existing automotive endpoints are outside this boundary.
+
+The standard-library hash uses scrypt N=16384/r=8/p=5, a random16-byte salt,32-byte digest and constant-time username/digest comparison; bounded input and fixed parameters prevent a malformed configured hash choosing arbitrary work. This parameter tuple is listed by the official [OWASP password-storage guidance](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html); browser authentication follows [FastAPI HTTP Basic](https://fastapi.tiangolo.com/advanced/security/http-basic-auth/). [scripts/workshop_password.py](../scripts/workshop_password.py) reads a16+ character password twice with hidden terminal input and prints only its salted hash. Password/hash/config/test credentials must remain private/ignored. See [the operating guide](WORKSHOP_OPERATING_GUIDE.md) for repeatable setup and known limits.
+
+New API confirmation binds the reviewer to middleware-verified account state; the existing nonblank `reviewer` request field remains a compatibility field and cannot impersonate another account. The UI account is read-only and history distinguishes identity kind. Additive migration `20261011_auth` follows `20261011_exports`, adds nonnull `reviewer_identity` with a two-value check and `self_reported` default for existing snapshots. It does not UPDATE historical immutable rows. New API snapshots carry `authenticated`; direct service/test callers default to `self_reported`. Existing DTOs remain loadable. Reconfirmation returns original attribution, including an old self-reported review. CSV v1 does not add identity-kind columns, preserving old output checksums/identities; inspect API/history for that distinction.
+
+This is a single configured account with access to all workshop records. Account ownership, real user/role policy, TLS/proxy/rate limiting, credential custody/revocation, retention/deletion/reconciliation and actual pilot remain company-dependent. Basic credentials are cached by the browser; use a dedicated context and close it, or rotate the hash/restart to revoke. No session/logout/user-management system or production/load claim was added. Fictional account verification does not authenticate a company employee or historical internship use. Actual verification results belong in section13 and the latest work log.
+
 ## 7. Implementation ledger — update every row as work happens
 
 Allowed statuses: `READY`, `IN_PROGRESS`, `IMPLEMENTED_UNVERIFIED`, `VERIFIED`, `WAITING_COMPANY`, `DEFERRED`. Dependencies can leave a READY item not yet executable. A feature is VERIFIED only when its acceptance checks have actually run. Describe scope rather than claiming production readiness.
@@ -342,14 +352,14 @@ Allowed statuses: `READY`, `IN_PROGRESS`, `IMPLEMENTED_UNVERIFIED`, `VERIFIED`, 
 | F02 | Workshop storage, models and migration | VERIFIED | F01 | Three tables, migration 20261011_workshop and create/read/replace routes; 133 total tests passed with real PostgreSQL; live app restart preserved draft |
 | F03 | Safe image attach/preview and duplicate warning | VERIFIED | F02 | 16 new cases plus live upload/preview/duplicate/chunked-limit checks; full suite 149 passed |
 | F04 | Manual source/draft review screen | VERIFIED | F01–F03 | Gated page/ordinary JS/CSS; Chrome browser flow and failure retention passed; Python suite 150 passed |
-| F05 | Confirmation, immutable revisions and conflict handling | VERIFIED | F02/F04 | Atomic/idempotent confirmation, bounded read-only history, corrections, source FK and PG mutation guard; local self-reported reviewer |
+| F05 | Confirmation, immutable revisions and conflict handling | VERIFIED | F02/F04 | Atomic/idempotent confirmation, bounded read-only history, corrections, source FK and PG mutation guard; F12 binds new API reviews to its account and preserves legacy attribution |
 | F06 | Reproducible demonstration CSV output | VERIFIED | F05 | Fixed demo mapping, private output identity/checksum, concurrent reuse and browser per-version download/reopen passed |
 | F07 | Optional AI image-to-draft extraction | IMPLEMENTED_UNVERIFIED | F03–F06 | Mock API/SDK/UI workflow verified; live provider/model/schema acceptance unverified; private-source use blocked pending Q07 |
 | F08 | Reviewed diagram/shorthand interpretation | IMPLEMENTED_UNVERIFIED | F04/F07 | Manual clarification/context/raw/cancelled/history/output checks verified; actual company meanings/vocabulary pending Q01 |
 | F09 | Actual destination mapping and export | WAITING_COMPANY | F06 | One destination schema plus checked record chain needed |
 | F10 | Basic lookup of confirmed records | VERIFIED | F05 | Latest reviewed per job, literal bounded filters/pagination/newer-draft status; SQLite/PG and Chrome checks passed |
 | F11 | Extraction and end-to-end evaluation | IMPLEMENTED_UNVERIFIED | F06/F07/F09 | Synthetic evaluator/CLI/protocol verified; real independent labels/provider metrics/workflow baseline pending Q08 |
-| F12 | Workshop pilot access, backup and operating guide | WAITING_COMPANY | Demonstrated useful flow | Local guide and actual disposable source/output/DB recovery verified; real authentication/operation/retention/reconciliation/pilot pending Q06/Q07/Q09 |
+| F12 | Workshop pilot access, backup and operating guide | IMPLEMENTED_UNVERIFIED for company pilot | Demonstrated useful flow | Local account/origin/pre-parser boundary, authenticated review attribution, guide and disposable recovery verified; real access policy/operation/retention/pilot remain pending Q06/Q07/Q09 |
 
 If a feature takes several turns, add subrows such as `F03.a upload validation` and `F03.b preview route`. Each subrow needs its own status and verification notes. Do not wait until the parent feature is finished to record partial work.
 
@@ -501,6 +511,8 @@ Validate all output through the same schemas. A valid JSON shape is not proof of
 
 **Completion:** record exactly what environment/access was tested and who approved actual use. Do not infer 24 users, six months' adoption or production deployment from a local trial.
 
+**Delivered local parts:** configured single-account access/origin checks and server-bound attribution, private source/output handling, fictional dump/restore and operating guide are verified. The actual company account policy/hosting/retention/deletion/reconciliation/pilot decisions remain pending; the prototype does not supply approval.
+
 ## 9. Build order and checkpoints
 
 | Milestone | Deliverable | Ready now? | Decision after demonstration |
@@ -519,11 +531,11 @@ If M2 loses to direct entry, keep the simpler form. If M3 cannot remove entry, d
 
 The manual milestone requires no search, marketplace or AI credentials. Provider failures must not prevent manual entry/review. Inspect existing settings loading before adding new environment handling.
 
-**Implemented setting:** `WORKSHOP_ENABLED` defaults to false in Settings and `.env.example`. The workshop endpoints are local demo operations without authentication; keep them disabled in any existing shared/public host. Enabling them does not install tables. Run Alembic explicitly against the intended isolated DB first; startup does not call `create_all` or migrate.
+**Implemented settings:** `WORKSHOP_ENABLED=false` plus `WORKSHOP_AUTH_USERNAME`, secret `WORKSHOP_AUTH_PASSWORD_HASH` and `WORKSHOP_ORIGIN`. Enabled workshop requests fail closed503 until the account/hash/origin is valid; unauthenticated requests401 and cross-origin requests403. Enabling does not install tables. Run Alembic explicitly against the intended isolated DB first; startup does not call `create_all` or migrate. See [the operating guide](WORKSHOP_OPERATING_GUIDE.md) for the interactive password-hash helper, private environment setup, exact-origin browser login and single-account limitations. Keep disabled on any existing shared/public host.
 
 ### Manual screen and browser verification
 
-Open `/workshop` after local startup. After saving, enter a reviewer name, explicitly acknowledge checked values and confirm. Unresolved interpretations block review; optional missing values remain unknown. Expand a reviewed version in history to download its demo CSV. For corrections, edit/save, resolve proposed values and confirm again; earlier CSV/revision stays unchanged.
+Open `/workshop` at the configured origin after local startup and native HTTP Basic login. After saving, check the read-only account, explicitly acknowledge checked values and confirm. Unresolved interpretations block review; optional missing values remain unknown. Expand a reviewed version in history to download its demo CSV. For corrections, edit/save, resolve proposed values and confirm again; earlier CSV/revision stays unchanged.
 
  Attach the fictional PNG from `tests/fixtures/workshop/`, enter a job reference/stage and items, choose states deliberately and save. Copy the generated job ID, reopen it or revisit the resulting `?job=` URL. Existing records cannot change origin. Manual drafts need no model key.
 
@@ -533,7 +545,7 @@ Python route/asset gate test: `tests/unit/test_workshop_page.py`. Repeatable bro
 
 ```sh
 npm install --prefix 'car mechanic assistant/runtime/workshop-browser-tests' playwright@1.64.0
-node tests/browser/workshop.cjs 'car mechanic assistant/runtime/workshop-browser-tests/node_modules/playwright' http://127.0.0.1:8000
+node tests/browser/workshop.cjs 'car mechanic assistant/runtime/workshop-browser-tests/node_modules/playwright' http://127.0.0.1:8000 'PATH_TO_PRIVATE_FICTIONAL_CREDENTIAL_JSON'
 ```
 
 Node/Chrome are test tools, not application dependencies. The library supports the installed Chrome channel and file-input actions; see official [browser](https://playwright.dev/docs/browsers) and [input](https://playwright.dev/docs/input) documentation. Desktop/mobile screenshots stay ignored under runtime. Native computer-use access timed out without a state result, so it was not counted as a successful visual check. Playwright-rendered screenshots were inspected locally instead.
@@ -545,10 +557,14 @@ From the repository root, use the existing Python environment and a separately p
 ```sh
 export DATABASE_URL='postgresql://YOUR_LOCAL_ROLE@127.0.0.1:5432/yap_test_workshop'
 export WORKSHOP_ENABLED=true
+export WORKSHOP_AUTH_USERNAME='fictional-local-operator'
+export WORKSHOP_ORIGIN='http://127.0.0.1:8000'
 export USE_GOOGLE_CSE=false
 export USE_EBAY_API=false
 .venv/bin/python -m alembic upgrade head
-.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+.venv/bin/python -m scripts.workshop_password
+# Store its hash in WORKSHOP_AUTH_PASSWORD_HASH in an ignored private env file.
+.venv/bin/python -m uvicorn app.main:app --env-file 'PATH_TO_PRIVATE_ENV_FILE' --host 127.0.0.1 --port 8000
 ```
 
 The role/database placeholder must be replaced with an existing isolated local target. `/docs` describes the draft/source operations; `/workshop` opens the manual screen. The root automotive UI also links to it. In a second terminal, this sends the authored fixture only:
@@ -557,9 +573,10 @@ The role/database placeholder must be replaced with an existing isolated local t
 import json
 from pathlib import Path
 import httpx
+from getpass import getpass
 
 record = json.loads(Path("tests/fixtures/workshop/examples.json").read_text())["examples"][0]["record"]
-with httpx.Client(base_url="http://127.0.0.1:8000") as client:
+with httpx.Client(base_url="http://127.0.0.1:8000", auth=("fictional-local-operator", getpass("Local operator password: "))) as client:
     response = client.post("/api/v1/workshop/jobs", json=record)
     response.raise_for_status()
     job = response.json()
@@ -577,7 +594,7 @@ F02 verification used a task-created PostgreSQL 14.20 cluster under ignored `run
 Implemented private storage setting: `WORKSHOP_STORAGE_DIR`. Override only with a nonpublic directory; the service rejects the static mount. Example synthetic upload after local startup:
 
 ```sh
-curl -f -F data_origin=synthetic_demo -F file=@tests/fixtures/workshop/synthetic-sheet.png http://127.0.0.1:8000/api/v1/workshop/documents
+curl -f --user fictional-local-operator -F data_origin=synthetic_demo -F file=@tests/fixtures/workshop/synthetic-sheet.png http://127.0.0.1:8000/api/v1/workshop/documents
 ```
 
 Possible later settings, added only when needed:
@@ -679,6 +696,8 @@ If interrupted mid-feature, record what exists, what is broken/unverified, the l
 
 | 11 October 2026 | F12 actual disposable recovery/full regression | Local PG URL + pg_dump/pg_restore fixture test/full pytest/clean workshop suite | Targeted1 passed/9 warnings; **249 full passed/no skips/129 warnings;176 clean passed/48 warnings** |14 workshop PG cases run; same local server/temporary namespace/private fictional file restore only |
 | 11 October 2026 | Final source/privacy/config check | Original SHA256/ignore check, root Settings presence flags, explicit Git scope/whitespace |18 originals unchanged/ignored; root Gemini key absent and workshop model absent; no real source/provider/deployment call | No secret values printed; live smoke and company decisions remain pending |
+| 11 October 2026 | F12 account/origin/attribution regression | Explicit PG URL + full pytest; clean API workshop pytest; CLI Alembic upgrade/check and pip check | **284 full passed/no skips/132 warnings;211 clean passed/no skips/51 warnings**;35 added checks;15 workshop PG cases run; schema aligned/requirements clean | Fictional account/records; generic failure no-store/secret logging, pre-parser rejection and old review/CSV migration checked; no company policy/load/TLS/pilot evidence |
+| 11 October 2026 | F12 authenticated browser/live restart | Isolated Chrome harness with private fictional credential path; restarted loopback HTTP checks | Full manual/review/correction/history/CSV/mocked AI/diagram/lookup flow passed; anonymous page/upload401; account readonly; authenticated200/no-store, cross-origin403, static-bypass404 | No live provider; credentials/config0600 and ignored;18 originals unchanged/ignored; latest generic-error change additionally verified in Python |
 
 Replace vague “tests pass” with the command, counts, skipped checks and test environment. PostgreSQL integration is skipped without its explicit disposable test URL; do not present a skipped test as passed.
 
@@ -732,12 +751,12 @@ Record a question as resolved only when there is an actual answer. An elapsed wa
 ## 15. Current handoff snapshot
 
 - **Branch/repository:** `main`, remote `origin` is the user's existing GitHub repository. Verify actual remote before pushing on a different machine.
-- **Previous delivery before F12 local part:** `3f41e59`, manual clarification boundary. Read Git history for the final local guide/recovery commit hash.
-- **What exists:** current automotive API/RAG, visit review/planning material, F01 schemas/fictional fixtures and F02 workshop models/migration/draft service/API/tests.
-- **Latest implementation:** F12 local operating guide and real disposable pg_dump/pg_restore/source/output recovery test. Full249 passed/no skips; clean API176 passed; last full Chrome workflow including F08 passed. All18 originals still unchanged/ignored.
-- **What does not exist:** live extraction evidence, independently labelled real benchmark, actual destination mapping, real authentication/pilot operating policy, production backup/reconciliation/retention or permitted company deployment.
+- **Previous delivery:** `2a1fa5b`, local guide/disposable recovery. Read Git history for the final authentication increment hash.
+- **What exists:** existing automotive API/RAG and the separate workshop manual source/draft/review/history/correction/demo-output/lookup workflow, configured local account, mocked optional AI, synthetic evaluator, operating guide and disposable recovery checks.
+- **Latest implementation:** F12 local account/origin boundary before body parsing, server-bound reviewer attribution and additive `20261011_auth`. Full284 passed/no skips/132 warnings; clean API211 passed/no skips/51 warnings;15 workshop PG cases passed. Full authenticated Chrome workflow, including anonymous page/upload rejection and readonly account attribution, passed.18 original sources unchanged/ignored; private authentication files0600/ignored.
+- **What does not exist:** live extraction evidence, independently labelled real benchmark, actual destination mapping, real company account/pilot operating policy, production backup/reconciliation/retention or permitted company deployment.
 - **Next conditional work:** F07 fictional live smoke with configured key/model; F09 checked destination mapping; real F08/F11 labels/baseline; F12 selected access/host/retention/provider/pilot path. Questions Q01–Q10 are still pending; no independent coding feature remains ready under the current agreed scope.
-- **Independent work delivered:** source handling, manual review/version/export, mocked extraction, manual clarification boundaries, lookup, synthetic comparator/protocol, local operating guide and disposable recovery. New company data/rules/identity/approval must not be fabricated to extend these.
+- **Independent work delivered:** source handling, manual review/version/export, configured local account/origin/attribution controls, mocked extraction, manual clarification boundaries, lookup, synthetic comparator/protocol, local operating guide and disposable recovery. New company data/rules/identity/approval must not be fabricated to extend these.
 - **Unrelated changes to preserve:** root `PROJECT_SUMMARY.md` and `SYSTEM_DESIGN.md` as seen on this machine; verify current status rather than assuming it remains identical.
 - **Open decisions:** real output mapping, model-processing path, operator and expected labels. None should be fabricated.
 
@@ -750,7 +769,7 @@ Treat the master plan as the current implementation ledger. Inspect Git status
 and preserve unrelated user work. F01–F06 manual milestone is verified. Start
 the next branch whose prerequisite is supplied: F07 key/model smoke, F09 checked
 destination mapping, real F08/F11 labels/baseline or selected F12 access/operation.
-Local guide/recovery is verified. Manual F08 actual meanings remain pending Q01. F11 synthetic
+Local account/origin/attribution and guide/recovery are verified. Manual F08 actual meanings remain pending Q01. F11 synthetic
 harness/F10 lookup are verified. F07 mocked checks passed; live
 provider use is unverified and private-source AI remains blocked. Use synthetic examples until
 real-data prerequisites are met. Keep company visit files and runtime artifacts
@@ -936,3 +955,16 @@ The assessment separates physical/parsable/quality-approved/indexed pages, class
 - **Unfinished:** real auth/named identity/roles/session-origin protection, permitted hosting/provider/data/retention/delete/reconciliation/backup support and company pilot. Those choices are unresolved Q06/Q07/Q09; no dummy approval/inferred24 users is substituted. Real F08 meaning/F09 mapping/F11 labels/baseline also pending; private-source AI still403. Core manual local milestone is working; full company project remains incomplete.
 - **Commit/push:** intended recovery test/guide/README/master/build increment; private visit/runtime and unrelated root docs excluded.
 - **Next:** input-dependent branch only: configure permitted key/model for fictional F07 smoke, or provide actual reviewer meanings/labels, one redacted source→invoice/software→spreadsheet chain plus columns, named operator/owner and operating/processing decisions. User asked to retain questions in Markdown; Q01–Q10 remain the durable company checklist rather than repeating chat requests. Do not repeatedly rerun unchanged passing checks while awaiting inputs.
+
+
+### 11 October 2026 — F12 authentication prototype verified; company pilot pending
+
+- **Status:** IMPLEMENTED_UNVERIFIED for actual company pilot; fictional local account/origin/attribution part verified. Authentication infrastructure was built/tested without inventing a company access policy or approving deployment.
+- **Scope:** one configured named account with a salted scrypt password hash, HTTP Basic browser challenge, explicit canonical origin and rejection of cross-origin browser requests before multipart parsing; protect page/API/source/output. Server binds new review attribution to the authenticated account. Existing snapshots remain self-reported and immutable; demo CSV v1 bytes stay reproducible. No user-management framework, sessions/cookies, roles/deletion policy or public deployment.
+- **Reaches:** Settings/example config, auth middleware/hash setup helper, router/page/JS reviewer presentation, revision DTO/model/new additive migration, tests/fixtures/browser/run docs. Existing automotive endpoints remain outside the workshop boundary. Existing unrelated root documents stay unstaged.
+- **Company decisions:** actual operator/password storage/TLS host/access scope/retention/processing/pilot still need Q06/Q07/Q09. Building a credential boundary does not approve deployment or authenticate historical reviewers.
+- **Verification:**35 additional checks, including one real legacy-auth migration/CSV-preservation case. Final full suite **284 passed/no skips/132 warnings** with PostgreSQL14.20; clean API-only **211 passed/no skips/51 warnings**. Earlier targeted49 boundary/review/diagram cases passed; the final suites additionally include the setup-helper and generic-failure checks. All15 workshop PG cases passed, including recovery and unchanged CSV reuse across migration. An extra legacy reconfirmation assertion passed in a targeted PG run. CLI Alembic upgrade/check aligned; isolated API requirements pip check clean. Full authenticated Chrome capture/review/correction/history/CSV, mocked AI, manual diagram context and lookup regression passed, with anonymous page/upload401 and readonly account attribution. Restarted HTTP boundary checks passed;18 originals unchanged/ignored, auth files0600/ignored and33 local documentation links resolve.
+- **Final error boundary:** the outer global generic500 response also needs no-store, because it can be generated outside the authentication response wrapper. Added that header and a meaningful injected-exception test checking response/cache/log secrecy; final suites above ran after the fix. OpenAPI advertises Basic authentication for workshop callers.
+- **Failures corrected before acceptance:** TestClient does not accept constructor `auth`; set its supported `.auth` property. Historical migration fixtures use reflected old tables rather than querying the new ORM before upgrade. Build a reviewed DTO from the validated draft dictionary, not the distinct draft-model class. These fixture failures were not presented as successful security/migration checks.
+- **Local runtime:** only the task-owned API was stopped/restarted and disposable public schema upgraded to `20261011_auth`. Fictional credentials/config live mode0600 under ignored `runtime/workshop-auth/`; values never printed/committed. Demo remains loopback port18041 and requires native Basic login. Password hash setup is interactive in the guide; the test harness accepts a private credential-file path.
+- **Next:** conditional F07 key/model smoke or company Q01–Q10 real semantics/labels/mapping/operating path. This increment does not prove real AI accuracy, staff use, public deployment, employee identity, or résumé history.

@@ -56,13 +56,13 @@ def test_manual_context_cancelled_raw_notes_reviewer_and_stage_survive_output(di
     reviewed = diagram_client.post(API + f"/jobs/{job['id']}/confirm", json=ACK)
     assert reviewed.status_code == 200
     snapshot = reviewed.json()
-    assert snapshot["reviewer"] == ACK["reviewer"] and snapshot["record"]["record_stage"] == "quote"
+    assert snapshot["reviewer"] == "fictional-test-operator" and snapshot["reviewer_identity"] == "authenticated" and snapshot["record"]["record_stage"] == "quote"
     exported = diagram_client.post(API + f"/revisions/{snapshot['id']}/exports").json()
     download = diagram_client.get(API + f"/exports/{exported['id']}/download")
     rows = list(csv.DictReader(StringIO(download.content.decode("utf-8-sig"))))
     assert rows[0]["diagram_notes"] == record["diagram_notes"]
     assert rows[0]["diagram_notes_raw"] == record["diagram_notes_raw"]
-    assert rows[0]["manual_provenance"] == record["manual_provenance"] and rows[0]["reviewer"] == ACK["reviewer"]
+    assert rows[0]["manual_provenance"] == record["manual_provenance"] and rows[0]["reviewer"] == snapshot["reviewer"]
     assert rows[1]["cancelled"] == "true" and rows[1]["description"] == rows[1]["amount"] == ""
     assert rows[1]["description_raw"] == "Fictional crossed-out panel repair"
     assert diagram_client.get(API + f"/jobs/{job['id']}/revisions").json() == [snapshot]

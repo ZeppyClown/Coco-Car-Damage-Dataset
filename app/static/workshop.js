@@ -1,5 +1,6 @@
 "use strict";
 const api = document.querySelector('meta[name="workshop-api"]').content;
+const reviewerAccount = document.querySelector('meta[name="workshop-user"]').content;
 const $ = id => document.getElementById(id);
 const states = ["missing", "unclear", "proposed", "confirmed"];
 const scalarFields = [
@@ -94,6 +95,7 @@ function showSource() {
   else { image.removeAttribute("src"); $("image-stage").style.height = "0px"; }
 }
 function render(record = { data_origin: "synthetic_demo", items: [] }) {
+  $("reviewer").value = reviewerAccount;
   aiProvenance = record.ai_provenance || null; $("ai-send-ack").checked = false;
   $("ai-provenance").textContent = aiProvenance ? `Initial AI proposal: ${aiProvenance.model} · ${aiProvenance.prompt_version} · source ${aiProvenance.source_document_id}. Review every value; this is not an accuracy result.` : "";
   sourceId = record.source_document_id || null; $("data-origin").value = record.data_origin; $("data-origin").disabled = Boolean(job);
@@ -115,7 +117,7 @@ function renderHistory() {
     const details = element("details"); const record = revision.record;
     const stages = { quote: "Quote", approved_scope: "Approved scope", completed_work: "Completed work" };
     details.append(element("summary", `Reviewed version ${revision.version} · ${stages[record.record_stage]} · ${record.job_reference}`));
-    details.append(element("p", `Reviewer: ${revision.reviewer} (self-reported) · ${new Date(revision.reviewed_at).toLocaleString()}`));
+    details.append(element("p", `Reviewer: ${revision.reviewer} (${revision.reviewer_identity === "authenticated" ? "authenticated account" : "self-reported legacy identity"}) · ${new Date(revision.reviewed_at).toLocaleString()}`));
     if (record.ai_provenance) details.append(element("p", `Initial AI proposal: ${record.ai_provenance.model} · ${record.ai_provenance.prompt_version} · source ${record.ai_provenance.source_document_id}`));
     if (record.diagram_notes && !record.manual_provenance) details.append(element("p", "This older version has no stated diagram clarification context. Add it to a new draft and review again."));
     for (const [name, label] of scalarFields) if (record[name] != null) details.append(element("p", label + ": " + record[name]));
@@ -214,7 +216,7 @@ $("extract-source").addEventListener("click", () => {
 $("confirm-record").addEventListener("click", () => {
   if (!job || dirty) return status("Save the draft before confirming.", true);
   const reviewer = $("reviewer").value.trim();
-  if (!reviewer || !$("review-ack").checked) return status("Enter your reviewer name and acknowledge checking the values.", true);
+  if (!reviewer || !$("review-ack").checked) return status("Acknowledge checking the values before confirming as your authenticated account.", true);
   action(async () => {
     const revision = await request("/jobs/" + job.id + "/confirm", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ expected_version: job.draft_version, reviewer, acknowledged: true }) });
     $("review-ack").checked = false;

@@ -1,24 +1,27 @@
 from uuid import UUID
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, Request
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.workshop_auth import BASIC
 from app.db.session import get_db
 from app.schemas.workshop import WorkshopDraft, WorkshopDraftUpdate, WorkshopJobResponse, WorkshopDocumentResponse, DataOrigin, RecordStage, WorkshopConfirmRequest, WorkshopRevisionResponse, WorkshopExportResponse, WorkshopExtractionRequest, WorkshopLookupResponse
 from app.services.workshop_extraction import extract_source
 from app.services.workshop import create_job, get_job, update_job, attach_document, get_document, document_file, MAX_UPLOAD_BYTES, confirm_job, list_revisions, generate_export, get_export, export_file, lookup_jobs
 
 
-def require_workshop_enabled():
-    # shortcut: local demo only; add authenticated access before a workshop pilot.
+def require_workshop_enabled(request: Request):
     if not settings.WORKSHOP_ENABLED:
         raise HTTPException(status_code=404, detail="Workshop demo is disabled")
+    if not getattr(request.state, "workshop_user", None):
+        raise HTTPException(status_code=503, detail="Workshop authentication boundary is unavailable")
+    return request.state.workshop_user
 
 
-router = APIRouter(prefix="/workshop", dependencies=[Depends(require_workshop_enabled)])
+router = APIRouter(prefix="/workshop", dependencies=[Depends(BASIC), Depends(require_workshop_enabled)])
 
 
 @router.post("/documents", response_model=WorkshopDocumentResponse, status_code=201)
@@ -69,8 +72,8 @@ def replace_draft(job_id: UUID, request: WorkshopDraftUpdate, db: Session = Depe
 
 
 @router.post("/jobs/{job_id}/confirm", response_model=WorkshopRevisionResponse)
-def confirm_draft(job_id: UUID, request: WorkshopConfirmRequest, db: Session = Depends(get_db)):
-    return confirm_job(db, job_id, request)
+def confirm_draft(job_id: UUID, request: WorkshopConfirmRequest, db: Session = Depends(get_db), reviewer: str = Depends(require_workshop_enabled)):
+    return confirm_job(db, job_id, request.model_copy(update={"reviewer":reviewer}), authenticated=True)
 
 
 @router.get("/jobs/{job_id}/revisions", response_model=list[WorkshopRevisionResponse])

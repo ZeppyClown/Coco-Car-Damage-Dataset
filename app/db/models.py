@@ -321,6 +321,7 @@ class WorkshopJobRevision(Base):
     __table_args__ = (
         UniqueConstraint("job_id", "version", name="uq_workshop_job_revision"),
         CheckConstraint("version >= 1", name="ck_workshop_revision_version"),
+        CheckConstraint("reviewer_identity IN ('self_reported', 'authenticated')", name="ck_workshop_reviewer_identity"),
     )
 
     id = Column(Uuid, primary_key=True, default=uuid4)
@@ -329,6 +330,7 @@ class WorkshopJobRevision(Base):
     version = Column(Integer, nullable=False)
     record = Column(JSON, nullable=False)
     reviewer = Column(String(200), nullable=False)
+    reviewer_identity = Column(String(20), nullable=False, default="self_reported", server_default="self_reported")
     reviewed_at = Column(DateTime(timezone=True), nullable=False)
 
 

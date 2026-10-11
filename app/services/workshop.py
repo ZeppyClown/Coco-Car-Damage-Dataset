@@ -199,7 +199,7 @@ def _revision_response(revision: WorkshopJobRevision) -> WorkshopRevisionRespons
     reviewed_at = reviewed_at.astimezone(timezone.utc)
     return WorkshopRevisionResponse(
         id=revision.id, job_id=revision.job_id, version=revision.version,
-        record=revision.record, reviewer=revision.reviewer, reviewed_at=reviewed_at,
+        record=revision.record, reviewer=revision.reviewer, reviewer_identity=revision.reviewer_identity, reviewed_at=reviewed_at,
     )
 
 
@@ -254,7 +254,7 @@ def lookup_jobs(db: Session, *, q: str | None = None, job_id: UUID | None = None
     return WorkshopLookupResponse(results=results, limit=limit, offset=offset, has_more=len(matches) > limit)
 
 
-def confirm_job(db: Session, job_id: UUID, request: WorkshopConfirmRequest):
+def confirm_job(db: Session, job_id: UUID, request: WorkshopConfirmRequest, *, authenticated: bool = False):
     try:
         job = db.scalar(select(WorkshopJob).where(WorkshopJob.id == job_id).with_for_update()
                         .execution_options(populate_existing=True))
@@ -284,6 +284,7 @@ def confirm_job(db: Session, job_id: UUID, request: WorkshopConfirmRequest):
             job_id=job.id, version=job.draft_version, record=record.model_dump(mode="json"),
             source_document_id=record.source_document_id,
             reviewer=request.reviewer, reviewed_at=datetime.now(timezone.utc),
+            reviewer_identity="authenticated" if authenticated else "self_reported",
         )
         db.add(revision)
         db.flush()

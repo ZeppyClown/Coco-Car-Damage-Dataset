@@ -2,6 +2,7 @@ from pydantic_settings import BaseSettings
 from typing import Optional
 import os
 from pathlib import Path
+from pydantic import SecretStr
 
 
 class Settings(BaseSettings):
@@ -15,6 +16,9 @@ class Settings(BaseSettings):
     WORKSHOP_ENABLED: bool = False
     WORKSHOP_AI_ENABLED: bool = False
     WORKSHOP_AI_MODEL: Optional[str] = None
+    WORKSHOP_AUTH_USERNAME: Optional[str] = None
+    WORKSHOP_AUTH_PASSWORD_HASH: Optional[SecretStr] = None
+    WORKSHOP_ORIGIN: Optional[str] = None
     WORKSHOP_STORAGE_DIR: Path = Path(__file__).resolve().parents[2] / "car mechanic assistant/runtime/workshop"
 
     # Database

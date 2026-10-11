@@ -73,7 +73,7 @@ async def error_handling_middleware(request: Request, call_next):
 
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            headers={"X-Request-ID": request_id},
+            headers={"X-Request-ID": request_id, "Cache-Control": "no-store"},
             content={
                 "success": False,
                 "error": "Internal server error",

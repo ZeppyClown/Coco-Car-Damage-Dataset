@@ -157,6 +157,7 @@ class WorkshopReviewedRevision(_WorkshopSchema):
     version: int = Field(ge=1, strict=True)
     record: WorkshopReviewedDraft
     reviewer: Reference
+    reviewer_identity: Literal["self_reported", "authenticated"] = "self_reported"
     reviewed_at: AwareDatetime
 
 
@@ -185,7 +186,7 @@ class WorkshopDocumentResponse(_WorkshopSchema):
 
 class WorkshopConfirmRequest(_WorkshopSchema):
     expected_version: int = Field(ge=1, strict=True)
-    reviewer: Reference
+    reviewer: Reference = Field(description="Compatibility field; HTTP API attribution uses the authenticated account")
     acknowledged: bool = Field(strict=True)
 
     @model_validator(mode="after")

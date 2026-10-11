@@ -2,6 +2,8 @@
 
 Two applications share this repository: a structured FastAPI/PostgreSQL service and a Gemini/ChromaDB manual assistant. The current rebuild is dated October 2026; internship history and business-use claims require separate evidence.
 
+The new workshop job-sheet capture/review project is specified in the [master plan and implementation ledger](car%20mechanic%20assistant/WORKSHOP_MASTER_PLAN.md). It gives the build order, feature acceptance checks, missing company prerequisites and Claude handoff. Every implementation part must update that ledger; its application features are currently planned, not implemented.
+
 ## Run the automotive API
 
 Use Python 3.12. Install `requirements.txt`, supply `DATABASE_URL`, and run:

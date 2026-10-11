@@ -68,3 +68,9 @@ test.db
 # Car mechanic assistant: knowledge base and guides are Markdown and must be tracked
 !car mechanic assistant/**/*.md
 !SYSTEM_DESIGN.md
+!AGENTS.md
+!CLAUDE.md
+
+# Private workshop visit sources and duplicate attachment (portable across clones)
+/company visit/
+/car mechanic assistant/accident-report-owner-driver-particulars-blank-copy.pdf

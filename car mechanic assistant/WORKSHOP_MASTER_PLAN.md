@@ -1,6 +1,6 @@
 # Workshop job-sheet project — master plan and implementation ledger
 
-**Last updated:** 12 October 2026. **Current phase:** local manual workflow/lookup, configured-account access, mocked and printed-fictional live AI integration, synthetic evaluation and disposable recovery checks delivered. A focused company validation worksheet is ready to fill privately. **Company-dependent work remains incomplete:** real-source permission/quality, meanings/labels/mapping, permitted pilot and measured outcomes.
+**Last updated:** 12 October 2026. **Current phase:** local manual workflow/lookup, configured-account access, mocked and printed-fictional live AI integration, synthetic evaluation and disposable recovery checks delivered. A focused company validation worksheet is ready to fill privately. **Usefulness is assumed by the user; business-benefit measurement is optional. Company-dependent technical work remains incomplete:** real-source permission/quality, meanings/labels/mapping and permitted pilot operation.
 
 This is the authoritative implementation/handoff document for the workshop administrative project. Every contributor, including Codex and Claude, must update it for **every feature or implementation part**, including partial work, fixes, migrations, tests, configuration and changed decisions. Do not rely on chat history to resume the work.
 
@@ -8,9 +8,11 @@ The first product is a small local application that turns a permitted paper shee
 
 ## 1. Start here: the actual next task
 
-**Next task depends on company inputs:** Q01/Q02 meanings/stage, Q03/Q04/Q10 checked destination/correction mapping, Q06/Q07/Q09 operator/processing/access/operation and Q08 independent labels/baseline. F07 now has a successful live **printed fictional** Gemini image→unsaved proposed draft→source-checked manual review→demo CSV API smoke. Reinspection found the existing manual assistant's ignored local key; it was supplied only to an explicitly configured temporary process. The workshop does not automatically load another application's credentials. Root/manual demo AI remains default-off, private-source processing blocked and real handwriting/company accuracy unverified. The selected project is job-sheet capture/review; public-reference RAG remains separate research.
+**Next task depends on technical company inputs:** Q01/Q02 meanings/stage, Q03/Q04/Q10 checked destination/correction mapping, Q06/Q07/Q09 operator/processing/access/operation and the independent-label portion of Q08. F07 now has a successful live **printed fictional** Gemini image→unsaved proposed draft→source-checked manual review→demo CSV API smoke. Reinspection found the existing manual assistant's ignored local key; it was supplied only to an explicitly configured temporary process. The workshop does not automatically load another application's credentials. Root/manual demo AI remains default-off, private-source processing blocked and real handwriting/company accuracy unverified. The selected project is job-sheet capture/review; public-reference RAG remains separate research.
 
-Use the [workshop validation worksheet](WORKSHOP_VALIDATION_WORKSHEET.md) for the next company discussion. Make a private copy, then follow one job through source meaning, actual destination, independent labels, permission and complete-task timing. It is tailored to this project; the earlier visit workbook also covers the separate manual-RAG investigation. No company answer or validation result is prefilled.
+**User decision, 12 October:** assume the project is useful to its customer/workshop users. Do not require interviews proving demand, baseline timings, adoption or removed-copying measurements before continuing implementation. Those studies are optional and needed only for actual benefit/outcome claims. This assumption does not establish what a source means, which destination columns exist, extraction accuracy or operating permission. Keep technical correctness and company compatibility checks.
+
+Use the [workshop validation worksheet](WORKSHOP_VALIDATION_WORKSHEET.md) for the next company discussion. Make a private copy, then follow one job through source meaning, actual destination, independent labels and permission. Complete-task timing is optional. It is tailored to this project; the earlier visit workbook also covers the separate manual-RAG investigation. No company answer or validation result is prefilled.
 
 Do not start by scanning an archive, training a model, building a vector database or integrating the accounting system. None is required to demonstrate the core review workflow.
 
@@ -27,14 +29,14 @@ This milestone is a local demonstration. It does not claim company deployment, r
 3. Read the existing schema/session/router/test fixtures listed in section 5. Confirm actual paths before adding code.
 4. Check whether the private visit files exist locally. Their absence does not block a synthetic/manual prototype. Do not obtain company files from public search as replacements for actual evidence.
 5. Mark the next branch whose company prerequisite is supplied `IN_PROGRESS` and state its exact scope. Printed-fictional F07 integration is verified; repeated smoke calls are not a substitute for missing company evidence.
-6. Choose only a branch whose prerequisite is actually available. F09 needs one checked record chain/accepted destination schema; real F07/F08/F11 need permitted samples/reviewer labels/baseline; real F12 operation needs owner/access/host/retention decisions. Do not build or claim guessed company rules. No public/live deployment is authorised.
+6. Choose a branch whose technical prerequisite is available. F09 needs one checked record chain/accepted destination schema; real F07/F08/F11 need permitted samples/reviewer labels; real F12 operation needs owner/access/host/retention decisions. Usefulness is assumed: do not gate coding on baseline time, demand or adoption. Do not build or claim guessed company rules. No public/live deployment is authorised.
 7. Update the ledger, verification table, next task and work log **before** committing. Commit only the intended files, then push as previously authorised by the user.
 
 ## 2. Business problem and scope
 
 The reviewed visit material supports investigating repeated transcription of workshop job information. A useful product must make the record clearer and/or remove an existing copying step. If it produces an additional record but staff still retype every destination, it may increase work.
 
-The initial scope is one job-sheet capture/review flow, one reviewed record, and one demonstration output. It should remain usable without an AI key. Later, confirm a real output mapping and measure the complete task with an actual operator.
+The initial scope is one job-sheet capture/review flow, one reviewed record, and one demonstration output. It should remain usable without an AI key. Later, confirm a real output mapping. Measuring the complete task with an actual operator is an optional study under the user's usefulness assumption; it is not a coding prerequisite.
 
 **Initial exclusions:** automatic repair diagnosis, automatic pricing, liability/claim decisions, tax/accounting treatment decisions, live financial-system writes, bulk archive scanning, supplier integrations and a new repair-manual RAG system. These are not dependencies of this project. Add them only when the user chooses a concrete new scope supported by evidence.
 
@@ -52,7 +54,8 @@ The private sources are in local `company visit/`. The key private documents are
 | Two text transcripts | Yes, local/private | Identify themes and workflow questions | Original audio, unclear terms and precise roles/rules |
 | Final invoice/accounting entry/spreadsheet chain | No | Would specify real reuse | Destination schema and approved field mappings |
 | Independent expected extraction values | No | Would support accuracy evaluation | Correct interpretation of ambiguous notes/marks |
-| Operator baseline and pilot owner | No | Would establish usefulness and ownership | Whether a new workflow will actually be adopted |
+| User's usefulness decision | Assumed by user, 12 October | Continue without business-benefit validation | Actual time savings/adoption remain unmeasured |
+| Pilot operator and owner | No | Would establish operating responsibility | Who will use/support and approve the selected pilot |
 | Permission for future provider processing | Not confirmed | Would allow the selected real-data extraction path | Permitted provider/storage/retention for customer records |
 
 Having uploaded photos available for this review is not blanket approval to send them to any external model or publish them. Synthetic examples may be used freely for development when clearly labelled. Actual company records remain private.
@@ -74,7 +77,7 @@ Having uploaded photos available for this review is not blanket approval to send
 - Real extraction accuracy: independent labels and permitted processing needed.
 - Company-compatible export: target schema and rules needed.
 - Automated imports/ledger changes: separate integration scope and operating authority needed.
-- Staff time-saving/adoption: actual task baseline and operator needed.
+- Optional staff time-saving/adoption claims: actual task baseline and observations needed; not required to continue building.
 - Workshop deployment beyond the local demonstration: access/hosting/record-handling decisions needed.
 
 Keep pending questions recorded. Continue independent ready work without repeatedly interrupting the user.
@@ -362,8 +365,8 @@ Allowed statuses: `READY`, `IN_PROGRESS`, `IMPLEMENTED_UNVERIFIED`, `VERIFIED`, 
 | F08 | Reviewed diagram/shorthand interpretation | IMPLEMENTED_UNVERIFIED | F04/F07 | Manual clarification/context/raw/cancelled/history/output checks verified; actual company meanings/vocabulary pending Q01 |
 | F09 | Actual destination mapping and export | WAITING_COMPANY | F06 | One destination schema plus checked record chain needed |
 | F10 | Basic lookup of confirmed records | VERIFIED | F05 | Latest reviewed per job, literal bounded filters/pagination/newer-draft status; SQLite/PG and Chrome checks passed |
-| F11 | Extraction and end-to-end evaluation | IMPLEMENTED_UNVERIFIED | F06/F07/F09 | Synthetic evaluator/CLI/protocol verified; real independent labels/provider metrics/workflow baseline pending Q08 |
-| F12 | Workshop pilot access, backup and operating guide | IMPLEMENTED_UNVERIFIED for company pilot | Demonstrated useful flow | Local account/origin/pre-parser boundary, authenticated review attribution, guide and disposable recovery verified; real access policy/operation/retention/pilot remain pending Q06/Q07/Q09 |
+| F11 | Extraction evaluation; optional benefit measurement | IMPLEMENTED_UNVERIFIED for real accuracy | F06/F07; F09 for destination checks | Synthetic evaluator/CLI verified; independent labels/provider quality pending Q08; baseline timing/adoption optional, usefulness assumed |
+| F12 | Workshop pilot access, backup and operating guide | IMPLEMENTED_UNVERIFIED for company pilot | User-assumed usefulness; selected operating scope | Local account/origin/pre-parser boundary, authenticated review attribution, guide and disposable recovery verified; real access policy/operation/retention/pilot remain pending Q06/Q07/Q09 |
 
 If a feature takes several turns, add subrows such as `F03.a upload validation` and `F03.b preview route`. Each subrow needs its own status and verification notes. Do not wait until the parent feature is finished to record partial work.
 
@@ -477,7 +480,7 @@ Validate all output through the same schemas. A valid JSON shape is not proof of
 
 **Checks:** reviewer confirms expected output for representative examples; destination accepts a permitted test file if available; incompatible/missing required fields block output; mapping version recorded; repeated generation and corrected-version handling understood. A live financial write requires an explicit later task; a test CSV is not an imported transaction.
 
-**Completion:** call it company-compatible only after those checks. Describe the actual removed step if an operator really uses it; otherwise record compatibility only.
+**Completion:** call it company-compatible only after those checks. Demonstrating an actually removed copying step is optional under the user's usefulness assumption; only claim that outcome if observed.
 
 ### F10 — confirmed-record lookup
 
@@ -491,21 +494,23 @@ Validate all output through the same schemas. A valid JSON shape is not proof of
 
 **Delivered:** VERIFIED on11October2026: latest-only/literal filters, same-name separation, UTC dates, pagination and browser search→newer-draft/open/history checked. No archive-speed or staff-acceptance result.
 
-### F11 — evaluation and baseline comparison
+### F11 — extraction correctness and optional benefit measurement
 
-**Purpose:** establish whether AI and the overall workflow are useful.
+**Purpose:** establish extraction correctness. Usefulness is assumed by the user; measuring business benefit is optional.
 
 **Implementation now:** a small evaluation script or existing-test extension reading fictional/privately labelled examples. Report sample/field counts and missing/unclear cases. Keep expected labels independent of the model output. Store real results privately and public synthetic outputs clearly labelled.
 
-**Real trial later:** company reviewer independently labels permitted examples; reserve held-out cases; compare current copying, direct digital entry and AI draft/review. Time the whole routine: photograph, wait, review, clarify, output, remaining entry and corrections. Record how many entry destinations genuinely stopped requiring manual copying.
+**Real accuracy check later:** company reviewer independently labels permitted examples; reserve held-out cases and retain incorrect/missing values and provider failures. This requires labels and the selected processing path, not a time-saving baseline.
+
+**Optional benefit study:** compare current copying, direct digital entry and AI draft/review. Time the whole routine: photograph, wait, review, clarify, output, remaining entry and corrections. Record how many entry destinations genuinely stopped requiring manual copying. Skip this study while building unless the user requests measured benefit claims.
 
 **Checks:** evaluator rejects missing labels/empty sample; denominators and skipped fields visible; cancelled/unknown values not counted as correctly invented; critical identity/amount/description errors reported separately; synthetic tests excluded from company accuracy/adoption statistics.
 
-**Completion:** a reproducible development report first; a company outcome only when actual observation exists. Document dates, method, sample limits and human-reviewed residual errors. Document-capture field accuracy is not retrieval precision.
+**Completion:** a reproducible development report first; real extraction-quality evidence needs independent permitted labels. Benefit/adoption studies are outside required build completion under the user's assumption. Actual outcome claims still need observations. Document dates, method, sample limits and human-reviewed residual errors. Document-capture field accuracy is not retrieval precision.
 
 ### F12 — permitted pilot operation
 
-**Purpose:** support an actual operator safely after the local workflow proves useful.
+**Purpose:** support an actual operator in the selected operating environment. Usefulness is assumed; no benefit study is required before this work.
 
 **Prerequisites:** named operator/owner, permitted host/storage/provider path, data retention/access decisions and selected scope. Local demo completion does not imply these approvals.
 
@@ -522,14 +527,14 @@ Validate all output through the same schemas. A valid JSON shape is not proof of
 | Milestone | Deliverable | Ready now? | Decision after demonstration |
 |---|---|---|---|
 | M1: manual vertical slice | F01–F06; fictional source → review → version → demo CSV | Yes, with isolated development environment | Is the review UI understandable and the record lifecycle correct? |
-| M2: AI drafting | F07 plus manual F08 | Mock and printed-fictional live integration verified; company use/quality conditional | Does extraction reduce complete entry/review effort versus direct form? |
-| M3: real reuse | F09 plus selected F10 | Needs company mapping | Can one existing copying destination be removed? |
-| M4: measured local trial | Real portion of F11 | Needs labels, operator and baseline | Is it useful enough to maintain? |
+| M2: AI drafting | F07 plus manual F08 | Mock and printed-fictional live integration verified; company processing/quality conditional | Are proposed values correct and uncertainty/review preserved? |
+| M3: real reuse | F09 plus selected F10 | Needs company mapping | Does the output match and work with the specified destination? |
+| M4: independent accuracy check | Real correctness portion of F11 | Needs permitted cases and independent labels; no timing baseline | Which critical errors/failures remain on representative held-out cases? |
 | M5: permitted workshop pilot | F12 and agreed scope | Needs operating decisions | Is actual use authorised and supportable? |
 
 There is no honest fixed completion date for company-dependent milestones. Code estimates should be revised after M1; provider/integration/approval delays are not coding effort.
 
-If M2 loses to direct entry, keep the simpler form. If M3 cannot remove entry, do not expand the system to justify its existence. If no operator wants it, leave an accurate local prototype and record that result.
+User-assumed usefulness is sufficient to proceed with implementation. Optional timing/adoption studies may later inform product decisions, but do not block coding or replace the correctness checks above.
 
 ## 10. Configuration, dependencies and operating boundaries
 
@@ -746,10 +751,10 @@ Keep actual answers and documents in the private visit files. Here, record gener
 | Q02 | Confirm whether source is quote, approved scope or completed work | Real stage/output correctness | Pending |
 | Q03 | One redacted sheet → final invoice/software record → spreadsheet chain | F09 mapping | Pending |
 | Q04 | Destination name, columns/import format and approved mapping | F09 real compatibility | Pending |
-| Q05 | Which existing entry step should disappear | Business usefulness | Pending |
+| Q05 | Usefulness/demand; optional observation of which entry step disappears | No coding blocker; measured benefit claims only | Assumed by user, 12 October; actual benefit unmeasured |
 | Q06 | Real user/reviewer and pilot decision owner | Real F11/F12 | Pending |
 | Q07 | Permitted source storage and selected external-provider processing | Real F07/F12 | Pending |
-| Q08 | Baseline task time and independently checked expected values | Real measured results | Pending |
+| Q08 | Independently checked expected values; optional baseline task time | Real accuracy; optional benefit claims | Labels pending; baseline optional |
 | Q09 | Access/retention/backup/hosting decisions | F12 | Pending |
 | Q10 | What happens when a record already reused downstream is corrected | F09 correction handling | Pending |
 
@@ -765,7 +770,8 @@ The [validation worksheet](WORKSHOP_VALIDATION_WORKSHEET.md) provides the fill-i
 - **Latest implementation:** F07 provider schema compatibility and full printed-fictional live API flow. Final290 passed/no skips/132 warnings; clean API217 passed/no skips/51 warnings;15 workshop PG cases ran. Actual initial provider proposal/review/export provenance and browser reopening verified. Authentication/recovery still verified. The latest work log contains exact source/model/time/privacy evidence and remaining requirements.
 - **What does not exist:** real handwriting/independently labelled benchmark, actual destination mapping, company account/pilot operating policy, production backup/reconciliation/retention or permitted company deployment.
 - **Latest provider integration:** F07 original schema failed400/endpoint502 without DB writes. Explicit string/null money serialization and provider-only omission of nested maxItems50 retain all local validators. Full printed-fictional live API proposal→source-checked quote review→repeatable CSV/provenance passed on `gemini-3.1-flash-lite`. Final tests/browser/privacy results appear in the newest work-log/result entries.
-- **Next conditional work:** Q01/Q02 meanings/stage; Q03/Q04/Q10 destination/correction mapping; Q06/Q07/Q09 actual operator/provider/access/operation; Q08 independent labels/baseline. Questions remain pending. Independent planned coding and printed-fictional provider smoke are delivered; actual inputs are needed for the remaining outcome requirements.
+- **Next conditional work:** Q01/Q02 meanings/stage; Q03/Q04/Q10 destination/correction mapping; Q06/Q07/Q09 actual operator/provider/access/operation; Q08 independent labels. These technical questions remain pending. Independent planned coding and printed-fictional provider smoke are delivered; actual inputs are needed for the remaining technical requirements. Baseline timing and usefulness evidence are not required.
+- **Usefulness decision:** assumed by user on 12 October. Demand, baseline timing, adoption and removed-copying studies are optional; do not treat them as implementation blockers. Q08 independent labels and the destination/operating rules remain technical inputs.
 - **Independent work delivered:** source handling, manual review/version/export, configured local account/origin/attribution controls, mocked extraction, manual clarification boundaries, lookup, synthetic comparator/protocol, local operating guide and disposable recovery. New company data/rules/identity/approval must not be fabricated to extend these.
 - **Unrelated changes to preserve:** root `PROJECT_SUMMARY.md` and `SYSTEM_DESIGN.md` as seen on this machine; verify current status rather than assuming it remains identical.
 - **Open decisions:** real output mapping, model-processing path, operator and expected labels. None should be fabricated.
@@ -779,8 +785,8 @@ Bring back these specific artifacts rather than another general interview. Keep 
 | Remaining work | Minimum input to return | What the next implementer can then do | Evidence needed before completion |
 |---|---|---|---|
 | F08: actual meanings/stage (Q01/Q02) | A reviewer explains one permitted sheet, each raw note/amount/cancellation/diagram mark and whether it is a quote, approved work or completed work; unresolved values remain unknown | Save independently reviewed expected values and any approved vocabulary without guessing from the photograph | Reviewer checks that captured meaning and stage match that source |
-| F09/M3: real reuse (Q03/Q04/Q05/Q10) | The same job's redacted source, final invoice/software record and relevant spreadsheet row; destination columns/import example; approved required fields/conversions and correction procedure; identify the copying step to remove | Implement one deterministic, versioned destination mapping using the existing reviewed-record/export path | Checked representative output and permitted destination acceptance; an operator confirms any entry step actually removed |
-| Real F07/F11/M4: quality/usefulness (Q06/Q07/Q08) | Permitted processing/storage path, representative source cases with independently checked labels, named reviewer/operator and observed current-task baseline | Select the approved extraction path, retain failures, compare held-out values and time existing/manual/AI workflows end to end | Recorded sample/denominator/error/review-time results; a fictional smoke or developer correction is insufficient |
+| F09/M3: destination correctness (Q03/Q04/Q10) | The same job's redacted source, final invoice/software record and relevant spreadsheet row; destination columns/import example; approved required fields/conversions and correction procedure | Implement one deterministic, versioned destination mapping using the existing reviewed-record/export path | Checked representative output and permitted destination acceptance; actual entry-step removal is optional to measure |
+| Real F07/F11/M4: extraction correctness (Q01/Q02/Q07/Q08) | Permitted processing/storage path and representative source cases with independently checked labels and reviewer explanations | Select the approved extraction path, retain failures and compare held-out values | Recorded sample/denominator/error/failure results; a fictional smoke or developer correction is insufficient; no baseline time required |
 | Real F12/M5: workshop operation (Q06/Q07/Q09) | Decision owner and intended users/host; agreed access, provider, retention/deletion, backup and support rules; actual pilot decision | Implement only the selected operational gaps and verify them on the agreed host before any separately authorised deployment | Access and recovery checks in that environment plus actual operating approval; the current single-account local drill is insufficient |
 
 Existing verification remains **290 full tests and 217 clean API tests passed**, plus the recorded live printed-fictional flow/browser reopen. Those are prior implementation results, not new company evidence or a new test run. This documentation-only audit does not change code, models, fixtures, configuration, CSV mapping or runtime. Résumé adoption, retrieval-precision, corpus-size and internship-history claims remain unverified separately.
@@ -793,7 +799,8 @@ CLAUDE.md and car mechanic assistant/WORKSHOP_MASTER_PLAN.md first.
 Treat the master plan as the current implementation ledger. Inspect Git status
 and preserve unrelated user work. F01–F06 manual milestone is verified. Start
 the next branch whose prerequisite is supplied: F09 checked
-destination mapping, real F08/F11 labels/baseline or selected F12 access/operation.
+destination mapping, real F08/F11 labels/quality or selected F12 access/operation.
+Usefulness is assumed by the user; baseline timing, demand/adoption and removed-copying studies are optional and must not block coding.
 Local account/origin/attribution and guide/recovery are verified. Manual F08 actual meanings remain pending Q01. F11 synthetic
 harness/F10 lookup are verified. F07 mock and printed-fictional live API integration
 passed after a provider-schema fix; real quality/use remains unverified and private-source AI blocked. Use synthetic examples until
@@ -806,6 +813,13 @@ remain recorded and unanswered.
 ```
 
 ## 16. Work log
+
+### 12 October 2026 — usefulness assumed; technical checks retained
+
+- User instructed us to assume usefulness to the customer. This changes the build requirements: demand interviews, workflow baselines, time-saving/adoption studies and proof of removed copying are optional, not implementation/completion gates. It does not supply measured outcomes.
+- Updated current scope, F11/F12 dependencies, M2–M4 checkpoints, Q05/Q08 and the handoff table/prompt. Independent source meanings/labels, actual destination schema/correction rules and the selected processing/operating path remain technical prerequisites. Do not infer those from the usefulness assumption.
+- Updated the evaluation guide, validation worksheet, operating guide and README consistently; preserve prior work-log/results as historical evidence. Real accuracy and résumé outcome/history claims remain unverified. No code/config/schema/provider request changes.
+- Verification: scope consistency asserts across six documents, 24 schema fields/all stage values and 51 local links passed. Updated only the private copy that still exactly matched the previous blank template; mode0600 preserved, no answers overwritten, private path remains ignored. Whitespace/explicit staged scope checked. No application tests rerun for this requirements-only increment. Commit/push the intended documentation together, preserving unrelated root documents and private answers.
 
 ### 12 October 2026 — focused validation worksheet prepared
 

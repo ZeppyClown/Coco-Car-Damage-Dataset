@@ -2,6 +2,8 @@
 
 Blank template prepared 12 October 2026. This is for the selected **job-sheet capture/review** project. It contains no company answers, permission, labels or measured results. Use the [master plan](WORKSHOP_MASTER_PLAN.md) for implementation status and the [evaluation guide](WORKSHOP_EVALUATION_GUIDE.md) for the comparison protocol.
 
+**User decision, 12 October:** assume the project is useful to its customer. Demand, baseline timing, adoption and removed-copying studies are optional. Fill the technical sections for source meaning, destination correctness and selected operation; section 6 can be skipped while building. This is a user scope assumption, not a company answer or measured result.
+
 Start with **one permitted job and a person who can explain it**. One case can establish a candidate mapping; it cannot establish representative AI accuracy or time savings. Use more representative cases for those measurements after the company agrees the task and processing path. You do not need to scan the storeroom archive.
 
 ## 1. Make a private copy and capture the essential decisions
@@ -18,13 +20,14 @@ git check-ignore 'car mechanic assistant/runtime/workshop-validation-private.md'
 
 The ignored path is suitable only if the company permits this local storage. Follow its actual decision. Keep any supplied records/labels in an agreed private location. No passwords or API keys belong in this worksheet. Write `unknown`, `not available`, `not applicable` or `follow-up needed` instead of guessing. A blank cell is unanswered.
 
-If time is short, obtain these five things first:
+If time is short, obtain these technical inputs first:
 
 - One permitted sheet and a reviewer who explains its notes, amounts, cancelled values and stage.
 - That job's final invoice/software entry and relevant spreadsheet row, if they exist.
-- Destination software/columns/import example and the copying step the operator wants removed.
+- Destination software/columns/import example and approved mapping/correction rules.
 - A named operator/decision owner and separate local-storage/external-processing decisions.
-- An observed current-task timing, or a named person/date for doing the comparison later.
+
+Current-task timing and evidence that a copying step disappears are optional; collect them later only if measured benefit is wanted.
 
 | Meeting and scope | Fill in privately |
 |---|---|
@@ -34,10 +37,10 @@ If time is short, obtain these five things first:
 | Person who can decide on processing and a pilot | |
 | Selected task, in the operator's words | |
 | Current entry destinations and why each is used | |
-| Exactly which existing step should disappear | |
+| Optional: exactly which existing step should disappear | |
 | Decision/evidence IDs and unresolved questions | |
 
-## 2. Follow one real job through its records — Q02/Q03/Q04/Q05/Q10
+## 2. Follow one real job through its records — Q02/Q03/Q04/Q10
 
 Use an opaque case ID. Keep any link to identifying details private. Do not invent a missing invoice, spreadsheet or software entry; record its absence. If redaction changes a compared value, document that change privately and use a consistent redacted reference across the chain.
 
@@ -122,7 +125,7 @@ If cancellation is uncertain, retain that uncertainty here. The current JSON con
 
 The developer can convert these checked tables into private JSONL using the existing [input contract](WORKSHOP_EVALUATION_GUIDE.md#input-files). The reviewer should cross-check that conversion. Use `private_source` and `independent_company_review` for actual company labels. Preserve a separate original model prediction/failure file; never replace it with the human-corrected record. The comparator does not verify reviewer authority, stage correctness, permitted processing or business usefulness.
 
-## 4. Specify one usable destination — Q03/Q04/Q05/Q10
+## 4. Specify one usable destination — Q03/Q04/Q10
 
 Choose one actual copying destination first. Bring its permitted column/export/import example; a screenshot alone may need someone to explain types and rules. Blank invoice templates do not establish the software's import contract.
 
@@ -149,7 +152,7 @@ Copy a row for **every** required destination column. Give exact names and types
 | Expected output checked against the completed job chain | |
 | Permitted test file accepted; exact environment and errors | |
 | Repeat/corrected record handling checked | |
-| Existing copying step actually removed, or still necessary | |
+| Optional benefit observation: copying step actually removed, or still necessary | |
 
 The existing CSV is `workshop-demo-v1`, not an approved company import. Record test acceptance separately from an actual import. This worksheet does not authorise live financial writes; those require an explicit later scope and operating authority.
 
@@ -180,7 +183,9 @@ Record separate actual decisions. Interest in the project, uploading an example 
 
 The current prototype has one local account and a fictional recovery drill. Company policy and actual-host operation are not validated. Real-source AI remains blocked in the application; filling in an approval does not automatically change that boundary. The next implementer must review the decision and implement/test only the selected path.
 
-## 6. Measure the whole task — Q05/Q06/Q08
+## 6. Optional: measure the whole task — Q05/Q06/Q08
+
+**This section is optional and does not block coding or build completion.** Usefulness is assumed by the user. Complete it only to establish measured time savings/removed copying or to inform later product decisions. Extraction correctness remains a separate check using the independent labels in section 3 and the evaluation guide.
 
 Agree the comparison before collecting results. Compare the current routine, direct digital manual entry and AI draft plus human review on the same agreed task. Include all remaining destination entry. Record staff experience and task order; repeated familiarity can affect timing. A single developer run or one easy sheet is not a workshop productivity result.
 
@@ -238,9 +243,10 @@ Record zero or not applicable explicitly when a phase is unnecessary. Retain fai
 | Checked source meaning, stage, row order and cancellations | | |
 | Same-job final records and destination mapping/correction rules | | |
 | Independent label tables and representative-case agreement | | |
-| Operator/baseline or an agreed observation appointment | | |
+| Named operator/owner for actual operation | | |
+| Optional: baseline timings or an agreed observation appointment | | |
 | Processing/access/host/retention/support decisions | | |
 
-The developer updates master Q01–Q10 only when actual evidence resolves a question. Start F09 once the checked destination contract is supplied; start real F08/F11 once meanings/labels and trial prerequisites are supplied; select real F07/F12 changes only after the processing/operating path is established. Partial answers can unlock one branch without requiring every answer at once.
+The master records Q05 usefulness as assumed by the user; do not report it as validated by the company. Other questions need actual answers/evidence. Start F09 once the checked destination contract is supplied; start real F08/F11 once meanings/labels and the required processing path are supplied; select real F07/F12 changes only after the processing/operating path is established. A timing baseline is not required. Partial answers can unlock one branch without requiring every answer at once.
 
 This worksheet does not prove old résumé claims about 24 mechanics, 500+ repair-manual pages, 90% retrieval precision, six-month adoption or internship history. Those remain separate evidence questions. Real accuracy, compatibility and usefulness remain unverified until the corresponding checks actually run.

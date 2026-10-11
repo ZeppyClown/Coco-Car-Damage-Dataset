@@ -1,6 +1,6 @@
 # Workshop local operating and recovery guide
 
-Last updated: 11 October 2026. This describes the **local fictional demonstration**, now protected by one configured operator account. Company pilot approval, actual access policy, hosting, retention and destination mapping remain pending. The [master plan](WORKSHOP_MASTER_PLAN.md) records each feature and its exact evidence.
+Last updated: 12 October 2026. This describes the **local fictional demonstration**, now protected by one configured operator account. Company pilot approval, actual access policy, hosting, retention and destination mapping remain pending. The [master plan](WORKSHOP_MASTER_PLAN.md) records each feature and its exact evidence.
 
 ## What is available
 
@@ -136,12 +136,12 @@ The current rehearsal verifies a namespace restore on the same local PostgreSQL 
 
 ## Before company use
 
-The master Q01–Q10 ledger remains unresolved. Required decisions/evidence:
+Usefulness is assumed by the user as of 12 October; demand interviews, baseline timing and adoption measurements are optional. Remaining technical decisions/evidence from master Q01–Q10:
 
 - Reviewer meanings, diagram convention, stage and independently checked examples.
 - Redacted source→actual invoice/software→spreadsheet chain, accepted destination format and correction handling.
-- Operator/decision owner and which copying step should disappear.
-- Source/external-provider permission and independently labelled cases/baseline task times.
+- Operator/decision owner for the selected operating scope.
+- Source/external-provider permission and independently labelled cases; baseline timing is not required.
 - Named user identity, access/roles, permitted host, origin/session/CSRF controls, storage, retention/deletion, backup/restore and support owner.
 
 No real company pilot has been deployed. The local account/origin boundary, guide and fictional recovery evidence are development parts of F12; company approval, real account policy, hosting and retention remain unresolved. Actual data/use/outcome claims require actual evidence; the résumé targets remain separate from these tests.

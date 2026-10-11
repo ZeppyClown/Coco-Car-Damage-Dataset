@@ -2,6 +2,8 @@
 
 Last updated: 12 October 2026. Current evidence: evaluator and fictional workflow tests only. There is no measured company extraction accuracy, staff time saving, accounting compatibility or adoption result. The [master plan](WORKSHOP_MASTER_PLAN.md) is the implementation ledger.
 
+**Scope decision, 12 October:** the user instructs us to assume usefulness to the customer. Demand interviews, baseline timing, time-saving/adoption studies and proof of removed copying are optional and do not block implementation. Correctness checks still need independent expected values and the specified destination/processing rules. An assumption does not establish a measured outcome.
+
 ## Run the development comparison
 
 From the repository root:
@@ -85,20 +87,27 @@ Cancelled interpretations do not earn active-work correctness; literal cancelled
 
 Aggregate output does not echo case IDs, reviewer names, customer values, raw notes or images. Invalid CLI input produces a generic error and no report. Examine sensitive inputs locally rather than attaching full validation tracebacks to a public issue.
 
-## Company trial prerequisites and protocol
+## Company correctness-check prerequisites and protocol
 
-Use the [workshop validation worksheet](WORKSHOP_VALIDATION_WORKSHEET.md) as a private fill-in copy for the reviewer/operator. It captures one job chain, independently checked values, destination rules, separate permissions and per-run full-task timings. The developer can translate checked tables to the [JSONL input contract](#input-files); the reviewer must verify that translation. The blank worksheet is not a dataset, company approval or trial result.
+Use the [workshop validation worksheet](WORKSHOP_VALIDATION_WORKSHEET.md) as a private fill-in copy for the reviewer/operator. It captures one job chain, independently checked values, destination rules, separate permissions and optional per-run full-task timings. The developer can translate checked tables to the [JSONL input contract](#input-files); the reviewer must verify that translation. The blank worksheet is not a dataset, company approval or trial result.
 
-Before any real AI call, resolve Q07 processing permission. Before calling a result meaningful, resolve Q01/Q02/Q08: a workshop reviewer supplies meanings, stage and expected labels independently, and an operator agrees to a task comparison. F09 also needs the real source→final invoice/software→spreadsheet chain and destination mapping. The demo CSV is not that destination.
+Before any real AI call, resolve Q07 processing permission. Before claiming real extraction accuracy, resolve Q01/Q02 and the label portion of Q08: a workshop reviewer supplies meanings, stage and expected values independently. No task-timing comparison is required. F09 separately needs the real source→final invoice/software→spreadsheet chain and destination mapping. The demo CSV is not that destination.
 
 1. Freeze permitted source cases and assign opaque IDs. Include representative legibility, languages, crossed-out rows, ambiguous amounts, diagrams and missing fields. Record inclusion/exclusion reasons; do not select only easy sheets.
 2. Have the reviewer label from the source without seeing model output. Distinguish readable literal text from inferred meaning. Leave unresolved shorthand/diagram directions unknown until the reviewer explains the vehicle convention and authorised operation. Store label version and review date privately alongside the JSONL/source.
 3. Reserve cases that are not used for prompt/tuning decisions. Keep tuning and held-out results separate. Decide sample size and acceptable critical-error/review burden with the company; none has been approved yet.
 4. Freeze model name, SDK/prompt/schema versions, image capture procedure and prediction kind for a run. Capture all scheduled responses/failures. Never silently replace bad predictions with human corrections in the raw extraction set.
 5. Run the field comparison. Inspect identity/currency/amount/description/cancellation errors and unknown candidates first. Store residual errors and reviewer decisions privately. Compare a corrected final record separately if needed; human-corrected values do not establish automatic extraction accuracy.
-6. Compare the same agreed job across the existing copying routine, direct manual digital entry and AI draft+review. Rotate task order where practical to reduce familiarity effects. Use representative staff, not just the developer. Record who performed each task and relevant experience privately.
-7. Time the complete workflow: locate/photograph source, capture quality corrections, provider wait/failure, initial entry, review, clarification, correction, output and every remaining downstream copying step. Record interrupted/failed attempts and rework. Report sample counts, median/range and uncertainty; do not measure only model latency.
-8. Verify which destination actually stopped needing retyping, if any. A generated CSV/download is not evidence that a copying step was removed. Check destination acceptance and correction/version handling under F09 before counting reuse.
-9. Have the company review remaining critical errors and maintenance work. If AI adds effort, retain manual entry and record that observation. Agree scope/access/retention/backup/support before any pilot. Keep actual approval, participants, dates and limitations privately; publish only permitted summaries backed by those records.
+
+## Optional usefulness study
+
+Skip this study while building unless measured benefit is requested. Usefulness is assumed; actual time saved, removed entry steps or adoption still require evidence before being claimed.
+
+1. Compare the same agreed job across the existing copying routine, direct manual digital entry and AI draft+review. Rotate task order where practical to reduce familiarity effects. Use representative staff, not just the developer. Record who performed each task and relevant experience privately.
+2. Time the complete workflow: locate/photograph source, capture quality corrections, provider wait/failure, initial entry, review, clarification, correction, output and every remaining downstream copying step. Record interrupted/failed attempts and rework. Report sample counts, median/range and uncertainty; do not measure only model latency.
+3. Verify which destination actually stopped needing retyping, if any. A generated CSV/download is not evidence that a copying step was removed. Check destination acceptance and correction/version handling under F09 before counting reuse.
+4. Record the company's assessment of effort and maintenance. If AI adds effort, retain manual entry and document that observation. Keep participants, dates and limitations privately; publish only permitted summaries backed by those records.
+
+Actual pilot operation still needs its selected scope/access/retention/backup/support decisions and checks from the [operating guide](WORKSHOP_OPERATING_GUIDE.md#before-company-use), independently of this optional study.
 
 No real trial has run. Internship dates, “first AI system,” 24 mechanics, 500+ company-manual pages, 90% retrieval precision and six-month adoption remain separate historical evidence questions, not outputs of this evaluator.

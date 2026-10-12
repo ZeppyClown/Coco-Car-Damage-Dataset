@@ -29,7 +29,7 @@ This milestone is a local demonstration. It does not claim company deployment, r
 ### First actions for the next implementer
 
 1. Read this file, root `AGENTS.md`, root `CLAUDE.md`, [BUILD_STATUS.md](BUILD_STATUS.md) and [the repository README](../README.md).
-2. Run `git status --short` and identify unrelated user work. On 11 October, `PROJECT_SUMMARY.md` is modified and `SYSTEM_DESIGN.md` is untracked; preserve both unless the user explicitly includes them in the task.
+2. Run `git status --short` and identify unrelated user work. `PROJECT_SUMMARY.md` has uncommitted user edits; preserve them unless the user explicitly includes the file in the task. `SYSTEM_DESIGN.md` was rewritten and committed on 12 October at the user's request.
 3. Read the existing schema/session/router/test fixtures listed in section 5. Confirm actual paths before adding code.
 4. Check whether the private visit files exist locally. Their absence does not block a synthetic/manual prototype. Do not obtain company files from public search as replacements for actual evidence.
 5. Mark the next branch whose company prerequisite is supplied `IN_PROGRESS` and state its exact scope. Printed-fictional F07 integration is verified; repeated smoke calls are not a substitute for missing company evidence.
@@ -848,6 +848,15 @@ remain recorded and unanswered.
 ```
 
 ## 16. Work log
+
+### 12 October 2026 — system design rewritten and pipeline slides added (documentation only)
+
+- User asked for a system design and a Slidev deck walking the pipeline from input to final step. No application code, schema, route or configuration changed.
+- [`SYSTEM_DESIGN.md`](../SYSTEM_DESIGN.md) replaced the 2 October version, which predated the workshop module and still listed since-fixed valuation/parts failures. It now covers the workshop pipeline (8 steps, 17 routes, 5 tables, lifecycle, GST maths, switches), the automotive API and the manual assistant, read from current code.
+- [`slides/slides.md`](../slides/slides.md): 16 slides, input → sign in → attach → draft/AI proposal → save → confirm → find/correct → CSV → invoice. Uses only the tracked fictional sheet and stored-record screenshot. Run `cd slides && npm install && npm run dev`.
+- Verification: `slidev export --format png` rendered all 16 slides; each was inspected and six overflowing slides were fixed and re-rendered. No Python tests were rerun because no code changed; test counts quoted are the recorded F13 results.
+- `.gitignore` now tracks `slides/slides.md` and ignores `node_modules/` and `slides/dist/`.
+- Next task unchanged: Q11 supplier details and the technical company inputs in section 1.
 
 ### 12 October 2026 — actual record/export shown; fresh software checks and standalone scope
 

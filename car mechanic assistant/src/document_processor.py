@@ -1,4 +1,4 @@
-"""Markdown, text PDF and DOCX ingestion with source provenance."""
+"""Markdown, PDF (optional offline OCR) and DOCX ingestion with provenance."""
 from dataclasses import dataclass
 import hashlib
 import json
@@ -20,9 +20,19 @@ def canonical_vehicle_value(value):
 
 
 class DocumentProcessor:
-    def __init__(self, chunk_size=1000, chunk_overlap=200):
+    def __init__(self, chunk_size=1000, chunk_overlap=200, *, ocr_enabled=None,
+                 ocr_model_dir=None, ocr_min_confidence=None):
+        from .config import Config
         if not 0 <= chunk_overlap < chunk_size:
             raise ValueError("Require 0 <= overlap < chunk size")
+        self.ocr_enabled = Config.OCR_ENABLED if ocr_enabled is None else ocr_enabled
+        if not isinstance(self.ocr_enabled, bool):
+            raise ValueError("OCR enabled setting must be a boolean")
+        self.ocr_model_dir = Config.OCR_MODEL_DIR if ocr_model_dir is None else ocr_model_dir
+        self.ocr_min_confidence = Config.OCR_MIN_CONFIDENCE if ocr_min_confidence is None else ocr_min_confidence
+        if not 0 < self.ocr_min_confidence <= 1:
+            raise ValueError("OCR confidence threshold must be greater than 0 and at most 1")
+        self._ocr = None
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.manifest = {"files": [], "accepted_unique_pdf_pages": 0}
@@ -147,10 +157,33 @@ class DocumentProcessor:
                 from pypdf import PdfReader
                 reader = PdfReader(path)
                 record["physical_pages"] = len(reader.pages)
+                record.update({"pages": [], "quarantined_pages": 0})
                 for page, value in enumerate(reader.pages, 1):
                     text = value.extract_text() or ""
+                    provenance = {"page": page, "location": f"page {page}",
+                                  "extraction_method": "text", "status": "accepted"}
+                    record["pages"].append(provenance)
                     if not text.strip():
-                        raise ValueError(f"Page {page} needs OCR; text-only ingestion does not accept it")
+                        if not self.ocr_enabled:
+                            provenance.update({"status": "rejected", "reason": "OCR disabled"})
+                            raise ValueError(f"Page {page} needs OCR; text-only ingestion does not accept it (set OCR_ENABLED=true after provisioning local models)")
+                        from .ocr import OfflineOCR, OCR_ENGINE
+                        provenance.update({"extraction_method": "OCR", "ocr_engine": OCR_ENGINE,
+                                           "ocr_min_confidence": self.ocr_min_confidence})
+                        try:
+                            if self._ocr is None:
+                                self._ocr = OfflineOCR(self.ocr_model_dir)
+                            text, confidence = self._ocr.read_page(path, page - 1)
+                        except Exception as exc:
+                            provenance.update({"status": "rejected", "reason": str(exc)})
+                            raise
+                        provenance["ocr_confidence"] = confidence
+                        if not text.strip() or confidence < self.ocr_min_confidence:
+                            provenance.update({"status": "quarantined", "review_required": True,
+                                               "text": text, "reason": "No readable OCR text" if not text.strip()
+                                               else "OCR confidence below review threshold"})
+                            record["quarantined_pages"] += 1
+                            continue
                     blocks.append((f"page {page}", text))
                 content = "\n".join(text for _, text in blocks)
             elif path.suffix.lower() == ".docx":
@@ -171,6 +204,10 @@ class DocumentProcessor:
             else:
                 raise ValueError("Unsupported document type")
             if not content.strip():
+                if record.get("quarantined_pages"):
+                    record.update({"status": "quarantined", "chunks": 0})
+                    self.manifest["files"].append(record)
+                    return []
                 raise ValueError("Document has no usable text")
             tags = self._extract_metadata(content, path)
             sidecar = path.with_suffix(path.suffix + ".metadata.json")
@@ -180,8 +217,14 @@ class DocumentProcessor:
                          "document_hash": digest, "filename": path.name, "folder": self._get_folder_name(path)})
             tags.setdefault("language", "ja" if re.search(r"[\u3040-\u30ff]", content) else "zh" if re.search(r"[\u4e00-\u9fff]", content) else "en")
             chunks = []
+            page_records = {row["location"]: row for row in record.get("pages", [])}
             for location, text in blocks:
-                chunks.extend(self._chunk_by_sections(text, path, {**tags, "location": location}))
+                page_tags = {}
+                if path.suffix.lower() == ".pdf":
+                    page_tags = {key: value for key, value in page_records[location].items()
+                                 if key not in {"status", "location"}}
+                    page_tags["language"] = "ja" if re.search(r"[\u3040-\u30ff]", text) else "zh" if re.search(r"[\u4e00-\u9fff]", text) else "en"
+                chunks.extend(self._chunk_by_sections(text, path, {**tags, **page_tags, "location": location}))
             if path.suffix.lower() == ".pdf":
                 for _, text in blocks:
                     page_hash = hashlib.sha256(re.sub(r"\s+", " ", text).strip().encode()).hexdigest()
@@ -189,7 +232,8 @@ class DocumentProcessor:
                         self._page_hashes.add(page_hash)
                         self.manifest["accepted_unique_pdf_pages"] += 1
                 record["accepted_pages"] = len(blocks)
-            record.update({"chunks": len(chunks), "language": tags["language"], "status": "accepted"})
+            record.update({"chunks": len(chunks), "language": tags["language"],
+                           "status": "partially_quarantined" if record.get("quarantined_pages") else "accepted"})
             self.manifest["files"].append(record)
             return chunks
         except Exception as exc:

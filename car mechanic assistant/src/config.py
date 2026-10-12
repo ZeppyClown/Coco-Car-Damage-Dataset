@@ -34,6 +34,11 @@ class Config:
     CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "200"))
     MIN_RETRIEVAL_SIMILARITY = float(os.getenv("MIN_RETRIEVAL_SIMILARITY", "0.65"))
 
+    # Offline scanned-PDF extraction; models must be provisioned explicitly.
+    OCR_ENABLED = os.getenv("OCR_ENABLED", "false").lower() == "true"
+    OCR_MODEL_DIR = os.getenv("OCR_MODEL_DIR")
+    OCR_MIN_CONFIDENCE = float(os.getenv("OCR_MIN_CONFIDENCE", "0.90"))
+
     # Generation Settings
     MAX_TOKENS = int(os.getenv("MAX_TOKENS", "8192"))
     TEMPERATURE = float(os.getenv("TEMPERATURE", "0.3"))

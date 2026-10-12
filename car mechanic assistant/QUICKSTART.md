@@ -11,7 +11,9 @@ python -m src.vector_store --output runtime/releases/initial
 
 For another manual folder add `--knowledge-base /absolute/path/to/manuals` to either command. The builder refuses an existing output directory, retains failed staging directories for inspection and leaves the old serving index untouched. Current releases use schema 3. A model/dimension/schema or collection-name mismatch requires a fresh release; no reset of the old index is performed.
 
-Supported inputs: Markdown, text-based PDFs and DOCX. EN/CN/JP text extraction is tested with authored fixtures. PDF passages cite physical pages; DOCX passages retain block numbers and table row text. Scanned/image-only PDFs are rejected with an OCR requirement. OCR and repair correctness of scanned specifications are not claimed.
+Supported inputs: Markdown, text-based PDFs and DOCX. EN/CN/JP text extraction is tested with authored fixtures. PDF passages cite physical pages; DOCX passages retain block numbers and table row text. Scanned/image-only PDFs are rejected unless offline OCR is explicitly enabled.
+
+For scans, install the pinned assistant requirements and follow the checksum-verified model provisioning command in [the OCR handoff](handoff/mechanic-ocr.md). Then run `OCR_ENABLED=true OCR_MODEL_DIR=/absolute/path/to/ocr-models python -m src.document_processor --manifest runtime/corpus-ocr.json`. Models are never fetched during ingestion. `OCR_MIN_CONFIDENCE` defaults to `0.90`; low-confidence/unreadable pages are quarantined in the manifest and excluded from chunks/embeddings/usable page counts. Mixed PDFs retain text pages and OCR only image-only pages. EN/Simplified ZH/Traditional ZH/JA fictional scans are verified; real technical accuracy, complex tables and confidence calibration remain pending. Review the manifest even after a successful command.
 
 A neighbouring file such as `manual.pdf.metadata.json` can specify `make`, `model`, `engine`, `year_range`, `language`, `edition` and `scope`. Vehicle values are canonicalised. Multiple engines can be specified with `affected_engines: ["K20", "K24"]`; other vehicle applicability stays scalar. Missing required vehicle fields make a specific passage ineligible. Contradictory generic applicability is rejected; use `scope: generic` only for material verified as generally applicable. Untagged material is `unknown`, not universal. Originals must be authorised for this use. The manifest counts unique accepted PDF pages; DOCX is not counted as physical pages without a separate recorded rendering.
 
@@ -43,7 +45,20 @@ python -m src.evaluate_retrieval --labels labels.jsonl --retrieval ranked-result
 
 Each label record needs `query_id`, `category`, `language`, `relevant_ids`, `reviewer`, and `reviewed_at`. Each retrieval record needs `query_id` and ordered `retrieved_ids`. Category IDs are `starting`, `idle_stalling`, `misfire_ignition`, `fuel_pressure`, `cooling`, `charging`, `sensor_emissions`, `mechanical_noise`.
 
-Passage Precision@5 uses a fixed denominator of five; missing ranks count as zero and exact duplicates do not earn extra credit. Hit@5 is reported separately. Labels must come from independent source review; no benchmark dataset or 90% result is supplied. Negative queries need a separate abstention evaluation. Confidence intervals, materially overlapping-passage adjudication, experiment tracking and frozen workshop evaluation remain later milestones.
+Passage Precision@5 uses a fixed denominator of five; missing ranks count as zero and exact duplicates do not earn extra credit. Hit@5 is reported separately. Labels must come from independent source review; no real benchmark or 90% result is supplied. Negative queries need a separate abstention evaluation. Materially overlapping-passage adjudication and frozen workshop evaluation remain pending.
+
+The C2 harness builds temporary indexes for six chunk settings and five retrieval ablations, writes query ranks/failures and bootstrap intervals, and closes/removes each index. From the repository root, this uses fictional fixtures and deterministic test embeddings:
+
+```sh
+PYTHONPATH='car mechanic assistant' PYTHON_DOTENV_DISABLED=1 .venv-worker/bin/python -m src.retrieval_experiments \
+  --corpus tests/fixtures/retrieval_experiments/synthetic_kb \
+  --labels tests/fixtures/retrieval_experiments/synthetic_dev_labels.jsonl \
+  --output-dir .context/experiments/fictional-dev
+```
+
+Create `.venv-worker` with Python 3.12 and install `car mechanic assistant/requirements.txt` plus root `requirements-dev.txt`. The default is an offline test result, with implementation/model recorded in both summary and records. `--embeddings configured` explicitly selects the existing configured `GeminiEmbeddings` and makes provider embedding calls; use only an approved corpus/processing path. That selection was verified with a mock, without live inference. Outputs inside the repository must be Git-ignored and separate from corpus/index releases.
+
+Every runner label row must declare one consistent `evidence_origin` (`synthetic`, `real` or `independent`) and `split` (`development`/`dev` or `held-out`/`heldout`/`held_out`/`test`). Origins are declarations, not authenticated review. Held-out aliases share a single run allowance per commit/corpus release in the output directory; repeat use needs `--allow-held-out-override --held-out-override-reason 'reason'`. Keep the same output ledger; copying/deleting it or relabelling data is outside this local guard. The harness does not enforce selection of one frozen configuration; that protocol and real labels/results remain pending. See [the experiment handoff](handoff/mechanic-experiments.md).
 
 Run automated tests from repository root using `python -m pytest -q`. Older summaries and saved smoke results describe the January prototype; consult BUILD_STATUS.md for the verified rebuild state.
 

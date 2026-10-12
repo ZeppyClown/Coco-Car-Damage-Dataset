@@ -7,28 +7,24 @@ offline deterministic embeddings, latency & error recording, query-level ranks, 
 with bootstrap confidence intervals.
 """
 import argparse
-import copy
 import hashlib
 import json
 import math
-import os
 import random
 import re
 import shutil
 import subprocess
-import sys
 import tempfile
 import time
-from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from statistics import mean
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 # Import existing modules from car mechanic assistant
 from .config import Config
 from .document_processor import DocumentProcessor, canonical_vehicle_value
-from .evaluate_retrieval import CATEGORIES, evaluate, read_jsonl
+from .evaluate_retrieval import evaluate, read_jsonl
 from .vector_store import VectorStore
 
 
@@ -96,7 +92,7 @@ class AblationRetrieverWrapper:
     2. applicability_generic: adds vehicle filtering and generic candidate pool combining.
     3. folder_priority: adds folder priority scoring.
     4. exact_bonuses: adds fault code and vehicle exact match bonuses.
-    5. final_dedup_rerank: adds final near-duplicate text suppression and deterministic rank ordering.
+    5. final_dedup_rerank: adds whitespace-normalised exact-text suppression; every stage orders ties deterministically.
     """
 
     def __init__(self, vector_store: VectorStore, stage: str = "final_dedup_rerank"):
@@ -178,7 +174,7 @@ class AblationRetrieverWrapper:
         ranked = sorted(found.values(), key=lambda d: (-d["relevance_score"], d["id"]))
 
         if self.stage == "final_dedup_rerank":
-            # Stage 5: Deduplication of near-identical text
+            # Stage 5: Deduplication of whitespace-identical text
             selected = []
             seen = set()
             for doc in ranked:
@@ -243,6 +239,14 @@ def compute_bootstrap_ci(scores: List[float], n_bootstraps: int = 1000, ci: floa
     return (round(means[lower_idx], 4), round(means[upper_idx], 4))
 
 
+def normalize_split(value: str) -> str:
+    aliases = {"dev": "development", "development": "development",
+               "held-out": "held-out", "heldout": "held-out", "held_out": "held-out", "test": "held-out"}
+    if not isinstance(value, str) or value.strip().casefold() not in aliases:
+        raise ValueError("split must explicitly be development/dev or held-out/heldout/held_out/test")
+    return aliases[value.strip().casefold()]
+
+
 class HeldOutGuard:
     """
     Enforces held-out evaluation discipline:
@@ -257,11 +261,17 @@ class HeldOutGuard:
         if not self.ledger_path.exists():
             return []
         try:
-            return json.loads(self.ledger_path.read_text(encoding="utf-8"))
-        except Exception:
-            return []
+            entries = json.loads(self.ledger_path.read_text(encoding="utf-8"))
+            if not isinstance(entries, list) or not all(
+                    isinstance(entry, dict) and entry.get("frozen_release_id") and entry.get("split")
+                    for entry in entries):
+                raise ValueError("Invalid entries")
+            return entries
+        except (OSError, ValueError) as exc:
+            raise ValueError("Cannot read held-out guard ledger; refusing evaluation") from exc
 
     def _write_ledger(self, entries: List[Dict[str, Any]]) -> None:
+        # shortcut: single-process local ledger; add locking before concurrent experiment runs.
         self.ledger_path.parent.mkdir(parents=True, exist_ok=True)
         self.ledger_path.write_text(json.dumps(entries, indent=2), encoding="utf-8")
 
@@ -277,12 +287,15 @@ class HeldOutGuard:
         Raises PermissionError if already run and allow_override is False.
         Records the run event in the ledger.
         """
-        is_held_out = (split_name.lower() in ("held-out", "heldout", "test"))
+        split_name = normalize_split(split_name)
+        if allow_override and (not isinstance(override_reason, str) or not override_reason.strip()):
+            raise ValueError("Held-out override requires a nonblank reason")
+        is_held_out = split_name == "held-out"
         if not is_held_out:
             return {"split": split_name, "is_held_out": False, "allowed": True}
 
         ledger = self._read_ledger()
-        prior_runs = [e for e in ledger if e.get("frozen_release_id") == frozen_release_id and e.get("split") == split_name]
+        prior_runs = [e for e in ledger if e.get("frozen_release_id") == frozen_release_id]
 
         if prior_runs and not allow_override:
             raise PermissionError(
@@ -329,6 +342,32 @@ class RetrievalExperimentRunner:
         self.allow_held_out_override = allow_held_out_override
         self.held_out_override_reason = held_out_override_reason
         self.held_out_guard = held_out_guard or HeldOutGuard(self.output_dir / "held_out_guard_ledger.json")
+        if self.held_out_guard.ledger_path.resolve().parent != self.output_dir.resolve():
+            raise ValueError("Held-out ledger must be inside the caller's output directory")
+        implementation = type(self.embeddings)
+        module = "src.retrieval_experiments" if implementation is DeterministicTestEmbeddings else implementation.__module__
+        self.embedding_identity = {
+            "embedding_implementation": f"{module}.{implementation.__qualname__}",
+            "embedding_model": getattr(self.embeddings, "model", "unknown"),
+            "embedding_dimensions": getattr(self.embeddings, "dimensions", 0),
+        }
+
+    def _validate_output(self) -> None:
+        output = self.output_dir.resolve()
+        if output.is_relative_to(self.corpus_dir.resolve()) or output.is_relative_to(Config.CHROMA_PERSIST_DIR.resolve()):
+            raise ValueError("Experiment output must be separate from the corpus and serving index")
+        if any((parent / name).exists() for parent in (output, *output.parents)
+               for name in ("release.json", "chroma.sqlite3")):
+            raise ValueError("Experiment output cannot be inside an index release")
+        artifacts = [self.output_dir / "experiment_records.jsonl", self.output_dir / "comparison_summary.json",
+                     self.held_out_guard.ledger_path]
+        if any(path.is_symlink() for path in artifacts):
+            raise ValueError("Experiment output artifacts cannot be symlinks")
+        repository = Path(__file__).resolve().parents[2]
+        if output.is_relative_to(repository) and any(subprocess.run(
+                ["git", "check-ignore", "--quiet", "--", str(path.resolve())], cwd=repository,
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0 for path in artifacts):
+            raise ValueError("Experiment output inside the repository must be Git-ignored")
 
     def run_configuration(
         self,
@@ -343,16 +382,15 @@ class RetrievalExperimentRunner:
     ) -> Dict[str, Any]:
         """Run a single experiment configuration in an isolated temporary index."""
         start_time = time.time()
-        temp_dir = Path(tempfile.mkdtemp(prefix=f"exp_{config_id}_"))
-        index_dir = temp_dir / "chroma_index"
+        temp_dir = None
+        store = None
 
         record: Dict[str, Any] = {
             "config_id": config_id,
-            "corpus_hash": compute_dir_hash(self.corpus_dir),
-            "label_file_hash": compute_file_hash(self.labels_file),
+            "corpus_hash": None,
+            "label_file_hash": None,
             "evidence_origin": evidence_origin,
-            "embedding_model": getattr(self.embeddings, "model", "unknown"),
-            "embedding_dimensions": getattr(self.embeddings, "dimensions", 0),
+            **self.embedding_identity,
             "distance_metric": "cosine",
             "chunk_size": chunk_size,
             "chunk_overlap": chunk_overlap,
@@ -368,6 +406,10 @@ class RetrievalExperimentRunner:
         }
 
         try:
+            record["corpus_hash"] = compute_dir_hash(self.corpus_dir)
+            record["label_file_hash"] = compute_file_hash(self.labels_file)
+            temp_dir = Path(tempfile.mkdtemp(prefix="retrieval_exp_"))
+            index_dir = temp_dir / "chroma_index"
             # 1. Chunk documents with isolated DocumentProcessor
             t_chunk_start = time.time()
             processor = DocumentProcessor(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
@@ -424,11 +466,11 @@ class RetrievalExperimentRunner:
             for query_row in labels:
                 row_copy = dict(query_row)
                 if "relevant_source_stem" in row_copy:
-                    # Map stem to actual chunk IDs generated in this configuration
+                    # shortcut: source-stem fixtures label whole sources; use passage labels for real studies.
                     stem = row_copy["relevant_source_stem"]
                     matched_chunk_ids = [c.chunk_id for c in chunks if Path(c.source_file).stem == stem]
                     if matched_chunk_ids:
-                        row_copy["relevant_ids"] = matched_chunk_ids[:5]
+                        row_copy["relevant_ids"] = matched_chunk_ids
                 eval_labels.append(row_copy)
 
             eval_result = evaluate(eval_labels, retrieved_records)
@@ -444,12 +486,19 @@ class RetrievalExperimentRunner:
             record["status"] = "failed"
             record["errors"].append(str(e))
         finally:
+            if store is not None:
+                try:
+                    store.client.close()
+                except Exception as exc:
+                    record["status"] = "failed"
+                    record["errors"].append(f"Index close failed: {exc}")
+            if temp_dir is not None:
+                try:
+                    shutil.rmtree(temp_dir)
+                except OSError as exc:
+                    record["status"] = "failed"
+                    record["errors"].append(f"Index cleanup failed: {exc}")
             record["latency"]["total_wallclock_seconds"] = round(time.time() - start_time, 4)
-            # Clean up temporary index
-            try:
-                shutil.rmtree(temp_dir, ignore_errors=True)
-            except Exception:
-                pass
 
         return record
 
@@ -461,14 +510,20 @@ class RetrievalExperimentRunner:
         run_ablation_ladder: bool = True,
     ) -> Dict[str, Any]:
         """Run the experiment suite and write records and comparison summary."""
-        self.output_dir.mkdir(parents=True, exist_ok=True)
         raw_labels = read_jsonl(self.labels_file)
         if not raw_labels:
             raise ValueError("No label rows found in labels file")
 
-        # Check split and apply held-out guard
-        split_name = raw_labels[0].get("split", "development")
-        evidence_origin = raw_labels[0].get("evidence_origin", "synthetic")
+        origins = [row.get("evidence_origin") for row in raw_labels]
+        if any(origin not in ("synthetic", "real", "independent") for origin in origins) or len(set(origins)) != 1:
+            raise ValueError("Every label row must declare the same evidence_origin: synthetic, real or independent")
+        splits = [normalize_split(row.get("split")) for row in raw_labels]
+        if len(set(splits)) != 1:
+            raise ValueError("Every label row must declare the same split; do not mix development and held-out")
+        split_name = splits[0]
+        evidence_origin = origins[0]
+        self._validate_output()
+        self.output_dir.mkdir(parents=True, exist_ok=True)
         commit_hash = get_git_commit(self.corpus_dir)
         release_id = f"rel_{commit_hash[:10]}_{compute_dir_hash(self.corpus_dir)[:8]}"
 
@@ -585,6 +640,7 @@ class RetrievalExperimentRunner:
             "release_id": release_id,
             "split": split_name,
             "evidence_origin": evidence_origin,
+            **self.embedding_identity,
             "held_out_guard": guard_record,
             "total_configurations": len(run_records),
             "evaluated_configurations": evaluated_count,
@@ -599,16 +655,25 @@ def main():
     parser.add_argument("--corpus", type=Path, default=Path("car mechanic assistant/knowledge_base"), help="Corpus directory")
     parser.add_argument("--labels", type=Path, required=True, help="JSONL labels file")
     parser.add_argument("--output-dir", type=Path, default=Path("car mechanic assistant/runtime/experiments"), help="Output directory")
+    parser.add_argument("--embeddings", choices=("offline", "configured"), default="offline",
+                        help="offline deterministic test embeddings (default); configured explicitly uses Gemini")
     parser.add_argument("--allow-held-out-override", action="store_true", help="Explicitly allow re-evaluating a held-out split")
     parser.add_argument("--held-out-override-reason", type=str, default=None, help="Documented reason for held-out re-evaluation")
     parser.add_argument("--skip-chunk-grid", action="store_true", help="Skip chunk grid experiments")
     parser.add_argument("--skip-ablation-ladder", action="store_true", help="Skip retrieval ablation ladder")
     args = parser.parse_args()
 
+    if args.embeddings == "configured":
+        from .embeddings import GeminiEmbeddings
+        embeddings = GeminiEmbeddings()
+    else:
+        embeddings = DeterministicTestEmbeddings()
+
     runner = RetrievalExperimentRunner(
         corpus_dir=args.corpus,
         labels_file=args.labels,
         output_dir=args.output_dir,
+        embeddings=embeddings,
         allow_held_out_override=args.allow_held_out_override,
         held_out_override_reason=args.held_out_override_reason,
     )

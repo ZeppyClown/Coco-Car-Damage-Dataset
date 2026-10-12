@@ -39,6 +39,8 @@ Going to the workshop: use the detailed [fill-in interview workbook](car%20mecha
 
 See [assistant quickstart](car%20mechanic%20assistant/QUICKSTART.md), [build status](car%20mechanic%20assistant/BUILD_STATUS.md), and [full implementation/evidence plan](car%20mechanic%20assistant/RESUME_DELIVERY_PLAN.md).
 
+The separate manual assistant now includes opt-in offline multilingual scanned-PDF OCR with quarantine and a C2 retrieval experiment harness; [run instructions](car%20mechanic%20assistant/QUICKSTART.md) cover local model provisioning and fictional offline experiments. Verification uses fictional scans/test embeddings; no real retrieval result or mechanic adoption is established.
+
 The [résumé verification report](car%20mechanic%20assistant/RESUME_VERIFICATION.md) distinguishes working code from unverified business claims. [Company questions](car%20mechanic%20assistant/COMPANY_QUESTIONS.md) retain all missing evidence requests. A separate [public EN/CN/JP reference demo](car%20mechanic%20assistant/public_reference_corpus/README.md) uses attributed company summaries while authorised manuals are pending. It is not a repair corpus or evidence of Yap Motor adoption.
 
 ## Tests

@@ -166,3 +166,7 @@ An issued invoice has the same option: **Print invoice on the workshop form**. W
 ## New screen (13 October 2026)
 
 The numbered walk-through under “Complete one fictional job” above describes the earlier screen. The current screen has a step bar along the top and its own guide: open `/workshop` and click **How to use**. In short: New job → 1 Car & customer → 2 Knock → 3 Repair & parts → 4 Spray (add lines, click the car to mark damage) → 5 Check & save (Save, then tick and confirm) → 6 Print & invoice. The car picture needs `WORKSHOP_SHEET_TEMPLATE` set; without it a plain box is shown and marks still work.
+
+## Books, payments and the paper guide (13 October 2026)
+
+Run `python -m alembic upgrade head` once to add the payments table (`20261013_payments`). **Books** in the top bar lists each month's invoices with GST, paid and balance, and downloads them for Excel. Record payments on step 6 or from a Books row; a refund is a minus amount. To show reference pictures in the **Paper guide** pop-up, put PNG/JPEG files in a private folder (for example `car mechanic assistant/runtime/workshop/guide/`, named `01 …`, `02 …` for order) and set `WORKSHOP_GUIDE_DIR` to its full path. Keep that folder out of Git.

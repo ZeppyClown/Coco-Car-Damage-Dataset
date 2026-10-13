@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, func, Numeric, JSON, Index, UniqueConstraint, CheckConstraint, Uuid, text
+from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, func, Numeric, JSON, Index, UniqueConstraint, CheckConstraint, Uuid, text, Date
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -362,3 +362,17 @@ class WorkshopInvoice(Base):
     issued_at = Column(DateTime(timezone=True), nullable=False)
     html = Column(Text, nullable=False)
     checksum = Column(String(64), nullable=False)
+
+
+class WorkshopPayment(Base):
+    """Money received or refunded against an invoice; entries are added, never edited."""
+    __tablename__ = "workshop_payments"
+
+    id = Column(Uuid, primary_key=True, default=uuid4)
+    invoice_id = Column(Uuid, ForeignKey("workshop_invoices.id"), nullable=False, index=True)
+    amount = Column(Numeric(12, 2), nullable=False)
+    method = Column(String(20), nullable=False)
+    paid_on = Column(Date, nullable=False)
+    note = Column(String(500), nullable=False)
+    recorded_by = Column(String(200), nullable=False)
+    recorded_at = Column(DateTime(timezone=True), nullable=False)

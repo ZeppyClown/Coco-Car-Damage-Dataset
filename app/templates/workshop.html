@@ -23,6 +23,8 @@
   <nav class="tools" aria-label="Other pages">
     <button type="button" id="new-record">New job</button>
     <button type="button" data-step="find">Find job</button>
+    <button type="button" data-step="books">Books</button>
+    <button type="button" id="open-guide">Paper guide</button>
     <button type="button" data-step="help">How to use</button>
   </nav>
 </header>
@@ -45,6 +47,7 @@
         <label>Date out<input id="date_out" type="date"></label>
         <label>Quotation date<input id="quotation_date" type="date"></label>
       </div>
+      <div id="car-history" class="notice" hidden></div>
       <fieldset id="fuel"><legend>Fuel gauge</legend></fieldset>
       <details id="photo-box"><summary>Photo of the paper sheet (optional)</summary>
         <label>This job is<select id="data-origin" aria-label="Record origin"><option value="synthetic_demo">Practice (made-up job)</option><option value="private_source">Real job</option></select></label>
@@ -63,6 +66,7 @@
     <section class="card step" data-panel="lines">
       <h2 id="lines-title"></h2>
       <p class="hint" id="lines-hint"></p>
+      <div id="quick" aria-label="Common lines: click to add"></div>
       <div class="rows-head"><span>#</span><span>Comments or Remarks / Items</span><span>Amount ($)</span><span>Not sure</span><span>Crossed out</span><span></span></div>
       <div id="items"></div>
       <p id="no-lines" class="hint">No lines in this part yet.</p>
@@ -94,6 +98,7 @@
       <p class="notice">Practice jobs produce DEMO invoices. Real invoices are switched off until the company billing details are set.</p>
       <p id="billing-state" role="status">Choose “Make invoice” on a finished job above.</p>
       <div id="issued-invoice"></div>
+      <div id="invoice-payment"></div>
       <div id="invoice-form" hidden>
         <div class="form-grid">
           <label>Supplier name<input id="invoice-supplier-name" maxlength="200"></label>
@@ -150,6 +155,25 @@
   </details>
 </section>
 
+<section class="card step" data-panel="books">
+  <h2>Books</h2>
+  <p class="hint">Every invoice issued in the month, with GST and what has been paid. Figures come straight from the invoices; nothing is typed twice.</p>
+  <label class="inline">Month <input id="books-month" type="month"></label>
+  <button type="button" id="books-show">Show</button>
+  <a class="button" id="books-download" href="#">Download for Excel</a>
+  <p id="books-state" role="status"></p>
+  <div class="scroll"><table id="books-table"></table></div>
+  <div id="books-payment" hidden></div>
+</section>
+
+<dialog id="guide">
+  <div class="guide-bar"><strong id="guide-title">Paper guide</strong>
+    <button type="button" id="guide-previous">‹ Back</button><button type="button" id="guide-next">Next ›</button>
+    <button type="button" id="guide-close">Close</button></div>
+  <p id="guide-empty" hidden>No guide pictures are set up on this computer.</p>
+  <img id="guide-picture" alt="">
+</dialog>
+
 <section class="card step" data-panel="help">
   <h2>How to use</h2>
   <p>The steps along the top follow the paper job sheet, left to right. You can click any step at any time.</p>
@@ -168,6 +192,11 @@
     <li><b>Line crossed out on the paper?</b> Add it anyway and tick <i>Crossed out</i>. It is kept but not charged.</li>
     <li><b>Made a mistake after confirming?</b> Open the job, fix it, save and confirm again. The old version stays in the history.</li>
     <li><b>Looking for an old job?</b> Click <i>Find job</i> and search by owner, vehicle no., job no. or any word.</li>
+    <li><b>Car been here before?</b> Type the vehicle no. on step 1. The owner and contact fill in by themselves and the earlier jobs are listed.</li>
+    <li><b>Quick lines.</b> On Knock, Repair and Spray, click a grey button such as “Rear bumper” to add that line, then type the amount.</li>
+    <li><b>Customer paid?</b> On step 6, or in <i>Books</i>, record the amount and how it was paid. A refund is a minus amount.</li>
+    <li><b>End of the month.</b> Click <i>Books</i>, pick the month and <i>Download for Excel</i>. It lists every invoice with GST, paid and balance.</li>
+    <li><b>Not sure what a part is called?</b> Click <i>Paper guide</i> for the paper job sheet and the car, lorry and motorbike part names.</li>
     <li><b>Invoices.</b> One per job, only for finished jobs, and it cannot be changed once issued.</li>
   </ul>
 </section>

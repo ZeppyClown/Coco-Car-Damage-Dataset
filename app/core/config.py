@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     WORKSHOP_REAL_INVOICES_ENABLED: bool = False
     WORKSHOP_BILLING_SUPPLIER: Optional[InvoiceSupplier] = None
     WORKSHOP_SHEET_TEMPLATE: Optional[Path] = None
+    WORKSHOP_GUIDE_DIR: Optional[Path] = None
     WORKSHOP_STORAGE_DIR: Path = Path(__file__).resolve().parents[2] / "car mechanic assistant/runtime/workshop"
 
     # Database

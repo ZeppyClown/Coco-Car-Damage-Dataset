@@ -14,6 +14,13 @@ const sections = {
   repair: { title: "3 · Repair & parts", hint: "Servicing, repairs and parts to change, for example radiator, fan motor or front oil seal.", next: ["spray", "Next: Spray →"] },
   spray: { title: "4 · Spray", hint: "Spray painting lines, as written on the sheet. Click the car to show which panels.", next: ["check", "Next: Check & save →"] },
 };
+const panels = ["Front bumper", "Bonnet", "Front left fender", "Front right fender", "Front left door", "Front right door",
+  "Rear left door", "Rear right door", "Rear left fender", "Rear right fender", "Boot", "Rear bumper", "Roof", "Rocker panel"];
+const quickLines = {
+  knock: panels.map(name => "Knock " + name.toLowerCase()),
+  repair: ["Servicing", "Engine oil", "Radiator", "Coolant", "Fan motor", "Front oil seal", "Windscreen replace", "Headlight", "Rear lamp", "Side mirror", "Labour"],
+  spray: [...panels.map(name => "Spray " + name.toLowerCase()), "Spray rim", "Polish"],
+};
 const stageNames = { quote: "Quotation", approved_scope: "Agreed job", completed_work: "Finished job" };
 
 let step = "car", job = null, sourceId = null, aiProvenance = null, kept = {}, marks = [], fuel = null;
@@ -36,13 +43,14 @@ function showStep(name) {
   const panel = sections[name] ? "lines" : name;
   for (const node of document.querySelectorAll("[data-panel]")) node.hidden = node.dataset.panel !== panel;
   for (const button of document.querySelectorAll("#steps button, .tools [data-step]")) button.classList.toggle("active", button.dataset.step === name);
-  $("draft-form").hidden = name === "find" || name === "help";
+  $("draft-form").hidden = ["find", "help", "books"].includes(name);
   $("side").hidden = name === "print";
   if (sections[name]) {
     $("lines-title").textContent = sections[name].title; $("lines-hint").textContent = sections[name].hint;
-    $("lines-next").textContent = sections[name].next[1]; showRows();
+    $("lines-next").textContent = sections[name].next[1]; showRows(); showQuick();
   }
   if (name === "check") renderSummary();
+  if (name === "books") loadBooks();
   viewImage(); window.scrollTo(0, 0);
 }
 for (const button of document.querySelectorAll("[data-step]")) button.addEventListener("click", () => showStep(button.dataset.step));
@@ -86,6 +94,13 @@ function showRows() {
   $("no-lines").hidden = shown > 0; $("add-item").disabled = $("items").children.length >= 50;
 }
 $("add-item").addEventListener("click", () => { addRow().querySelector(".text").focus(); markDirty(); showRows(); });
+function showQuick() {
+  $("quick").replaceChildren(...quickLines[step].map(text => {
+    const chip = element("button", text, "chip"); chip.type = "button";
+    chip.addEventListener("click", () => { const row = addRow({ description: text }); markDirty(); showRows(); row.querySelector(".amount").focus(); });
+    return chip;
+  }));
+}
 function readRows(confirmed) {
   return [...$("items").children].map(row => {
     const text = row.querySelector(".text").value.trim(), typed = row.querySelector(".amount").value.trim();
@@ -121,6 +136,28 @@ $("car").addEventListener("click", event => {
 });
 $("car-outline").addEventListener("error", () => { $("car-outline").hidden = true; $("car").classList.add("blank"); });
 $("car-outline").src = api + "/sheet-diagram";
+
+// ---- car seen before: fill in what is empty, never overwrite typed values ---
+async function lookUpCar() {
+  const number = $("vehicle_reference").value.trim(), box = $("car-history"); box.hidden = true;
+  if (!number) return;
+  let car;
+  try { car = await request("/vehicles?number=" + encodeURIComponent(number)); } catch (error) { return; }
+  const others = car.jobs.filter(entry => entry.job_id !== job?.id); if (!others.length) return;
+  let filled = false;
+  for (const [id, value] of [["customer_reference", car.owner], ["contact", car.contact], ["make", car.make], ["model", car.model]]) {
+    if (value && !$(id).value.trim()) { $(id).value = value; filled = true; }
+  }
+  if (filled) markDirty();
+  box.replaceChildren(element("strong", `This car has been here ${others.length} time${others.length > 1 ? "s" : ""} before.` + (filled ? " Empty boxes were filled in from last time; check them." : "")));
+  const list = element("ul");
+  for (const entry of others.slice(0, 10)) {
+    const line = element("li", `${entry.date} · ${entry.job_reference} · ${entry.work.slice(0, 4).join(", ") || "no lines"} · $${entry.invoice_total ?? entry.amount}${entry.invoice_total ? " invoiced" : ""} `);
+    const open = element("button", "Open"); open.type = "button"; open.addEventListener("click", () => openJob(entry.job_id)); line.append(open); list.append(line);
+  }
+  box.append(list); box.hidden = false;
+}
+$("vehicle_reference").addEventListener("change", lookUpCar);
 
 // ---- photo of the paper sheet ---------------------------------------------
 function viewImage() {
@@ -160,7 +197,7 @@ function render(record = { data_origin: "synthetic_demo", items: [] }) {
   $("items").replaceChildren(); for (const item of record.items || []) addRow(item, "repair");
   showRows(); dirty = false; $("dirty-label").textContent = "No unsaved changes"; $("source-file").value = "";
   $("record-identity").textContent = job ? `${record.job_reference || "Job without a number"} · saved version ${job.draft_version}` : "New job, not saved yet";
-  $("open-id").value = job?.id || ""; showSource(); $("review-ack").checked = false;
+  $("open-id").value = job?.id || ""; showSource(); $("review-ack").checked = false; $("car-history").hidden = true;
 }
 function readDraft(confirmed = false) {
   const done = confirmed ? "confirmed" : "proposed", items = readRows(confirmed);
@@ -351,6 +388,7 @@ function resetBilling() {
   billingRevision = null; billingPreview = null; billingIssued = null; billingAllowed = false; billingDirty = false;
   $("invoice-form").hidden = true; $("issued-invoice").replaceChildren(); $("invoice-preview").textContent = "";
   $("invoice-ack").checked = false; $("billing-state").textContent = "Choose “Make invoice” on a finished job above.";
+  $("invoice-payment").replaceChildren();
   updateIssueButton();
 }
 function updateIssueButton() {
@@ -362,7 +400,7 @@ function showIssuedInvoice(invoice) {
   container.append(element("p", `${invoice.number} · total $${invoice.preview.total} · GST $${invoice.preview.gst} · issued by ${invoice.issued_by}`));
   container.append(link("Print invoice on the workshop form", api + "/invoices/" + invoice.id + "/sheet"), link("Plain copy", api + "/invoices/" + invoice.id + "/print"));
   $("billing-state").textContent = invoice.preview.data_origin === "synthetic_demo" ? "DEMO invoice saved. Not for payment or tax claims." : "Invoice saved. It is not a payment receipt.";
-  updateIssueButton();
+  updateIssueButton(); paymentBox(invoice.id, $("invoice-payment")).catch(() => {});
 }
 async function loadJobInvoice() {
   if (!job) return;
@@ -420,6 +458,68 @@ $("issue-invoice").addEventListener("click", () => {
   const preview = billingPreview;
   action(async () => { showIssuedInvoice(await request("/revisions/" + preview.revision_id + "/invoice", JSON_POST({ invoice: preview.request, acknowledged: true }))); status("Invoice issued. Print it on the workshop form."); });
 });
+
+// ---- payments --------------------------------------------------------------
+async function paymentBox(invoiceId, container, changed) {
+  const state = await request("/invoices/" + invoiceId + "/payments");
+  container.replaceChildren(element("h3", "Payment"));
+  container.append(element("p", `Grand total $${state.total} · paid $${state.paid} · ` + (Number(state.balance) > 0 ? `still owing $${state.balance}` : Number(state.balance) < 0 ? `overpaid $${state.balance.slice(1)}` : "fully paid")));
+  for (const entry of state.payments) container.append(element("p", `${entry.paid_on} · $${entry.amount} · ${entry.method}${entry.note ? " · " + entry.note : ""} · entered by ${entry.recorded_by}`, "hint"));
+  const amount = element("input"); amount.inputMode = "decimal"; amount.placeholder = "Amount"; amount.value = Number(state.balance) > 0 ? state.balance : ""; amount.setAttribute("aria-label", "Payment amount");
+  const method = element("select"); method.setAttribute("aria-label", "How it was paid");
+  for (const [value, label] of [["cash", "Cash"], ["nets", "NETS"], ["paynow", "PayNow"], ["bank", "Bank transfer"], ["other", "Other"]]) { const option = element("option", label); option.value = value; method.append(option); }
+  const paidOn = element("input"); paidOn.type = "date"; paidOn.value = singaporeDate(); paidOn.setAttribute("aria-label", "Date paid");
+  const note = element("input"); note.maxLength = 500; note.placeholder = "Note (optional)"; note.setAttribute("aria-label", "Note");
+  const add = element("button", "Record payment"); add.type = "button";
+  add.addEventListener("click", () => action(async () => {
+    const value = parseAmount(amount.value.replace(/^-/, "")); if (!value) throw new Error("Type the amount paid, for example 327.00. For a refund put a minus in front.");
+    await request("/invoices/" + invoiceId + "/payments", JSON_POST({ amount: (amount.value.trim().startsWith("-") ? "-" : "") + value, method: method.value, paid_on: paidOn.value, note: note.value.trim() }));
+    await paymentBox(invoiceId, container, changed); status("Payment recorded."); if (changed) await changed();
+  }));
+  const form = element("div", "", "pay"); form.append(amount, method, paidOn, note, add); container.append(form);
+}
+
+// ---- books -----------------------------------------------------------------
+const bookColumns = [["date", "Date"], ["number", "Invoice no."], ["job_reference", "Job no."], ["vehicle", "Vehicle"], ["customer", "Customer"],
+  ["knock", "Knock"], ["repair", "Repair"], ["spray", "Spray"], ["net", "Before GST"], ["gst", "GST"], ["total", "Grand total"], ["paid", "Paid"], ["balance", "Balance"]];
+async function loadBooks() {
+  const month = $("books-month").value || singaporeDate().slice(0, 7); $("books-month").value = month;
+  $("books-download").href = api + "/books?format=csv&month=" + month; $("books-payment").hidden = true;
+  const table = $("books-table"); table.replaceChildren();
+  let sheet;
+  try { sheet = await request("/books?month=" + month); } catch (error) { $("books-state").textContent = "The books could not load: " + error.message; return; }
+  $("books-state").textContent = sheet.rows.length ? `${sheet.rows.length} invoice${sheet.rows.length > 1 ? "s" : ""} in ${month}.` : `No invoices in ${month}.`;
+  const head = table.insertRow(); for (const [, label] of bookColumns) head.append(element("th", label)); head.append(element("th", ""));
+  for (const row of sheet.rows) {
+    const line = table.insertRow();
+    for (const [name] of bookColumns) { const cell = line.insertCell(); cell.textContent = name === "number" ? row.number.slice(0, 13) + (row.number.length > 13 ? "…" : "") : row[name]; if (name === "number") cell.title = row.number; }
+    const pay = element("button", Number(row.balance) > 0 ? "Record payment" : "Payments"); pay.type = "button";
+    pay.addEventListener("click", () => { $("books-payment").hidden = false; paymentBox(row.invoice_id, $("books-payment"), loadBooks).then(() => $("books-payment").scrollIntoView()).catch(error => status(error.message, true)); });
+    line.insertCell().append(pay);
+  }
+  const foot = table.insertRow(); foot.className = "group";
+  for (const [name] of bookColumns) foot.insertCell().textContent = name === "date" ? "TOTAL" : sheet.totals[name] ?? "";
+  foot.insertCell();
+}
+$("books-show").addEventListener("click", loadBooks);
+$("books-month").addEventListener("change", loadBooks);
+
+// ---- pop-up paper guide ----------------------------------------------------
+let guideNames = null, guideIndex = 0;
+function showGuide() {
+  const name = guideNames[guideIndex]; $("guide-empty").hidden = Boolean(name); $("guide-picture").hidden = !name;
+  $("guide-previous").disabled = guideIndex === 0; $("guide-next").disabled = guideIndex >= guideNames.length - 1;
+  if (!name) return;
+  $("guide-picture").src = api + "/guide/" + encodeURIComponent(name);
+  $("guide-title").textContent = `${name.replace(/^\d+[ _-]*/, "").replace(/\.[a-z]+$/i, "")} (${guideIndex + 1} of ${guideNames.length})`;
+}
+$("open-guide").addEventListener("click", async () => {
+  try { guideNames = guideNames || await request("/guide"); } catch (error) { guideNames = []; }
+  showGuide(); $("guide").showModal();
+});
+$("guide-previous").addEventListener("click", () => { guideIndex--; showGuide(); });
+$("guide-next").addEventListener("click", () => { guideIndex++; showGuide(); });
+$("guide-close").addEventListener("click", () => $("guide").close());
 
 window.addEventListener("resize", viewImage);
 window.addEventListener("beforeunload", event => { if (dirty || billingDirty) { event.preventDefault(); event.returnValue = ""; } });

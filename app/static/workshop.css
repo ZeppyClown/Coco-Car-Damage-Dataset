@@ -7,8 +7,8 @@ body { margin: 0; }
 .topbar { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: .4rem .6rem; align-items: center;
   padding: .5rem 1rem; background: #12313d; color: #fff; }
 .brand { font-size: 1.1rem; white-space: nowrap; }
-#steps { display: flex; flex: 1; flex-wrap: wrap; gap: .1rem; }
-.tools { display: flex; gap: .25rem; }
+#steps { display: flex; flex: 1 0 100%; order: 3; flex-wrap: wrap; gap: .1rem; }
+.tools { display: flex; flex-wrap: wrap; gap: .25rem; margin-left: auto; }
 .topbar button { border: 0; background: transparent; color: #cfe0e6; font: inherit; font-size: .92rem; padding: .45rem .45rem; white-space: nowrap; border-radius: 6px; cursor: pointer; }
 .topbar button:hover { background: #1f4a5a; }
 .topbar button.active { background: #fff; color: #12313d; font-weight: 600; }
@@ -86,3 +86,22 @@ pre { white-space: pre-wrap; background: #eef2f4; padding: .75rem; border-radius
   .rows-head, .row { grid-template-columns: 1.8rem minmax(0, 1fr) 5rem 2.5rem 2.5rem 2.2rem; }
   .rows-head span:nth-child(n+4) { font-size: .65rem; }
 }
+
+/* Quick lines, books, payments and the pop-up paper guide */
+#quick { display: flex; flex-wrap: wrap; gap: .3rem; margin: 0 0 .75rem; }
+.chip { margin: 0; padding: .3rem .6rem; border-radius: 999px; border-color: #b9c4c9; background: #eef2f4; font-size: .85rem; }
+#car-history ul { margin: .4rem 0 0; padding-left: 1.2rem; } #car-history button { padding: .1rem .5rem; }
+.scroll { overflow-x: auto; }
+#books-table { border-collapse: collapse; width: 100%; margin: .75rem 0; font-size: .9rem; white-space: nowrap; }
+#books-table th, #books-table td { border-bottom: 1px solid #cfd8dc; padding: .35rem .5rem; text-align: right; }
+#books-table th:nth-child(-n+5), #books-table td:nth-child(-n+5) { text-align: left; }
+#books-table th { border-bottom: 2px solid #12313d; } #books-table .group td { font-weight: 700; background: #eef2f4; }
+#books-table button { padding: .2rem .5rem; margin: 0; }
+.pay { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; } .pay input, .pay select { width: auto; } .pay button { margin: 0; }
+#books-payment, #invoice-payment { margin-top: 1rem; }
+dialog#guide { width: min(96vw, 1000px); max-height: 94vh; border: 0; border-radius: 8px; padding: 0; }
+dialog#guide::backdrop { background: #000a; }
+.guide-bar { position: sticky; top: 0; display: flex; gap: .4rem; align-items: center; padding: .5rem .75rem; background: #12313d; color: #fff; }
+.guide-bar strong { flex: 1; } .guide-bar button { margin: 0; }
+#guide-picture { display: block; width: 100%; } #guide-empty { padding: 1rem; }
+label.inline > input:not([type=checkbox]) { display: inline-block; width: auto; margin: 0 .25rem; }

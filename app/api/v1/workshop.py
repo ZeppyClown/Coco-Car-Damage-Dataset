@@ -12,6 +12,8 @@ from app.schemas.workshop import WorkshopDraft, WorkshopDraftUpdate, WorkshopJob
 from app.services.workshop_extraction import extract_source
 from app.services.workshop import create_job, get_job, update_job, attach_document, get_document, document_file, MAX_UPLOAD_BYTES, confirm_job, list_revisions, generate_export, get_export, export_file, lookup_jobs
 from app.schemas.workshop_invoice import InvoiceRequest, InvoiceIssueRequest, InvoicePreview, InvoiceResponse, InvoiceSettingsResponse
+from app.schemas.workshop_books import PaymentRequest
+from app.services.workshop_books import month_sheet, month_csv, payments, add_payment, vehicle_history, guide_pictures, guide_picture
 from app.services.workshop_sheet import job_sheet_html, invoice_sheet_html, car_outline
 from app.services.workshop_invoice import preview_invoice, issue_invoice, get_invoice, job_invoice, invoice_response, invoice_html
 
@@ -151,3 +153,40 @@ def print_bill_on_form(invoice_id: UUID, db: Session = Depends(get_db)):
 @router.get("/sheet-diagram")
 def car_outline_picture():
     return Response(car_outline(), media_type="image/png", headers={"Cache-Control": "no-store"})
+
+
+@router.get("/books")
+def books(month: str = Query(pattern=r"^\d{4}-(0[1-9]|1[0-2])$"), format: str = Query("json", pattern="^(json|csv)$"),
+          db: Session = Depends(get_db)):
+    sheet = month_sheet(db, month)
+    if format == "json":
+        return sheet
+    return Response(month_csv(sheet), media_type="text/csv; charset=utf-8", headers={
+        "Cache-Control": "no-store", "Content-Disposition": f'attachment; filename="workshop-books-{month}.csv"'})
+
+
+@router.get("/invoices/{invoice_id}/payments")
+def read_payments(invoice_id: UUID, db: Session = Depends(get_db)):
+    return payments(db, invoice_id)
+
+
+@router.post("/invoices/{invoice_id}/payments", status_code=201)
+def record_payment(invoice_id: UUID, request: PaymentRequest, db: Session = Depends(get_db),
+                   actor: str = Depends(require_workshop_enabled)):
+    return add_payment(db, invoice_id, request, actor)
+
+
+@router.get("/vehicles")
+def car_history(number: str = Query(min_length=1, max_length=200), db: Session = Depends(get_db)):
+    return vehicle_history(db, number)
+
+
+@router.get("/guide")
+def guide_list():
+    return guide_pictures()
+
+
+@router.get("/guide/{name}")
+def guide_file(name: str):
+    path, media_type = guide_picture(name)
+    return FileResponse(path, media_type=media_type, headers={"Cache-Control": "no-store"})

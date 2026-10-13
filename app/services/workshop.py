@@ -151,9 +151,13 @@ def _validate_source(db: Session, draft: WorkshopDraft) -> None:
         raise HTTPException(status_code=422, detail="Source and draft origins must match")
 
 
-def job_number(draft: WorkshopDraft) -> str | None:
+def number_key(text: str | None) -> str | None:
     """One key per job no. however it is typed: letters and digits only, upper case."""
-    return re.sub(r"[^A-Z0-9]", "", (draft.job_reference or "").upper()) or None
+    return re.sub(r"[^A-Z0-9]", "", (text or "").upper()) or None
+
+
+def job_number(draft: WorkshopDraft) -> str | None:
+    return number_key(draft.job_reference)
 
 
 def _duplicate_number(draft: WorkshopDraft) -> HTTPException:
@@ -315,8 +319,8 @@ def confirm_job(db: Session, job_id: UUID, request: WorkshopConfirmRequest, *, a
         raise
 
 
-DEMO_MAPPING_VERSION = "workshop-demo-v1"
-DEMO_CSV_COLUMNS = (
+MAPPING_VERSION = "workshop-job-v2"
+CSV_COLUMNS = (
     "mapping_version", "output_kind", "job_id", "revision_id", "revision", "data_origin", "record_stage",
     "job_reference", "customer_reference", "vehicle_reference", "make", "model", "currency",
     "line_number", "cancelled", "description", "amount", "description_raw", "amount_raw",
@@ -334,14 +338,14 @@ def _csv_cell(value):
     return text
 
 
-def demo_csv(revision: WorkshopRevisionResponse) -> bytes:
+def job_csv(revision: WorkshopRevisionResponse) -> bytes:
     record = revision.record.model_dump(mode="json")
-    common = {name: record.get(name) for name in DEMO_CSV_COLUMNS}
-    common.update(mapping_version=DEMO_MAPPING_VERSION, output_kind="DEMO_ONLY",
+    common = {name: record.get(name) for name in CSV_COLUMNS}
+    common.update(mapping_version=MAPPING_VERSION, output_kind="JOB_LINES",
                   job_id=str(revision.job_id), revision_id=str(revision.id), revision=revision.version,
                   reviewer=revision.reviewer, reviewed_at=revision.reviewed_at.isoformat())
     output = StringIO(newline="")
-    writer = csv.DictWriter(output, fieldnames=DEMO_CSV_COLUMNS, lineterminator="\r\n")
+    writer = csv.DictWriter(output, fieldnames=CSV_COLUMNS, lineterminator="\r\n")
     writer.writeheader()
     for index, item in enumerate(record["items"], 1):
         row = {**common, "line_number": index, "cancelled": "true" if item["cancelled"] else "false",
@@ -381,10 +385,10 @@ def generate_export(db: Session, revision_id: UUID):
                              .with_for_update().execution_options(populate_existing=True))
         if revision is None:
             raise HTTPException(status_code=404, detail="Reviewed workshop revision not found")
-        content = demo_csv(_revision_response(revision))
+        content = job_csv(_revision_response(revision))
         checksum = sha256(content).hexdigest()
         existing = db.scalar(select(WorkshopExport).where(
-            WorkshopExport.revision_id == revision_id, WorkshopExport.mapping_version == DEMO_MAPPING_VERSION))
+            WorkshopExport.revision_id == revision_id, WorkshopExport.mapping_version == MAPPING_VERSION))
         if existing is not None:
             if existing.checksum != checksum:
                 raise HTTPException(status_code=503, detail="Download layout no longer matches its recorded output")
@@ -402,7 +406,7 @@ def generate_export(db: Session, revision_id: UUID):
             output.write(content)
             output.flush()
             os.fsync(output.fileno())
-        export = WorkshopExport(id=export_id, revision_id=revision_id, mapping_version=DEMO_MAPPING_VERSION,
+        export = WorkshopExport(id=export_id, revision_id=revision_id, mapping_version=MAPPING_VERSION,
                                 checksum=checksum, storage_key=path.name, byte_size=len(content))
         db.add(export)
         db.flush()

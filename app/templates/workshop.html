@@ -205,7 +205,7 @@
     <select id="expense-category" aria-label="Type of cost"></select>
     <input id="expense-description" maxlength="500" placeholder="What for" aria-label="What for">
     <input id="expense-bill" maxlength="200" placeholder="Supplier invoice no." aria-label="Supplier invoice no.">
-    <input id="expense-job" maxlength="200" placeholder="Job no. (if for one job)" aria-label="Job no.">
+    <input id="expense-job" maxlength="200" placeholder="Job no. (if bought for one job)" aria-label="Job no.">
     <input id="expense-amount" inputmode="decimal" placeholder="Amount paid" aria-label="Amount paid">
     <input id="expense-gst" inputmode="decimal" placeholder="GST in it" aria-label="GST in the amount">
     <button type="button" id="add-expense">Record expense</button>
@@ -216,6 +216,10 @@
   <h3>Profit and loss for the month</h3>
   <p class="hint">Sales less costs, both before GST. It only knows the invoices and expenses entered here.</p>
   <table id="profit-table" class="sheet narrow"></table>
+
+  <h3>Profit on each job</h3>
+  <p class="hint">For each invoice this month: what was charged before GST, less every expense recorded with that job no. (whenever it was paid). Costs with no job no., such as rent and wages, are only in the month's figures above.</p>
+  <div class="scroll"><table id="job-profit-table" class="sheet"></table></div>
 </section>
 
 <dialog id="guide">

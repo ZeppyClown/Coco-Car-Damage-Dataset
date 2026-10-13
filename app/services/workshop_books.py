@@ -17,8 +17,9 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.db.models import WorkshopExpense, WorkshopInvoice, WorkshopJobRevision, WorkshopPayment
+from app.db.models import WorkshopExpense, WorkshopInvoice, WorkshopJob, WorkshopJobRevision, WorkshopPayment
 from app.schemas.workshop_books import ExpenseRequest, PaymentRequest
+from app.services.workshop import number_key
 from app.services.workshop_invoice import get_invoice
 
 SECTIONS = ("knock", "repair", "spray")
@@ -144,8 +145,11 @@ def expense_csv(sheet: dict) -> bytes:
 
 
 def add_expense(db: Session, request: ExpenseRequest, actor: str) -> dict:
+    key = number_key(request.job_reference)
+    if key and db.scalar(select(WorkshopJob.id).where(WorkshopJob.job_number == key)) is None:
+        raise HTTPException(422, f"There is no job no. {request.job_reference.strip()}. Check the number, or leave Job no. empty.")
     try:
-        db.add(WorkshopExpense(**request.model_dump(), recorded_by=actor, recorded_at=datetime.now(timezone.utc)))
+        db.add(WorkshopExpense(**request.model_dump(), job_number=key, recorded_by=actor, recorded_at=datetime.now(timezone.utc)))
         db.commit()
     except SQLAlchemyError:
         db.rollback()
@@ -153,9 +157,23 @@ def add_expense(db: Session, request: ExpenseRequest, actor: str) -> dict:
     return expense_sheet(db, request.spent_on.isoformat()[:7])
 
 
+def job_profit(db: Session, rows: list[dict]) -> list[dict]:
+    """For each invoice: what was charged before GST, what was spent on that job (whenever it was paid), and the difference."""
+    keys = {row["invoice_id"]: number_key(row["job_reference"]) for row in rows}
+    spent: dict[str, Decimal] = {}
+    if rows:
+        for expense in db.scalars(select(WorkshopExpense).where(WorkshopExpense.job_number.in_(list(keys.values())))):
+            sign = -1 if expense.amount < 0 else 1
+            spent[expense.job_number] = spent.get(expense.job_number, Decimal(0)) + Decimal(expense.amount) - sign * Decimal(expense.gst)
+    return [{"job_reference": row["job_reference"], "number": row["number"], "vehicle": row["vehicle"], "customer": row["customer"],
+             "charged": row["net"], "cost": _money(spent.get(keys[row["invoice_id"]], 0)),
+             "profit": _money(Decimal(row["net"]) - spent.get(keys[row["invoice_id"]], Decimal(0)))} for row in rows]
+
+
 def profit_and_loss(db: Session, month: str) -> dict:
-    """Sales less costs for the month, all before GST, plus the GST collected and paid."""
-    sales, costs = month_sheet(db, month)["totals"], expense_sheet(db, month)
+    """Sales less costs for the month, all before GST, plus the GST collected and paid, and the profit on each job."""
+    invoices, costs = month_sheet(db, month), expense_sheet(db, month)
+    sales = invoices["totals"]
     by_type = dict.fromkeys(EXPENSE_CATEGORIES, Decimal(0))
     for row in costs["rows"]:
         by_type[row["category"]] += Decimal(row["net"])
@@ -169,7 +187,7 @@ def profit_and_loss(db: Session, month: str) -> dict:
             "gst_collected": sales["gst"], "gst_paid": costs["totals"]["gst"],
             "gst_owed": _money(Decimal(sales["gst"]) - Decimal(costs["totals"]["gst"])),
             "money_in": _money(received), "money_out": costs["totals"]["amount"],
-            "unpaid_invoices": sales["balance"]}
+            "unpaid_invoices": sales["balance"], "jobs": job_profit(db, invoices["rows"])}
 
 
 def vehicle_history(db: Session, number: str) -> dict:

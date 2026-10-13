@@ -16,7 +16,7 @@ from sqlalchemy.exc import OperationalError
 from app.core.config import settings
 from app.db.models import WorkshopExport
 from app.schemas.workshop import WorkshopRevisionResponse
-from app.services.workshop import demo_csv
+from app.services.workshop import job_csv
 
 
 EXAMPLE = json.loads((Path(__file__).parents[1] / "fixtures/workshop/examples.json").read_text())["examples"][0]["record"]
@@ -36,10 +36,10 @@ def revision(record=None):
 
 def test_exact_demo_row_and_reproducibility():
     snapshot = revision()
-    content = demo_csv(snapshot)
+    content = job_csv(snapshot)
     assert content.startswith(b"\xef\xbb\xbf")
     assert rows(content) == [{
-        "mapping_version": "workshop-demo-v1", "output_kind": "DEMO_ONLY",
+        "mapping_version": "workshop-job-v2", "output_kind": "JOB_LINES",
         "job_id": str(UUID(int=2)), "revision_id": str(UUID(int=1)), "revision": "3",
         "data_origin": "synthetic_demo", "record_stage": "quote", "job_reference": "DEMO-JOB-001",
         "customer_reference": "Fictional Example Person", "vehicle_reference": "DEMO-VEHICLE-A",
@@ -51,7 +51,7 @@ def test_exact_demo_row_and_reproducibility():
         "reviewer": "Fictional reviewer", "reviewed_at": "2026-10-11T00:00:00+00:00",
         "source_document_id": "", "manual_provenance": "Authored fictional example, not a company document.",
     }]
-    assert demo_csv(snapshot) == content
+    assert job_csv(snapshot) == content
 
 
 @pytest.mark.parametrize("text", ["=1+1", "+1+1", "-1+1", "@SUM(A1)", "  =1", "\ttext", "\rtext", "\ntext", "＝1+1"])
@@ -59,7 +59,7 @@ def test_formula_like_text_is_escaped_but_record_unchanged(text):
     record = deepcopy(EXAMPLE)
     record["diagram_notes_raw"] = text
     snapshot = revision(record)
-    assert rows(demo_csv(snapshot))[0]["diagram_notes_raw"] == "'" + text
+    assert rows(job_csv(snapshot))[0]["diagram_notes_raw"] == "'" + text
     assert snapshot.record.diagram_notes_raw == text
 
 
@@ -73,7 +73,7 @@ def test_unicode_newlines_null_zero_and_cancelled_raw_survive():
     ]
     record["written_adjustment"] = "-2.50"
     record["field_states"]["written_adjustment"] = "confirmed"
-    output = rows(demo_csv(revision(record)))
+    output = rows(job_csv(revision(record)))
     assert output[0]["description"] == '示例, "door"\ninspection' and output[0]["description_raw"] == "literal\n示例"
     assert [row["amount"] for row in output] == ["", "0.00", ""]
     assert output[2]["cancelled"] == "true" and output[2]["description"] == "" and output[2]["amount_raw"] == "80 cancelled"

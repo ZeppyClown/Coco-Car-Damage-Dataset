@@ -141,7 +141,7 @@ fs.mkdirSync(artifactDir, { recursive: true });
     const content = fs.readFileSync(outputPath);
     assert.equal(require("node:crypto").createHash("sha256").update(content).digest("hex"), exported.checksum);
     assert(content.toString("utf8").includes("Fictional corrected inspection / 示例"));
-    assert(content.toString("utf8").includes("DEMO_ONLY"));
+    assert(content.toString("utf8").includes("JOB_LINES"));
     const repeatedExport = await context.request.post(base + "/api/v1/workshop/revisions/" + revisions[0].id + "/exports");
     assert.deepEqual(await repeatedExport.json(), exported);
     const oldExport = await (await context.request.post(base + "/api/v1/workshop/revisions/" + revisions[1].id + "/exports")).json();

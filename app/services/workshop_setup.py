@@ -13,7 +13,7 @@ from app.db.models import WorkshopCompany, WorkshopExpense, WorkshopJob, Worksho
 from app.schemas.workshop import WorkshopReviewedDraft
 from app.schemas.workshop_books import CompanyRequest
 from app.schemas.workshop_invoice import InvoiceRequest
-from app.services.workshop import job_number
+from app.services.workshop import job_number, number_key
 from app.services.workshop_invoice import billing_supplier, store_invoice
 
 
@@ -51,7 +51,7 @@ GIVEN = ["Wei Ming", "Siew Hoon", "Bee Lian", "Chee Keong", "Jia Hui", "Kok Leon
          "Chin Hock", "Li Ting", "Swee Lan", "Ah Seng", "Hui Min", "Jun Jie"]
 OTHERS = ["Muhammad Faizal", "Nurul Aisyah", "Siti Rahimah", "Ahmad Zulkifli", "Rajesh Kumar", "Suresh Pillai", "Priya Nair",
           "Hafiz Rahman", "Kavitha Menon", "Daniel Pereira"]
-JOBS_PER_MONTH = 26
+JOBS_PER_MONTH = 30
 STREETS = ["Ang Mo Kio Ave 4", "Bedok North St 2", "Jurong West St 52", "Tampines St 81", "Yishun Ring Rd", "Hougang Ave 8",
            "Bukit Batok St 31", "Woodlands Dr 14", "Toa Payoh Lor 5", "Clementi Ave 2"]
 PANELS = ["front bumper", "rear bumper", "bonnet", "boot", "front left door", "rear left door", "front right fender",
@@ -63,7 +63,7 @@ INSURERS = ["NTUC Income", "AIG", "Great Eastern", "MSIG", "Tokio Marine", "Sing
 SUPPLIERS = {"parts": ["Hock Seng Auto Parts", "Kim Huat Motor Spares", "Eastern Auto Supply"],
              "paint": ["Nippon Refinish Supply", "Colourtech Paints"], "subcontract": ["Ah Seng Windscreen", "Precision Wheel Alignment"]}
 # (type, paid to, what for, amount, GST on the bill, day of the month it is paid)
-FIXED = [("rent", "JTC Corporation", "Workshop unit rent", 4800, True, 1), ("wages", "Staff payroll", "Wages for the month", 8400, False, 28),
+FIXED = [("rent", "JTC Corporation", "Workshop unit rent", 3800, True, 1), ("wages", "Staff payroll", "Wages for the month", 7200, False, 28),
          ("utilities", "SP Services", "Electricity and water", 640, True, 15), ("tools", "Sin Hup Tools", "Sandpaper, masking tape, consumables", 215, True, 5)]
 # Where each panel sits on the form's car outline, as percentages of the picture.
 SPOTS = {"front bumper": (50, 10), "bonnet": (52, 27), "roof": (52, 45), "boot": (52, 63), "rear bumper": (52, 79),
@@ -151,6 +151,11 @@ def add_example_data(db: Session, actor: str) -> dict:
                 customer={"name": customer[0], "address": f"Blk {rng.randrange(100, 900)} {rng.choice(STREETS)} #{rng.randrange(2, 15):02d}-{rng.randrange(100, 400)}"},
             ), actor, reviewed_at)
             total, luck = invoice.preview.total, rng.random()
+            # What this job cost: parts and paint bought for it, so each job shows its own profit.
+            category = "paint" if any(item.section == "spray" for item in record.items) and rng.random() < 0.5 else "parts"
+            _expense(db, day_in + timedelta(days=1) if day_in < today else day_in, rng.choice(SUPPLIERS[category]), category,
+                     "Paint and materials" if category == "paint" else "Parts", (total * Decimal(rng.randrange(22, 42)) / 100).quantize(Decimal(1)),
+                     Decimal("9") / Decimal("109"), actor, f"SI-{rng.randrange(10**4, 10**5)}", record.job_reference)
             paid = total if luck < 0.72 else (total / 2).quantize(CENT) if luck < 0.86 else Decimal(0)
             if (today - record.date_out).days < 3 and luck > 0.4:
                 paid = Decimal(0)
@@ -165,9 +170,9 @@ def add_example_data(db: Session, actor: str) -> dict:
                 if month.replace(day=day) <= today:
                     _expense(db, month.replace(day=day), name, category, what, Decimal(amount), registered if gst else 0, actor)
             month = (month + timedelta(days=32)).replace(day=1)
-        for day in days[::4]:
-            category = rng.choice(("parts", "parts", "paint", "subcontract"))
-            what = {"parts": "Parts for the week's jobs", "paint": "Paint, thinner and clear coat", "subcontract": "Outside work for a customer's car"}[category]
+        for day in days[::9]:
+            category = rng.choice(("parts", "paint", "subcontract"))
+            what = {"parts": "Workshop stock: oil, filters, bulbs", "paint": "Thinner, primer and clear coat stock", "subcontract": "Wheel alignment machine servicing"}[category]
             _expense(db, day, rng.choice(SUPPLIERS[category]), category, what, Decimal(rng.randrange(180, 950)), registered, actor,
                      f"SI-{rng.randrange(10**4, 10**5)}")
         db.commit()
@@ -177,7 +182,9 @@ def add_example_data(db: Session, actor: str) -> dict:
     return setup_state(db)
 
 
-def _expense(db: Session, day: date, supplier: str, category: str, what: str, amount: Decimal, gst_share, actor: str, bill: str = "") -> None:
-    db.add(WorkshopExpense(spent_on=day, supplier=supplier, category=category, description=what, supplier_invoice=bill, job_reference="",
+def _expense(db: Session, day: date, supplier: str, category: str, what: str, amount: Decimal, gst_share, actor: str, bill: str = "",
+             job: str = "") -> None:
+    db.add(WorkshopExpense(spent_on=day, supplier=supplier, category=category, description=what, supplier_invoice=bill, job_reference=job,
+                           job_number=number_key(job),
                            amount=amount, gst=(amount * gst_share).quantize(CENT), recorded_by=actor,
                            recorded_at=datetime.combine(day, time(10), tzinfo=timezone.utc)))

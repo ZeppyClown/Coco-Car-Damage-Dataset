@@ -30,7 +30,7 @@ from app.core.config import settings
 from app.db.models import WorkshopDocument
 from app.db.models import WorkshopExport
 from app.services.workshop import generate_export, export_file, lookup_jobs
-from app.services.workshop import demo_csv, DEMO_MAPPING_VERSION
+from app.services.workshop import job_csv, MAPPING_VERSION
 from app.schemas.workshop import WorkshopRevisionResponse
 from app.db.models import WorkshopInvoice
 from app.schemas.workshop_invoice import InvoiceRequest
@@ -183,6 +183,21 @@ def test_concurrent_identical_sources_reuse_one_row_and_file(workshop_postgres, 
         assert len(db.scalars(select(WorkshopDocument)).all()) == 1
 
 
+class _LegacyJob:
+    def __init__(self, job_id):
+        self.id = job_id
+
+
+def legacy_job(db, draft):
+    """Save a job the way an older database version held it: the current model has columns that version lacks."""
+    job_id = uuid4()
+    db.execute(text("INSERT INTO workshop_jobs (id, source_document_id, draft, draft_version) VALUES "
+                    "(:id, :source, CAST(:draft AS JSON), 1)"),
+               {"id": job_id, "source": draft.source_document_id, "draft": draft.model_dump_json()})
+    db.commit()
+    return _LegacyJob(job_id)
+
+
 def reviewed_fixture():
     import json
     data = json.loads((Path(__file__).parents[1] / "fixtures/workshop/examples.json").read_text())
@@ -246,7 +261,7 @@ def test_review_guard_upgrade_preserves_existing_snapshot(workshop_postgres, tmp
         content = (Path(__file__).parents[1] / "fixtures/workshop/synthetic-sheet.png").read_bytes()
         source = attach_document(db, content, "demo.png", "image/png", "synthetic_demo")
         draft.source_document_id = source.id
-        job_id = create_job(db, draft).id
+        job_id = legacy_job(db, draft).id
     # Insert using the old table shape; current ORM requires the new source column.
     previous = Table("workshop_job_revisions", MetaData(), autoload_with=engine)
     with engine.begin() as connection:
@@ -289,7 +304,7 @@ def test_export_migration_and_simultaneous_generation(workshop_postgres, tmp_pat
     migrate(engine, "20261011_review_guard")
     monkeypatch.setattr(settings, "WORKSHOP_STORAGE_DIR", tmp_path)
     with Session(engine) as db:
-        job_id = create_job(db, reviewed_fixture()).id
+        job_id = legacy_job(db, reviewed_fixture()).id
     revision_id = uuid4()
     previous = Table("workshop_job_revisions", MetaData(), autoload_with=engine)
     with engine.begin() as connection:
@@ -319,20 +334,20 @@ def test_auth_upgrade_preserves_legacy_review_and_existing_csv(workshop_postgres
     monkeypatch.setattr(settings, "WORKSHOP_STORAGE_DIR", tmp_path)
     draft = reviewed_fixture()
     with Session(engine) as db:
-        job_id = create_job(db, draft).id
+        job_id = legacy_job(db, draft).id
     legacy = WorkshopRevisionResponse(id=uuid4(), job_id=job_id, version=1, record=draft.model_dump(mode="json"),
         reviewer="Fictional old self-reported reviewer", reviewed_at=datetime.now(timezone.utc))
     previous = Table("workshop_job_revisions", MetaData(), autoload_with=engine)
     with engine.begin() as connection:
         connection.execute(previous.insert().values(id=legacy.id, job_id=job_id, version=1,
             record=draft.model_dump(mode="json"), reviewer=legacy.reviewer, reviewed_at=legacy.reviewed_at))
-    content = demo_csv(legacy)
+    content = job_csv(legacy)
     export_id = uuid4()
     output = tmp_path / (export_id.hex + ".csv")
     output.write_bytes(content)
     output.chmod(0o600)
     with Session(engine) as db:
-        db.add(WorkshopExport(id=export_id, revision_id=legacy.id, mapping_version=DEMO_MAPPING_VERSION,
+        db.add(WorkshopExport(id=export_id, revision_id=legacy.id, mapping_version=MAPPING_VERSION,
             checksum=sha256(content).hexdigest(), byte_size=len(content), storage_key=output.name))
         db.commit()
     migrate(engine)
@@ -371,6 +386,7 @@ def test_postgres_latest_review_lookup_literal_json_and_pagination(workshop_post
         confirm_job(db, second_id, WorkshopConfirmRequest(expected_version=1, reviewer="Fictional", acknowledged=True))
         create_job(db, WorkshopDraft(data_origin="synthetic_demo", job_reference="DRAFT-ONLY"))
         draft.customer_reference = "Fictional corrected name"
+        draft.job_reference = first.draft["job_reference"]
         update_job(db, first_id, WorkshopDraftUpdate(expected_version=1, draft=draft))
         matches = lookup_jobs(db, customer="%", q="filter", limit=1)
         assert matches.has_more and len(matches.results) == 1
@@ -507,8 +523,13 @@ def test_invoice_migration_preserves_auth_head_reviews_and_exports(workshop_post
     draft = reviewed_fixture()
     draft.record_stage = "completed_work"
     with Session(engine) as db:
-        job_id = create_job(db, draft).id
-        review = confirm_job(db, job_id, WorkshopConfirmRequest(expected_version=1, reviewer="Fictional", acknowledged=True), authenticated=True)
+        job_id = legacy_job(db, draft).id
+        review = WorkshopRevisionResponse(id=uuid4(), job_id=job_id, version=1, record=draft.model_dump(mode="json"), reviewer="Fictional",
+                                          reviewer_identity="authenticated", reviewed_at=datetime.now(timezone.utc))
+        db.execute(text("INSERT INTO workshop_job_revisions (id, job_id, version, record, reviewer, reviewer_identity, reviewed_at) VALUES "
+                        "(:id, :job, 1, CAST(:record AS JSON), 'Fictional', 'authenticated', :at)"),
+                   {"id": review.id, "job": job_id, "record": review.record.model_dump_json(), "at": review.reviewed_at})
+        db.commit()
         output = generate_export(db, review.id)
         original = export_file(get_export(db, output.id)).read_bytes()
     migrate(engine)
@@ -523,3 +544,82 @@ def test_invoice_migration_preserves_auth_head_reviews_and_exports(workshop_post
         with pytest.raises(DBAPIError, match="Issued invoices cannot change"):
             with engine.begin() as connection:
                 connection.execute(text(sql))
+
+
+def _finished(db, reference):
+    draft = reviewed_fixture()
+    draft.record_stage, draft.job_reference = "completed_work", reference
+    job_id = create_job(db, draft).id
+    return confirm_job(db, job_id, WorkshopConfirmRequest(expected_version=1, reviewer="Fictional", acknowledged=True))
+
+
+def test_invoices_issued_at_the_same_moment_get_consecutive_numbers(workshop_postgres):
+    engine = workshop_postgres
+    migrate(engine)
+    with Session(engine) as db:
+        revisions = [_finished(db, f"RACE-{index}") for index in range(8)]
+    barrier = Barrier(8)
+
+    def bill(revision):
+        with Session(engine) as db:
+            barrier.wait(timeout=10)
+            return issue_invoice(db, revision.id, InvoiceRequest.model_validate(billing_request()), "Fictional operator").number
+
+    # All eight start together with no counter row for the year yet, then eight more with it in place.
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        numbers = sorted(pool.map(bill, revisions))
+    year = numbers[0][4:8]
+    assert numbers == [f"INV-{year}-{count:04d}" for count in range(1, 9)]
+
+
+def test_job_numbers_are_unique_for_new_old_and_simultaneous_jobs(workshop_postgres):
+    from app.db.models import WorkshopExpense
+    from app.schemas.workshop_books import ExpenseRequest
+    from app.services.workshop_books import add_expense
+    engine = workshop_postgres
+    migrate(engine, "20261013_payments")
+    draft = reviewed_fixture().model_dump(mode="json")
+    old = [uuid4() for _ in range(3)]
+    with engine.begin() as connection:
+        for index, (job_id, reference) in enumerate(zip(old, ("OLD 7", "old-7", "OLD 8"))):
+            connection.execute(text("INSERT INTO workshop_jobs (id, draft, draft_version, created_at, updated_at) VALUES "
+                                    "(:id, CAST(:draft AS JSON), 1, :at, :at)"),
+                               {"id": job_id, "draft": __import__("json").dumps({**draft, "job_reference": reference}),
+                                "at": datetime(2026, 1, 1 + index, tzinfo=timezone.utc)})
+    migrate(engine)
+    with Session(engine) as db:
+        # Jobs saved before the rule existed: the oldest keeps the shared number, the later one has none.
+        assert [db.get(WorkshopJob, job_id).job_number for job_id in old] == ["OLD7", None, "OLD8"]
+        later = get_job(db, old[1])
+        with pytest.raises(HTTPException) as refused:
+            update_job(db, old[1], WorkshopDraftUpdate(expected_version=1, draft=WorkshopDraft.model_validate(later.draft)))
+        assert refused.value.status_code == 409 and "already used" in refused.value.detail
+        renamed = WorkshopDraft.model_validate({**later.draft, "job_reference": "OLD 7B"})
+        assert update_job(db, old[1], WorkshopDraftUpdate(expected_version=1, draft=renamed)).job_number == "OLD7B"
+        with pytest.raises(HTTPException):
+            create_job(db, WorkshopDraft.model_validate({**draft, "job_reference": "Old 8"}))
+    barrier = Barrier(6)
+
+    def create(_):
+        with Session(engine) as db:
+            barrier.wait(timeout=10)
+            try:
+                create_job(db, WorkshopDraft.model_validate({**draft, "job_reference": "SAME-1"}))
+                return 201
+            except HTTPException as error:
+                return error.status_code
+
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        assert sorted(pool.map(create, range(6))) == [201, 409, 409, 409, 409, 409]
+    with Session(engine) as db:
+        # An expense can only name a job that exists, and follows the job if its number is corrected.
+        spend = dict(spent_on="2026-10-14", supplier="Fictional Parts", category="parts", amount="10.00")
+        with pytest.raises(HTTPException):
+            add_expense(db, ExpenseRequest(**spend, job_reference="NO SUCH"), "Fictional operator")
+        add_expense(db, ExpenseRequest(**spend, job_reference="old-8"), "Fictional operator")
+        with pytest.raises(IntegrityError):
+            db.execute(text("UPDATE workshop_expenses SET job_number = 'MADEUP'"))
+        db.rollback()
+        job = get_job(db, old[2])
+        update_job(db, old[2], WorkshopDraftUpdate(expected_version=1, draft=WorkshopDraft.model_validate({**job.draft, "job_reference": "OLD 9"})))
+        assert db.scalar(select(WorkshopExpense.job_number)) == "OLD9"

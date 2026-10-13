@@ -405,7 +405,17 @@ class WorkshopExpense(Base):
     description = Column(String(500), nullable=False)
     supplier_invoice = Column(String(200), nullable=False)
     job_reference = Column(String(200), nullable=False)
+    # Set when the expense is for one job; the foreign key means it can only name a job that exists.
+    job_number = Column(String(200), ForeignKey("workshop_jobs.job_number", onupdate="CASCADE"), index=True)
     amount = Column(Numeric(12, 2), nullable=False)
     gst = Column(Numeric(12, 2), nullable=False)
     recorded_by = Column(String(200), nullable=False)
     recorded_at = Column(DateTime(timezone=True), nullable=False)
+
+
+class WorkshopInvoiceCounter(Base):
+    """Last invoice number used in each year. Taking the next one locks the row, so two invoices cannot share a number."""
+    __tablename__ = "workshop_invoice_counters"
+
+    year = Column(Integer, primary_key=True)
+    last = Column(Integer, nullable=False)

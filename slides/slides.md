@@ -1,7 +1,7 @@
 ---
 theme: default
 title: Workshop job sheets — from paper to invoice
-info: Pipeline walkthrough. All examples are fictional demo data.
+info: Pipeline walkthrough.
 colorSchema: light
 transition: slide-left
 mdc: true
@@ -14,7 +14,7 @@ The workshop pipeline, input to output, one step at a time
 <div class="pt-8 text-sm opacity-70">
 Yap Motor automotive assistant · as built, 13 October 2026<br>
 Part 1: the paper the workshop uses today · Part 2: what the web app does with it · Part 3: the pipeline step by step<br>
-Web app records are fictional demo data. Part 1 shows real workshop documents: keep this deck internal.
+Part 1 shows real workshop documents: keep this deck internal.
 </div>
 
 ---
@@ -145,15 +145,15 @@ The same job sheet, in the web app
 
 ---
 
-# Typing it in, with the paper beside it
+# Typing it in, in the same order as the paper
 
 <img src="/app-entry.png" class="border shadow" style="height:300px;margin:auto" />
 
 <div class="text-sm pt-3">
 
-- The photo of the sheet stays on screen (left) while staff type (right)
-- Every line keeps **what was written** and **what it means**; an empty amount is never turned into zero
-- Crossed-out lines are kept and marked cancelled. Nothing counts as checked until a signed-in person confirms it
+- Six steps along the top follow the sheet: car and customer, knock, repair and parts, spray, check, print
+- Numbered lines like the paper, with one-click common lines; click the car to mark the damage
+- An empty amount is never turned into zero. Crossed-out lines are kept. Two jobs cannot share a job number
 
 </div>
 
@@ -167,7 +167,7 @@ The same job sheet, in the web app
 
 - **Before:** flip through the job-sheet book
 - **Now:** search by customer, vehicle, job number, a word in the work lines, or date
-- Shows the latest checked version, warns about newer unchecked edits, and opens the original photo in one click
+- Shows the latest checked version and warns about newer unchecked edits. A returning car fills in its own details
 
 </div>
 
@@ -181,7 +181,7 @@ The same job sheet, in the web app
 
 - **Before:** a correction is a line crossed out on the page
 - **Now:** each checked version is saved for good, with who checked it and when. A correction makes a new version
-- From each version: download a CSV, **print the job sheet in the paper layout** (new), or prepare an invoice
+- From each version: **print the job sheet in the paper layout**, make the invoice, record the payment
 
 </div>
 
@@ -196,7 +196,7 @@ The same job sheet, in the web app
   </div>
   <div class="text-center">
     <img src="/private/sheet-new.png" class="border shadow" style="height:340px;margin:auto" />
-    <div class="text-sm pt-1">Printed from the web app (fictional record)</div>
+    <div class="text-sm pt-1">Printed from the web app</div>
   </div>
 </div>
 
@@ -217,13 +217,40 @@ The app prints the checked values **onto the workshop's own form**, so the headi
   </div>
   <div class="text-center">
     <img src="/private/invoice-new.png" class="border shadow" style="height:330px;margin:auto" />
-    <div class="text-sm pt-1">Web app: invoice printed on the workshop form (fictional)</div>
+    <div class="text-sm pt-1">Web app: invoice printed on the workshop form</div>
   </div>
 </div>
 
 <div class="text-sm pt-2">
 
 The work lines sit in the numbered rows; **Total, GST 9% and Grand total** fill the last three rows, worked out to the cent. The invoice number and date print beside the car outline. Once issued, an invoice cannot be edited.
+
+</div>
+
+---
+
+# The books keep themselves
+
+<img src="/app-books.png" class="border shadow" style="height:300px;margin:auto" />
+
+<div class="text-sm pt-3">
+
+- **Before:** invoices typed again into software nobody used, and the boss's own Excel sheet
+- **Now:** every invoice is already in the month's sheet with GST, paid and balance; nothing is typed twice
+- Supplier bills, wages and rent go in the same page; it downloads for Excel
+
+</div>
+
+---
+
+# Profit for the month, and on each job
+
+<img src="/app-profit.png" class="border shadow" style="height:300px;margin:auto" />
+
+<div class="text-sm pt-3">
+
+- Sales less costs for the month, with the GST collected and paid
+- Each job shows what was charged, what was spent on it and what is left
 
 </div>
 
@@ -311,7 +338,7 @@ layout: two-cols-header
 - Staff type the values in
 - They must then say where the values came from
 
-Each record is tagged at the start as **fictional demo** or **real company record**. That tag can never be changed later.
+Jobs typed into the app are real records. Example jobs added at set-up are tagged as examples inside the database; that tag can never be changed later.
 
 ::right::
 
@@ -504,10 +531,10 @@ flowchart LR
 
 | output_kind | revision | record_stage | job_reference | description | amount | currency |
 |---|---|---|---|---|---|---|
-| DEMO_ONLY | 2 | quote | DEMO-JOB-001 | Example filter replacement | 25.10 | SGD |
+| JOB_LINES | 2 | quote | 1042 | Oil filter replacement | 25.10 | SGD |
 
 <div class="pt-4 text-sm opacity-70">
-The column layout is a demo. It is not matched to any accounting software.
+One row for each line of the job.
 </div>
 
 ---
@@ -544,7 +571,7 @@ The column layout is a demo. It is not matched to any accounting software.
 
 - Stored as finished HTML with a fingerprint; print or save as PDF from the browser
 - One invoice per job. It cannot be replaced or edited
-- Fictional records get `DEMO-INV-…` numbers. Real invoices are off until the supplier details are set
+- Numbered in order, `INV-2026-0001` onwards, from a counter in the database. The workshop's details are typed once at set-up
 
 ---
 

@@ -514,7 +514,7 @@ const expenseColumns = [["date", "Date"], ["supplier", "Paid to"], ["category", 
 async function loadExpenses(month) {
   $("expenses-download").href = api + "/expenses?format=csv&month=" + month;
   if (!$("expense-date").value.startsWith(month)) $("expense-date").value = month === singaporeDate().slice(0, 7) ? singaporeDate() : month + "-01";
-  const table = $("expenses-table"), profitTable = $("profit-table"); table.replaceChildren(); profitTable.replaceChildren();
+  const table = $("expenses-table"), profitTable = $("profit-table"); table.replaceChildren(); profitTable.replaceChildren(); $("job-profit-table").replaceChildren();
   let sheet, profit;
   try { [sheet, profit] = await Promise.all([request("/expenses?month=" + month), request("/profit?month=" + month)]); }
   catch (error) { table.insertRow().insertCell().textContent = "Expenses could not load: " + error.message; return; }
@@ -533,6 +533,12 @@ async function loadExpenses(month) {
   line("GST collected on invoices", profit.gst_collected); line("GST paid on expenses", profit.gst_paid); line("GST difference (collected less paid)", profit.gst_owed);
   line("Money received from customers this month", profit.money_in); line("Money paid out this month", profit.money_out);
   line("Still owed by customers on this month's invoices", profit.unpaid_invoices);
+  const jobs = $("job-profit-table"); jobs.replaceChildren();
+  const jobHead = jobs.insertRow(); for (const label of ["Job no.", "Invoice no.", "Vehicle", "Customer", "Charged (before GST)", "Spent on the job", "Profit on the job"]) jobHead.append(element("th", label));
+  for (const entry of profit.jobs) {
+    const row = jobs.insertRow(); if (Number(entry.profit) < 0) row.className = "loss";
+    for (const name of ["job_reference", "number", "vehicle", "customer", "charged", "cost", "profit"]) row.insertCell().textContent = entry[name];
+  }
 }
 $("add-expense").addEventListener("click", () => action(async () => {
   const typed = $("expense-amount").value.trim(), amount = parseAmount(typed.replace(/^-/, "")), gst = $("expense-gst").value.trim() ? parseAmount($("expense-gst").value) : "0";

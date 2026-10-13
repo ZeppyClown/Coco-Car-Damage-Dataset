@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy import func, select
 
 from app.core.config import settings
-from app.db.models import WorkshopInvoice, WorkshopJob
+from app.db.models import WorkshopInvoice, WorkshopInvoiceCounter, WorkshopJob
 from app.schemas.workshop import WorkshopDraft
 from app.services.workshop_extraction import extraction_schema
 
@@ -83,7 +83,7 @@ def test_expenses_and_profit_for_the_month(shop):
     def spend(**values):
         return shop.post(API + "/expenses", json={"spent_on": TODAY, "supplier": "Fictional Parts", "category": "parts", **values})
     assert spend(amount="0.00").status_code == 422 and spend(amount="10.00", gst="11.00").status_code == 422
-    assert spend(amount="10.90", gst="0.90", description="Oil filter", job_reference="J-9").status_code == 201
+    assert spend(amount="10.90", gst="0.90", description="Oil filter", job_reference="j 9").status_code == 201
     assert spend(amount="5.00", category="rent").status_code == 201
     assert spend(amount="-1.09", gst="0.09", description="Supplier credit").status_code == 201
     month = TODAY[:7]
@@ -94,9 +94,12 @@ def test_expenses_and_profit_for_the_month(shop):
     assert csv_text.splitlines()[0].startswith("Date,Supplier,Type") and csv_text.splitlines()[-1] == "TOTAL,,,,,,14.81,0.81,14.00"
     profit = shop.get(API + "/profit", params={"month": month}).json()
     # The fixture job is one line of 25.10 including GST: 23.03 before GST, 2.07 GST.
-    assert profit | {"costs": None} == {
+    # Only the expense typed against job J-9 (10.00 before GST) counts as that job's cost; "j 9" finds the same job.
+    assert spend(amount="1.00", job_reference="NO-SUCH-JOB").status_code == 422
+    assert [(job["job_reference"], job["charged"], job["cost"], job["profit"]) for job in profit["jobs"]] == [("J-9", "23.03", "10.00", "13.03")]
+    assert profit | {"costs": None, "jobs": None} == {
         "month": month, "sales": "23.03", "costs": None, "total_costs": "14.00", "profit": "9.03", "gst_collected": "2.07",
-        "gst_paid": "0.81", "gst_owed": "1.26", "money_in": "0.00", "money_out": "14.81", "unpaid_invoices": "25.10"}
+        "gst_paid": "0.81", "gst_owed": "1.26", "money_in": "0.00", "money_out": "14.81", "unpaid_invoices": "25.10", "jobs": None}
     assert profit["costs"] == [{"category": "parts", "label": "Parts", "amount": "9.00"}, {"category": "rent", "label": "Rent", "amount": "5.00"}]
 
 
@@ -118,11 +121,14 @@ def test_example_jobs_fill_the_books_once(shop, test_db):
     assert shop.post(API + "/setup/example-jobs").status_code == 409
     month = TODAY[:7]
     numbers = [number for number in test_db.scalars(select(WorkshopInvoice.number).order_by(WorkshopInvoice.number))]
-    assert len(numbers) > 15 and len(set(numbers)) == len(numbers) and all("DEMO" not in number for number in numbers)
+    year = numbers[0][4:8]
+    assert len(numbers) > 15 and numbers == [f"INV-{year}-{count:04d}" for count in range(1, len(numbers) + 1)]
+    assert test_db.get(WorkshopInvoiceCounter, int(year)).last == len(numbers)
     invoice = test_db.scalars(select(WorkshopInvoice)).first()
     assert invoice.snapshot["request"]["supplier"]["name"] == COMPANY["name"]
     assert shop.get(API + f"/invoices/{invoice.id}/sheet").status_code in (200, 503)
     profit = shop.get(API + "/profit", params={"month": month}).json()
     assert float(profit["total_costs"]) > 0 and float(profit["sales"]) > 0
+    assert profit["jobs"] and all(float(job["cost"]) > 0 for job in profit["jobs"])
     found = shop.get(API + "/jobs", params={"q": "Knock"}).json()["results"]
     assert found and any(result["record"]["accident"] for result in shop.get(API + "/jobs", params={"limit": 100}).json()["results"])

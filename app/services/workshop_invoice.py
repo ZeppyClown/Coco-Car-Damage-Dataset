@@ -7,12 +7,12 @@ from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.db.models import WorkshopCompany, WorkshopJob, WorkshopJobRevision, WorkshopInvoice
+from app.db.models import WorkshopCompany, WorkshopInvoiceCounter, WorkshopJob, WorkshopJobRevision, WorkshopInvoice
 from app.schemas.workshop import WorkshopReviewedDraft
 from app.schemas.workshop_invoice import InvoiceRequest, InvoicePreview, InvoiceResponse, InvoiceSupplier
 
@@ -133,14 +133,27 @@ Job ID: {preview.job_id}<br>Reviewed revision: {preview.revision_id}<br>Calculat
 </body></html>"""
 
 
+def next_invoice_number(db: Session, year: int) -> int:
+    """Take the year's next number. The UPDATE locks the counter row until commit, so a second invoice waits its turn."""
+    bump = update(WorkshopInvoiceCounter).where(WorkshopInvoiceCounter.year == year).values(
+        last=WorkshopInvoiceCounter.last + 1).returning(WorkshopInvoiceCounter.last)
+    number = db.execute(bump).scalar()
+    if number is None:
+        try:
+            # First invoice of the year: start the counter. If someone else starts it at the same moment, use theirs.
+            with db.begin_nested():
+                db.add(WorkshopInvoiceCounter(year=year, last=1))
+            number = 1
+        except IntegrityError:
+            number = db.execute(bump).scalar()
+    return number
+
+
 def store_invoice(db: Session, job_id: UUID, revision: WorkshopJobRevision, request: InvoiceRequest, actor: str,
                   issued_at: datetime) -> InvoiceResponse:
     """Add one invoice with the next running number for its year; the caller commits."""
     preview = calculate_invoice(revision, request)
-    prefix = f"INV-{request.invoice_date.year}-"
-    # ponytail: next number = count + 1; the unique number column refuses a clash and the user clicks again.
-    count = db.scalar(select(func.count()).select_from(WorkshopInvoice).where(WorkshopInvoice.number.startswith(prefix)))
-    number = f"{prefix}{count + 1:04d}"
+    number = f"INV-{request.invoice_date.year}-{next_invoice_number(db, request.invoice_date.year):04d}"
     html = render_invoice(number, preview, actor, issued_at)
     invoice = WorkshopInvoice(id=uuid4(), job_id=job_id, revision_id=revision.id, number=number,
                               snapshot=preview.model_dump(mode="json"), issued_by=actor, issued_at=issued_at,

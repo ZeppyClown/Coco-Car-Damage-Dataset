@@ -297,3 +297,7 @@ Issued invoices can also be printed on the same form (`GET /api/v1/workshop/invo
 ### F18 — profit per job, invoice counter, old jobs checked, 14 October 2026
 
 Books now shows the profit on each job (what was charged less the expenses recorded with that job no.). Invoice numbers come from a locked counter in the database, so two invoices issued together get consecutive numbers. The migration gives earlier jobs their job number so the no-duplicates rule covers them too. Demo labels were removed from the slide deck and the per-job download. Full suite with PostgreSQL **349 passed, 0 skipped, 0 failed**. Details: [master section 16](WORKSHOP_MASTER_PLAN.md#16-work-log).
+
+### F19 — ready to host, 14 October 2026
+
+The container now updates its own database when it starts, so no database command is run by hand. Staff get their own logins (added by the owner), the blank job-sheet picture is uploaded in the app and kept in the database, repeated wrong passwords lock an address out for five minutes, and every table is closed to Supabase's public data API. New: `scripts/run_workshop.sh`, `scripts/backup_workshop.sh`, [hosting guide](WORKSHOP_HOSTING.md). Full suite with PostgreSQL **352 passed, 0 skipped, 0 failed**. **Not hosted yet**: that needs the owner's Supabase and host accounts. Details: [master section 16](WORKSHOP_MASTER_PLAN.md#16-work-log).

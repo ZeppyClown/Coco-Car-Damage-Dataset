@@ -50,3 +50,13 @@ class CompanyRequest(_WorkshopSchema):
     address: Description
     gst_registration_number: Reference | None = None
     phone: Annotated[str, Field(max_length=200)] = ""
+
+
+class UserRequest(_WorkshopSchema):
+    username: Annotated[str, Field(min_length=1, max_length=50)]
+    password: Annotated[str, Field(min_length=1, max_length=1024)]
+    role: Literal["owner", "staff"] = "staff"
+
+
+class UserSwitch(_WorkshopSchema):
+    active: bool = Field(strict=True)

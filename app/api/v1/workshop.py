@@ -12,9 +12,9 @@ from app.schemas.workshop import WorkshopDraft, WorkshopDraftUpdate, WorkshopJob
 from app.services.workshop_extraction import extract_source
 from app.services.workshop import create_job, get_job, update_job, attach_document, get_document, document_file, MAX_UPLOAD_BYTES, confirm_job, list_revisions, generate_export, get_export, export_file, lookup_jobs
 from app.schemas.workshop_invoice import InvoiceRequest, InvoiceIssueRequest, InvoicePreview, InvoiceResponse, InvoiceSettingsResponse
-from app.schemas.workshop_books import CompanyRequest, ExpenseRequest, PaymentRequest
+from app.schemas.workshop_books import CompanyRequest, ExpenseRequest, PaymentRequest, UserRequest, UserSwitch
 from app.services.workshop_books import month_sheet, month_csv, payments, add_payment, vehicle_history, guide_pictures, guide_picture, expense_sheet, expense_csv, add_expense, profit_and_loss
-from app.services.workshop_setup import setup_state, save_company, add_example_data
+from app.services.workshop_setup import setup_state, save_company, add_example_data, save_form, users, save_user, switch_user, MAX_FORM_BYTES
 from app.services.workshop_sheet import job_sheet_html, invoice_sheet_html, car_outline
 from app.services.workshop_invoice import billing_supplier, preview_invoice, issue_invoice, get_invoice, job_invoice, invoice_response, invoice_html
 
@@ -24,6 +24,12 @@ def require_workshop_enabled(request: Request):
         raise HTTPException(status_code=404, detail="The workshop app is switched off")
     if not getattr(request.state, "workshop_user", None):
         raise HTTPException(status_code=503, detail="Workshop authentication boundary is unavailable")
+    return request.state.workshop_user
+
+
+def require_owner(request: Request):
+    if getattr(request.state, "workshop_role", None) != "owner":
+        raise HTTPException(status_code=403, detail="Only an owner login can change this. Ask the owner to do it.")
     return request.state.workshop_user
 
 
@@ -152,8 +158,8 @@ def print_bill_on_form(invoice_id: UUID, db: Session = Depends(get_db)):
 
 
 @router.get("/sheet-diagram")
-def car_outline_picture():
-    return Response(car_outline(), media_type="image/png", headers={"Cache-Control": "no-store"})
+def car_outline_picture(db: Session = Depends(get_db)):
+    return Response(car_outline(db), media_type="image/png", headers={"Cache-Control": "no-store"})
 
 
 @router.get("/books")
@@ -221,10 +227,30 @@ def read_setup(db: Session = Depends(get_db)):
 
 
 @router.put("/setup")
-def write_setup(request: CompanyRequest, db: Session = Depends(get_db), actor: str = Depends(require_workshop_enabled)):
+def write_setup(request: CompanyRequest, db: Session = Depends(get_db), actor: str = Depends(require_owner)):
     return save_company(db, request, actor)
 
 
 @router.post("/setup/example-jobs", status_code=201)
-def example_jobs(db: Session = Depends(get_db), actor: str = Depends(require_workshop_enabled)):
+def example_jobs(db: Session = Depends(get_db), actor: str = Depends(require_owner)):
     return add_example_data(db, actor)
+
+
+@router.put("/setup/form")
+def upload_form(file: UploadFile = File(...), db: Session = Depends(get_db), actor: str = Depends(require_owner)):
+    return save_form(db, file.file.read(MAX_FORM_BYTES + 1), actor)
+
+
+@router.get("/users")
+def read_users(request: Request, db: Session = Depends(get_db)):
+    return {"me": request.state.workshop_user, "role": request.state.workshop_role, "users": users(db) if request.state.workshop_role == "owner" else []}
+
+
+@router.post("/users", status_code=201)
+def write_user(request: UserRequest, db: Session = Depends(get_db), actor: str = Depends(require_owner)):
+    return save_user(db, request, actor)
+
+
+@router.post("/users/{username}/active")
+def switch_login(username: str, request: UserSwitch, db: Session = Depends(get_db), actor: str = Depends(require_owner)):
+    return switch_user(db, username, request.active)

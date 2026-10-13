@@ -17,7 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.db.models import WorkshopJobRevision
+from app.db.models import WorkshopCompany, WorkshopJobRevision
 from app.schemas.workshop import WorkshopReviewedDraft, WorkshopRevisionResponse
 from app.schemas.workshop_invoice import InvoiceResponse
 from app.services.workshop import _revision_response
@@ -165,7 +165,11 @@ def render_invoice_sheet(invoice: InvoiceResponse, record: WorkshopReviewedDraft
     return _document(f"{invoice.number} — {title}", pages, PRINT_HINT, template)
 
 
-def _template() -> bytes | None:
+def _template(db: Session) -> bytes | None:
+    """The blank form: the picture uploaded in the app, else the file named in the server settings."""
+    uploaded = db.scalar(select(WorkshopCompany.sheet_template).where(WorkshopCompany.id == 1))
+    if uploaded:
+        return bytes(uploaded)
     template: Path | None = settings.WORKSHOP_SHEET_TEMPLATE
     try:
         # An empty WORKSHOP_SHEET_TEMPLATE= line parses as Path("."), which means "not configured".
@@ -175,8 +179,8 @@ def _template() -> bytes | None:
 
 
 @lru_cache(maxsize=2)
-def _outline(path: Path, modified: float) -> bytes:
-    with Image.open(path) as form:
+def _outline(form_bytes: bytes) -> bytes:
+    with Image.open(BytesIO(form_bytes)) as form:
         left, top, right, bottom = DIAGRAM
         box = (round(form.width * left / 100), round(form.height * top / 100),
                round(form.width * right / 100), round(form.height * bottom / 100))
@@ -185,15 +189,15 @@ def _outline(path: Path, modified: float) -> bytes:
         return output.getvalue()
 
 
-def car_outline() -> bytes:
-    """The car drawing cut from the configured form, for marking damage on screen."""
-    template: Path | None = settings.WORKSHOP_SHEET_TEMPLATE
-    if not template or template == Path("."):
-        raise HTTPException(status_code=404, detail="Blank job-sheet image is not configured")
+def car_outline(db: Session) -> bytes:
+    """The car drawing cut from the blank form, for marking damage on screen."""
+    template = _template(db)
+    if template is None:
+        raise HTTPException(status_code=404, detail="Blank job-sheet image is not set up")
     try:
-        return _outline(template, template.stat().st_mtime)
+        return _outline(template)
     except (OSError, ValueError):
-        raise HTTPException(status_code=503, detail="Configured blank job-sheet image cannot be read")
+        raise HTTPException(status_code=503, detail="Blank job-sheet image cannot be read")
 
 
 def _revision(db: Session, revision_id: UUID) -> WorkshopRevisionResponse:
@@ -204,11 +208,11 @@ def _revision(db: Session, revision_id: UUID) -> WorkshopRevisionResponse:
 
 
 def job_sheet_html(db: Session, revision_id: UUID) -> str:
-    return render_job_sheet(_revision(db, revision_id), _template())
+    return render_job_sheet(_revision(db, revision_id), _template(db))
 
 
 def invoice_sheet_html(db: Session, invoice_id: UUID) -> str:
     invoice = get_invoice(db, invoice_id)
     invoice_html(invoice)  # refuse to restyle an invoice whose stored copy fails its integrity check
     response = invoice_response(invoice)
-    return render_invoice_sheet(response, _revision(db, response.preview.revision_id).record, _template())
+    return render_invoice_sheet(response, _revision(db, response.preview.revision_id).record, _template(db))

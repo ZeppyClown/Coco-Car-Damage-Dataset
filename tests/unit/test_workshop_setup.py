@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy import func, select
 
 from app.core.config import settings
-from app.db.models import WorkshopInvoice, WorkshopInvoiceCounter, WorkshopJob
+from app.db.models import WorkshopInvoice, WorkshopInvoiceCounter, WorkshopJob, WorkshopUser
 from app.schemas.workshop import WorkshopDraft
 from app.services.workshop_extraction import extraction_schema
 
@@ -44,11 +44,11 @@ def issue(client, revision, supplier=SUPPLIER):
 
 
 def test_saved_workshop_details_unlock_invoices_with_running_numbers(shop):
-    assert shop.get(API + "/setup").json() == {"company": None, "jobs": 0}
+    assert shop.get(API + "/setup").json() | {"form": None} == {"company": None, "jobs": 0, "form": None}
     first, second = finished(shop, "J-1"), finished(shop, "J-2")
     assert issue(shop, first).status_code == 403
     assert shop.put(API + "/setup", json={**COMPANY, "name": ""}).status_code == 422
-    assert shop.put(API + "/setup", json=COMPANY).json() == {"company": COMPANY, "jobs": 2}
+    assert shop.put(API + "/setup", json=COMPANY).json() | {"form": None} == {"company": COMPANY, "jobs": 2, "form": None}
     assert shop.get(API + "/billing-settings").json() == {"real_invoices_enabled": True, "supplier": SUPPLIER}
     assert issue(shop, first, {**SUPPLIER, "name": "Someone else"}).status_code == 422
     year = TODAY[:4]
@@ -132,3 +132,64 @@ def test_example_jobs_fill_the_books_once(shop, test_db):
     assert profit["jobs"] and all(float(job["cost"]) > 0 for job in profit["jobs"])
     found = shop.get(API + "/jobs", params={"q": "Knock"}).json()["results"]
     assert found and any(result["record"]["accident"] for result in shop.get(API + "/jobs", params={"limit": 100}).json()["results"])
+
+
+def test_staff_logins_roles_switch_off_and_lockout(shop, test_db):
+    from app.core.workshop_auth import FAILURES, MAX_FAILURES
+    from tests.conftest import TEST_OPERATOR, TEST_PASSWORD
+    owner = (TEST_OPERATOR, TEST_PASSWORD)
+    assert shop.get(API + "/users").json() == {"me": owner[0], "role": "owner", "users": [
+        {"username": owner[0], "role": "owner", "active": True, "built_in": True}]}
+    assert shop.post(API + "/users", json={"username": "mei ling", "password": "short"}).status_code == 422
+    assert shop.post(API + "/users", json={"username": owner[0], "password": "long-enough-password"}).status_code == 422
+    assert shop.post(API + "/users", json={"username": "bad:name", "password": "long-enough-password"}).status_code == 422
+    created = shop.post(API + "/users", json={"username": "meiling", "password": "counter-desk-2026"})
+    assert created.status_code == 201 and created.json()[1] == {"username": "meiling", "role": "staff", "active": True, "built_in": False}
+    assert "counter-desk-2026" not in created.text and test_db.get(WorkshopUser, "meiling").password_hash.startswith("scrypt$")
+    shop.auth = ("meiling", "counter-desk-2026")
+    # Staff can do the daily work under their own name, but not change the workshop, the logins or add example jobs.
+    assert shop.get(API + "/users").json() == {"me": "meiling", "role": "staff", "users": []}
+    job = shop.post(API + "/jobs", json={**EXAMPLE, "job_reference": "S-1"}).json()
+    revision = shop.post(API + f"/jobs/{job['id']}/confirm", json={"expected_version": 1, "reviewer": "someone else", "acknowledged": True}).json()
+    assert revision["reviewer"] == "meiling"
+    for method, path, body in (("put", "/setup", COMPANY), ("post", "/setup/example-jobs", None),
+                               ("post", "/users", {"username": "x", "password": "long-enough-password"}),
+                               ("post", "/users/meiling/active", {"active": True})):
+        assert getattr(shop, method)(API + path, json=body).status_code == 403
+    assert shop.put(API + "/setup/form", files={"file": ("form.png", b"x", "image/png")}).status_code == 403
+    shop.auth = ("meiling", "wrong-password-here")
+    assert shop.get(API + "/setup").status_code == 401
+    shop.auth = owner
+    assert shop.post(API + "/users/meiling/active", json={"active": False}).json()[1]["active"] is False
+    assert shop.post(API + "/users/nobody/active", json={"active": False}).status_code == 404
+    shop.auth = ("meiling", "counter-desk-2026")
+    assert shop.get(API + "/setup").status_code == 401
+    # Ten wrong passwords from one address: that address waits, even with the right password.
+    FAILURES.clear()
+    shop.auth = (owner[0], "wrong-password-here")
+    assert [shop.get(API + "/setup").status_code for _ in range(MAX_FAILURES + 1)] == [401] * MAX_FAILURES + [429]
+    shop.auth = owner
+    assert shop.get(API + "/setup").status_code == 429
+    FAILURES.clear()
+    assert shop.get(API + "/setup").status_code == 200
+
+
+def test_blank_form_picture_can_be_uploaded_and_is_used_for_printing(shop, monkeypatch):
+    from io import BytesIO
+    from PIL import Image
+    monkeypatch.setattr(settings, "WORKSHOP_SHEET_TEMPLATE", None)
+    picture = BytesIO(); Image.new("RGB", (600, 850), "white").save(picture, "JPEG")
+    upload = lambda content: shop.put(API + "/setup/form", files={"file": ("form.jpg", content, "image/jpeg")})
+    assert upload(picture.getvalue()).status_code == 409
+    assert shop.put(API + "/setup", json=COMPANY).json()["form"] is None
+    assert shop.get(API + "/sheet-diagram").status_code == 404
+    assert upload(b"not a picture").status_code == 422
+    small = BytesIO(); Image.new("RGB", (50, 50)).save(small, "PNG")
+    assert upload(small.getvalue()).status_code == 415
+    assert upload(picture.getvalue()).json()["form"] == "uploaded"
+    outline = shop.get(API + "/sheet-diagram")
+    assert outline.status_code == 200 and Image.open(BytesIO(outline.content)).format == "PNG"
+    revision = finished(shop, "F-1")
+    assert "data:image/png;base64," in shop.get(API + f"/revisions/{revision['id']}/sheet").text
+    # Saving the workshop details again keeps the picture.
+    assert shop.put(API + "/setup", json=COMPANY).json()["form"] == "uploaded"

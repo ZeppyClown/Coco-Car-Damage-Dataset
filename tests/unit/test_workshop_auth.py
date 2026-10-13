@@ -94,7 +94,7 @@ def test_salted_hash_and_length_validation(auth_client, monkeypatch):
     encoded = hash_password(PASSWORD)
     assert encoded != hash_password(PASSWORD) and PASSWORD not in encoded
     monkeypatch.setattr(settings, "WORKSHOP_AUTH_PASSWORD_HASH", SecretStr(encoded))
-    assert _verify(HTTPBasicCredentials(username="fictional-test-operator", password=PASSWORD), _configuration()) == "fictional-test-operator"
+    assert _verify(HTTPBasicCredentials(username="fictional-test-operator", password=PASSWORD), _configuration()) == ("fictional-test-operator", "owner")
     for invalid in ("short", "x"*1025, "long password with newline\n", "密码"*16):
         with pytest.raises(ValueError):
             hash_password(invalid)

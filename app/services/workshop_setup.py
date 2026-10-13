@@ -1,17 +1,21 @@
 """First-time setup: the workshop's own details, and a set of example jobs to look around with."""
 from datetime import date, datetime, time, timedelta, timezone
+from io import BytesIO
 from decimal import Decimal
 from random import Random
 from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException
+from PIL import Image, UnidentifiedImageError
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.db.models import WorkshopCompany, WorkshopExpense, WorkshopJob, WorkshopJobRevision, WorkshopPayment
+from app.core.config import settings
+from app.core.workshop_auth import STAFF_PASSWORD_LENGTH, hash_password, valid_username
+from app.db.models import WorkshopCompany, WorkshopExpense, WorkshopJob, WorkshopJobRevision, WorkshopPayment, WorkshopUser
 from app.schemas.workshop import WorkshopReviewedDraft
-from app.schemas.workshop_books import CompanyRequest
+from app.schemas.workshop_books import CompanyRequest, UserRequest
 from app.schemas.workshop_invoice import InvoiceRequest
 from app.services.workshop import job_number, number_key
 from app.services.workshop_invoice import billing_supplier, store_invoice
@@ -24,7 +28,76 @@ def company(db: Session) -> dict | None:
 
 
 def setup_state(db: Session) -> dict:
-    return {"company": company(db), "jobs": db.scalar(select(func.count()).select_from(WorkshopJob))}
+    uploaded = db.scalar(select(func.length(WorkshopCompany.sheet_template)).where(WorkshopCompany.id == 1))
+    template = settings.WORKSHOP_SHEET_TEMPLATE
+    return {"company": company(db), "jobs": db.scalar(select(func.count()).select_from(WorkshopJob)),
+            "form": "uploaded" if uploaded else "file" if template and str(template) != "." and template.is_file() else None}
+
+
+MAX_FORM_BYTES = 8 * 1024 * 1024
+
+
+def save_form(db: Session, content: bytes, actor: str) -> dict:
+    """Keep the blank job-sheet picture in the database, as a PNG, so printing works without files on the server."""
+    row = db.get(WorkshopCompany, 1)
+    if row is None:
+        raise HTTPException(409, "Save the workshop details first")
+    if not content or len(content) > MAX_FORM_BYTES:
+        raise HTTPException(413, "The picture must be smaller than 8 MB")
+    try:
+        with Image.open(BytesIO(content)) as image:
+            if image.format not in {"PNG", "JPEG"} or max(image.size) > 6000 or min(image.size) < 400:
+                raise HTTPException(415, "Use a PNG or JPEG scan of the blank form, between 400 and 6000 pixels a side")
+            output = BytesIO()
+            image.convert("RGB").save(output, "PNG", optimize=True)
+    except (UnidentifiedImageError, OSError, ValueError, SyntaxError, Image.DecompressionBombError):
+        raise HTTPException(422, "That file is not a picture the app can read") from None
+    try:
+        row.sheet_template, row.updated_by, row.updated_at = output.getvalue(), actor, datetime.now(timezone.utc)
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        raise
+    return setup_state(db)
+
+
+def users(db: Session) -> list[dict]:
+    built_in = {"username": settings.WORKSHOP_AUTH_USERNAME, "role": "owner", "active": True, "built_in": True}
+    return [built_in, *({"username": user.username, "role": user.role, "active": user.active, "built_in": False}
+                        for user in db.scalars(select(WorkshopUser).order_by(WorkshopUser.username)))]
+
+
+def save_user(db: Session, request: UserRequest, actor: str) -> list[dict]:
+    """Add a login, or give an existing one a new password and role and switch it back on."""
+    if not valid_username(request.username) or request.username == settings.WORKSHOP_AUTH_USERNAME:
+        raise HTTPException(422, "Use a short login name in plain letters and digits that is not the main owner login")
+    try:
+        encoded = hash_password(request.password, STAFF_PASSWORD_LENGTH)
+    except ValueError:
+        raise HTTPException(422, f"The password needs at least {STAFF_PASSWORD_LENGTH} plain letters, digits or symbols") from None
+    try:
+        user = db.get(WorkshopUser, request.username) or WorkshopUser(
+            username=request.username, created_by=actor, created_at=datetime.now(timezone.utc))
+        user.password_hash, user.role, user.active = encoded, request.role, True
+        db.add(user)
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        raise
+    return users(db)
+
+
+def switch_user(db: Session, username: str, active: bool) -> list[dict]:
+    user = db.get(WorkshopUser, username)
+    if user is None:
+        raise HTTPException(404, "No such login")
+    try:
+        user.active = active
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        raise
+    return users(db)
 
 
 def save_company(db: Session, request: CompanyRequest, actor: str) -> dict:

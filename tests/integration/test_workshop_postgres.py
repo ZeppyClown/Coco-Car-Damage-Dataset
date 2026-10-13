@@ -623,3 +623,16 @@ def test_job_numbers_are_unique_for_new_old_and_simultaneous_jobs(workshop_postg
         job = get_job(db, old[2])
         update_job(db, old[2], WorkshopDraftUpdate(expected_version=1, draft=WorkshopDraft.model_validate({**job.draft, "job_reference": "OLD 9"})))
         assert db.scalar(select(WorkshopExpense.job_number)) == "OLD9"
+
+
+def test_tables_are_closed_to_hosted_data_apis_but_open_to_the_app(workshop_postgres):
+    engine = workshop_postgres
+    migrate(engine)
+    with engine.connect() as connection:
+        open_tables = connection.execute(text(
+            "SELECT tablename FROM pg_tables WHERE schemaname = current_schema() AND NOT rowsecurity AND tablename <> 'alembic_version'")).all()
+        assert open_tables == []
+    with Session(engine) as db:
+        # The app signs in as the tables' owner, which row level security does not restrict.
+        job_id = create_job(db, reviewed_fixture()).id
+        assert get_job(db, job_id).job_number == "DEMOJOB001"

@@ -580,8 +580,43 @@ function showSetup(state) {
   $("add-examples").disabled = !company || state.jobs > 0;
   $("example-state").textContent = state.jobs > 0 ? `The app already has ${state.jobs} job${state.jobs > 1 ? "s" : ""}, so examples cannot be added.` : company ? "" : "Save the workshop details first.";
   $("setup-hint").hidden = Boolean(company) && state.jobs > 0;
+  $("form-state").textContent = state.form === "uploaded" ? "A picture is saved." : state.form === "file" ? "Using the picture stored on this computer; upload one here to keep it with the books." : "No picture yet: print-outs will be plain until one is added.";
 }
-async function loadSetup() { const state = await request("/setup"); showSetup(state); return state; }
+function showUsers(account) {
+  $("signed-in").textContent = `Signed in as ${account.me}` + (account.role === "owner" ? " (owner)" : "");
+  const owner = account.role === "owner", table = $("users-table"); table.replaceChildren();
+  for (const id of ["save-company", "upload-form", "add-user", "add-examples"]) if (!owner) $(id).disabled = true;
+  if (!owner) { $("company-state").textContent = "Only an owner login can change this page."; $("users-step").hidden = true; return; }
+  const head = table.insertRow(); for (const label of ["Login", "Kind", "", ""]) head.append(element("th", label));
+  for (const user of account.users) {
+    const row = table.insertRow(); row.insertCell().textContent = user.username; row.insertCell().textContent = user.role === "owner" ? "Owner" : "Staff";
+    row.insertCell().textContent = user.built_in ? "main login" : user.active ? "on" : "switched off";
+    const cell = row.insertCell(); if (user.built_in) continue;
+    const toggle = element("button", user.active ? "Switch off" : "Switch on"); toggle.type = "button";
+    toggle.addEventListener("click", () => action(async () => {
+      const list = await request("/users/" + encodeURIComponent(user.username) + "/active", JSON_POST({ active: !user.active }));
+      status(`${user.username} ${user.active ? "can no longer sign in" : "can sign in again"}.`); setTimeout(() => showUsers({ ...account, users: list }));
+    }));
+    cell.append(toggle);
+  }
+}
+async function loadSetup() {
+  const [state, account] = await Promise.all([request("/setup"), request("/users")]);
+  showSetup(state); showUsers(account); return state;
+}
+$("upload-form").addEventListener("click", () => {
+  const file = $("form-file").files[0]; if (!file) return status("Choose the picture of the blank job sheet first.", true);
+  const data = new FormData(); data.append("file", file);
+  action(async () => { const state = await request("/setup/form", { method: "PUT", body: data }); $("form-file").value = ""; $("car-outline").hidden = false; $("car").classList.remove("blank"); $("car-outline").src = api + "/sheet-diagram?" + Date.now();
+    status("Blank job sheet saved. Print-outs will use it."); setTimeout(() => showSetup(state)); });
+});
+$("add-user").addEventListener("click", () => action(async () => {
+  const name = $("user-name").value.trim(), password = $("user-password").value;
+  if (!name || password.length < 10) throw new Error("Type a login name and a password of 10 or more characters.");
+  const list = await request("/users", JSON_POST({ username: name, password, role: $("user-role").value }));
+  $("user-name").value = ""; $("user-password").value = ""; status(`${name} can now sign in. Give them the password in person.`);
+  setTimeout(async () => showUsers(await request("/users")));
+}));
 $("save-company").addEventListener("click", () => action(async () => {
   if (!$("company-name").value.trim() || !$("company-address").value.trim()) throw new Error("Type the workshop name and address first.");
   const state = await request("/setup", { ...JSON_POST({ name: $("company-name").value.trim(), address: $("company-address").value.trim(),
@@ -598,4 +633,4 @@ document.querySelector('.tools [data-step="setup"]').addEventListener("click", (
 render(); renderHistory(); showStep("car");
 const initialJob = new URLSearchParams(location.search).get("job");
 if (initialJob) openJob(initialJob);
-else loadSetup().then(state => { if (!state.company) { showStep("setup"); status("Welcome. Fill in the workshop details to begin."); } }).catch(() => {});
+loadSetup().then(state => { if (initialJob) return; if (!state.company) { showStep("setup"); status("Welcome. Fill in the workshop details to begin."); } }).catch(() => {});

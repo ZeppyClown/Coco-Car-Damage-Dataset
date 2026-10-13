@@ -114,3 +114,5 @@ dialog#guide::backdrop { background: #000a; }
 #guide-picture { display: block; width: 100%; } #guide-empty { padding: 1rem; }
 label.inline > input:not([type=checkbox]) { display: inline-block; width: auto; margin: 0 .25rem; }
 #profit-table { white-space: normal; } #profit-table td:last-child { white-space: nowrap; }
+#signed-in { margin: 0; padding: .15rem 1rem 0; text-align: right; background: #dbe6ea; }
+#users-table td, #users-table th { text-align: left; }

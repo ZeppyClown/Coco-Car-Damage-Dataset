@@ -1,6 +1,6 @@
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, func, Numeric, JSON, Index, UniqueConstraint, CheckConstraint, Uuid, text, Date
+from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, func, Numeric, JSON, Index, UniqueConstraint, CheckConstraint, Uuid, text, Date, LargeBinary
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, deferred
 from datetime import datetime
 from uuid import uuid4
 
@@ -390,6 +390,8 @@ class WorkshopCompany(Base):
     address = Column(String(2000), nullable=False)
     gst_registration_number = Column(String(200))
     phone = Column(String(200), nullable=False, default="", server_default="")
+    # The blank job-sheet form as a PNG, uploaded in the app so a hosted copy needs no files on disk. Loaded only when printing.
+    sheet_template = deferred(Column(LargeBinary))
     updated_by = Column(String(200), nullable=False)
     updated_at = Column(DateTime(timezone=True), nullable=False)
 
@@ -419,3 +421,16 @@ class WorkshopInvoiceCounter(Base):
 
     year = Column(Integer, primary_key=True)
     last = Column(Integer, nullable=False)
+
+
+class WorkshopUser(Base):
+    """A staff login added by the owner. Logins are switched off, never deleted, because records keep the name."""
+    __tablename__ = "workshop_users"
+    __table_args__ = (CheckConstraint("role IN ('owner', 'staff')", name="ck_workshop_user_role"),)
+
+    username = Column(String(50), primary_key=True)
+    password_hash = Column(String(200), nullable=False)
+    role = Column(String(10), nullable=False)
+    active = Column(Boolean, nullable=False, default=True, server_default="true")
+    created_by = Column(String(200), nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False)

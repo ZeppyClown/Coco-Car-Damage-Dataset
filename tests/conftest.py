@@ -15,6 +15,7 @@ from app.db.session import get_db
 from app.services.external.nhtsa import NHTSAService
 from app.core.config import settings
 from app.core.workshop_auth import hash_password
+from app.core.workshop_auth import FAILURES
 
 TEST_OPERATOR = "fictional-test-operator"
 TEST_PASSWORD = "Fictional tests only password 2026"
@@ -44,6 +45,7 @@ def client(test_db, monkeypatch):
     monkeypatch.setattr(NHTSAService, "get_recalls", no_recalls)
     monkeypatch.setattr(NHTSAService, "get_recalls_by_make_model_year", no_recalls)
     app.dependency_overrides[get_db] = lambda: test_db
+    FAILURES.clear()
     try:
         with TestClient(app, base_url="http://127.0.0.1") as client:
             client.auth = (TEST_OPERATOR, TEST_PASSWORD)

@@ -8,7 +8,7 @@ from time import monotonic
 from urllib.parse import urlsplit
 
 from fastapi import HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.security import HTTPBasic
 from starlette.concurrency import run_in_threadpool
 
@@ -141,6 +141,9 @@ class WorkshopAccessMiddleware:
         prefix = f"/api/{settings.API_VERSION}/workshop"
         path = scope.get("path", "").rstrip("/")
         if scope["type"] != "http" or not (path == "/workshop" or path == prefix or path.startswith(prefix + "/")):
+            if scope["type"] == "http" and settings.WORKSHOP_ONLY and path != "/health" and not path.startswith("/static/"):
+                response = RedirectResponse("/workshop") if path == "" else JSONResponse(status_code=404, content={"detail": "Not found"})
+                return await response(scope, receive, send)
             return await self.app(scope, receive, send)
         try:
             request = Request(scope)

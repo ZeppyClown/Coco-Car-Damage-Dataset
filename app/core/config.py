@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     API_VERSION: str = "v1"
     WORKSHOP_ENABLED: bool = False
     WORKSHOP_AI_ENABLED: bool = False
+    # Hosted copies: serve only the workshop app; every other page and API of this program answers 404.
+    WORKSHOP_ONLY: bool = False
     WORKSHOP_AI_MODEL: Optional[str] = None
     WORKSHOP_AUTH_USERNAME: Optional[str] = None
     WORKSHOP_AUTH_PASSWORD_HASH: Optional[SecretStr] = None

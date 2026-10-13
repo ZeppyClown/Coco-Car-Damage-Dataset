@@ -17,7 +17,11 @@ The app has two parts: the **program** (this repository, packaged by the `Docker
 
 1. **Supabase:** create a project in the Singapore region. Open *Connect* and copy the **Session pooler** connection string (port 5432). Do not use the Transaction pooler (port 6543): the app holds row locks inside a transaction and was not tested through it.
 2. **Owner password:** on your own computer run `python scripts/workshop_password.py`, type a password of 16 or more characters twice, and copy the line it prints (it starts with `scrypt$`). The password itself is never stored.
-3. **Host:** create a web service from this repository using the `Dockerfile`. Set these settings as secrets:
+3. **Host (Render, free plan):** push this repository to GitHub, then in Render choose *New → Blueprint* and pick it. `render.yaml` creates one free web service in Singapore and asks for the first four settings below; the rest are filled in. You only learn the address after the first deploy, so put a guess in `WORKSHOP_ORIGIN`, then correct it to the address Render shows and redeploy.
+
+   The free plan sleeps after 15 minutes without visitors and takes up to about a minute to wake; it has 512 MB of memory, 750 hours a month and no disk, so attached photos do not survive a restart. These figures are from third-party write-ups in 2026: check Render's own free-plan page.
+
+   Settings:
 
    | Setting | Value |
    |---|---|
@@ -36,7 +40,7 @@ The app has two parts: the **program** (this repository, packaged by the `Docker
 - **Paper guide pictures** are read from a folder (`WORKSHOP_GUIDE_DIR`) and are not in the database. Without that folder the pop-up says none are set up.
 - **Backups.** Supabase's free plan pauses a project after about a week of low activity and, according to third-party write-ups, keeps no backups; the paid plan keeps daily ones. Check Supabase's current pricing page before relying on either. Independently of the plan, `scripts/backup_workshop.sh` saves a dated copy of the whole database to a folder of your choice; run it daily from a computer you control.
 - **Sign-in is the browser's own username/password box.** There is no sign-out button; close the browser to switch person. On a shared counter computer staff must do that or everything is recorded under one name.
-- **The other pages of this program** (the parts and vehicle assistant at `/`) are served from the same container and are not behind the workshop login.
+- **The other pages of this program** (the parts and vehicle assistant at `/`) are not behind the workshop login. Set `WORKSHOP_ONLY=true` (the Render blueprint does) and they answer “not found”; `/` goes to `/workshop`.
 - **Customer data on the internet.** Names, vehicle numbers and phone numbers will sit with Supabase and the host. The workshop should agree to that before real customers are entered.
 
 ## Running it on one computer instead

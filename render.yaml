@@ -1,0 +1,30 @@
+# Render blueprint: the workshop app as one free web service. The database is a separate Supabase project.
+# In Render choose New > Blueprint and pick this repository; it asks for the four values marked "sync: false".
+services:
+  - type: web
+    name: yap-workshop
+    runtime: docker
+    plan: free
+    region: singapore
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL            # Supabase "Session pooler" connection string, port 5432
+        sync: false
+      - key: WORKSHOP_AUTH_USERNAME  # the owner's login name
+        sync: false
+      - key: WORKSHOP_AUTH_PASSWORD_HASH  # the scrypt$... line printed by scripts/workshop_password.py
+        sync: false
+      - key: WORKSHOP_ORIGIN         # this service's own address, e.g. https://yap-workshop.onrender.com
+        sync: false
+      - key: WORKSHOP_ENABLED
+        value: "true"
+      - key: WORKSHOP_ONLY
+        value: "true"
+      - key: WORKSHOP_AI_ENABLED
+        value: "false"
+      - key: USE_GOOGLE_CSE
+        value: "false"
+      - key: USE_EBAY_API
+        value: "false"
+      - key: DEBUG
+        value: "false"

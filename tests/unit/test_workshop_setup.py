@@ -193,3 +193,12 @@ def test_blank_form_picture_can_be_uploaded_and_is_used_for_printing(shop, monke
     assert "data:image/png;base64," in shop.get(API + f"/revisions/{revision['id']}/sheet").text
     # Saving the workshop details again keeps the picture.
     assert shop.put(API + "/setup", json=COMPANY).json()["form"] == "uploaded"
+
+
+def test_hosted_copy_serves_only_the_workshop(shop, monkeypatch):
+    assert shop.get("/docs").status_code == 200
+    monkeypatch.setattr(settings, "WORKSHOP_ONLY", True)
+    shop.auth = None
+    assert [shop.get(path, follow_redirects=False).status_code for path in ("/", "/docs", "/openapi.json", "/api/v1/query", "/health")] == [307, 404, 404, 404, 200]
+    assert shop.get("/", follow_redirects=False).headers["location"] == "/workshop"
+    assert shop.get("/static/workshop.js").status_code == 200 and shop.get("/workshop").status_code == 401

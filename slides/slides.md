@@ -12,9 +12,244 @@ mdc: true
 The workshop pipeline, input to output, one step at a time
 
 <div class="pt-8 text-sm opacity-70">
-Yap Motor automotive assistant · as built, 12 October 2026<br>
-All records shown are fictional demo data
+Yap Motor automotive assistant · as built, 13 October 2026<br>
+Part 1: the paper the workshop uses today · Part 2: what the web app does with it · Part 3: the pipeline step by step<br>
+Web app records are fictional demo data. Part 1 shows real workshop documents: keep this deck internal.
 </div>
+
+---
+layout: section
+---
+
+# Part 1 — Before
+
+What the workshop uses today: every file collected on the visit
+
+---
+
+# Everything collected from the workshop
+
+17 files: paper, photos of paper and two interview transcripts. Private, not on GitHub.
+
+| Files | What it is | Count |
+|---|---|---|
+| Quotation / job sheet, blank (PDF) | The form every job is written on | 1 page |
+| Job sheets 1–5 (photos) | Filled in by hand | 5 photos |
+| Accident report, blank (PDF) | Owner and driver particulars | 3 pages |
+| Private settlement, blank (PDF) | Agreement between two drivers | 1 page |
+| Warrant to act, sample (PDF) | Lets the workshop act for the owner | 1 page |
+| Car, lorry, motorbike front/back (photos) | Vehicle parts reference booklet | 6 photos |
+| Interview transcripts (text) | Accident paperwork; walk-ins and quotations | 2 files |
+
+---
+layout: two-cols-header
+---
+
+# The job sheet — the main document
+
+::left::
+
+Everything about a job goes on this one page:
+
+- Vehicle, owner, contact, date in and date out
+- Knock / spray / servicing, fuel gauge
+- Up to 20 numbered lines of work, each with an amount
+- A car outline to mark where the damage is
+- Workshop address, phone numbers and PayNow at the bottom
+
+It is filled in **by hand**, and it is the only record of the job.
+
+::right::
+
+<img src="/private/yap-motor-quotation-job-sheet-blank-p1.png" class="border shadow" style="height:420px;margin:auto" />
+
+---
+
+# Five real job sheets
+
+<div class="grid grid-cols-5 gap-2 pt-2">
+  <img src="/private/job-sheet-1.jpg" class="border shadow" />
+  <img src="/private/job-sheet-2.jpg" class="border shadow" />
+  <img src="/private/job-sheet-3.jpg" class="border shadow" />
+  <img src="/private/job-sheet-4.jpg" class="border shadow" />
+  <img src="/private/job-sheet-5.jpg" class="border shadow" />
+</div>
+
+<div class="pt-4 text-sm">
+
+The sheets in use are a slightly different print run from the blank form: they have **Knock / Spray / Parts** columns, 21 lines and **Total / GST 9% / Grand total** boxes.
+
+</div>
+
+---
+layout: two-cols-header
+---
+
+# What makes the paper hard to reuse
+
+::left::
+
+- Handwriting, in **English and Chinese** on the same sheet
+- Shorthand such as "K/S" that only staff can explain
+- Amounts **crossed out** and rewritten
+- Circled numbers on the car outline that point to notes
+- Totals and GST worked out by hand
+- To find an old job, someone has to flip through the book
+
+<div class="pt-4 text-sm opacity-70">
+We have not been told what each shorthand means yet. The app keeps the literal writing and never guesses.
+</div>
+
+::right::
+
+<img src="/private/job-sheet-1.jpg" class="border shadow" style="height:400px;margin:auto" />
+
+---
+
+# Accident paperwork
+
+<div class="grid grid-cols-5 gap-2 pt-2">
+  <img src="/private/accident-report-owner-driver-particulars-blank-p1.png" class="border shadow" />
+  <img src="/private/accident-report-owner-driver-particulars-blank-p2.png" class="border shadow" />
+  <img src="/private/accident-report-owner-driver-particulars-blank-p3.png" class="border shadow" />
+  <img src="/private/private-settlement-motor-accident-blank-p1.png" class="border shadow" />
+  <img src="/private/warrant-to-act-blank-sample-p1.png" class="border shadow" />
+</div>
+
+<div class="pt-4 text-sm">
+
+Left to right: accident report (3 pages), private settlement form, warrant to act. These are blank forms. The web app does **not** handle them yet; only the job sheet has been built.
+
+</div>
+
+---
+
+# Vehicle parts reference booklet
+
+<div class="grid grid-cols-3 gap-2 pt-2">
+  <img src="/private/car-front.jpg" class="border shadow" />
+  <img src="/private/car-back.jpg" class="border shadow" />
+  <img src="/private/lorry-front.jpg" class="border shadow" />
+  <img src="/private/lorry-back.jpg" class="border shadow" />
+  <img src="/private/motorbike-front.jpg" class="border shadow" />
+  <img src="/private/bike-back.jpg" class="border shadow" />
+</div>
+
+---
+layout: section
+---
+
+# Part 2 — After
+
+The same job sheet, in the web app
+
+---
+
+# Typing it in, with the paper beside it
+
+<img src="/app-entry.png" class="border shadow" style="height:300px;margin:auto" />
+
+<div class="text-sm pt-3">
+
+- The photo of the sheet stays on screen (left) while staff type (right)
+- Every line keeps **what was written** and **what it means**; an empty amount is never turned into zero
+- Crossed-out lines are kept and marked cancelled. Nothing counts as checked until a signed-in person confirms it
+
+</div>
+
+---
+
+# Finding a job again
+
+<img src="/app-lookup.png" class="border shadow" style="height:300px;margin:auto" />
+
+<div class="text-sm pt-3">
+
+- **Before:** flip through the job-sheet book
+- **Now:** search by customer, vehicle, job number, a word in the work lines, or date
+- Shows the latest checked version, warns about newer unchecked edits, and opens the original photo in one click
+
+</div>
+
+---
+
+# Corrections keep their history
+
+<img src="/app-history.png" class="border shadow" style="height:300px;margin:auto" />
+
+<div class="text-sm pt-3">
+
+- **Before:** a correction is a line crossed out on the page
+- **Now:** each checked version is saved for good, with who checked it and when. A correction makes a new version
+- From each version: download a CSV, **print the job sheet in the paper layout** (new), or prepare an invoice
+
+</div>
+
+---
+
+# New: the print-out looks like the paper
+
+<div class="grid grid-cols-2 gap-6 pt-2">
+  <div class="text-center">
+    <img src="/private/yap-motor-quotation-job-sheet-blank-p1.png" class="border shadow" style="height:340px;margin:auto" />
+    <div class="text-sm pt-1">Paper form</div>
+  </div>
+  <div class="text-center">
+    <img src="/private/sheet-new.png" class="border shadow" style="height:340px;margin:auto" />
+    <div class="text-sm pt-1">Printed from the web app (fictional record)</div>
+  </div>
+</div>
+
+<div class="text-sm pt-2">
+
+The app prints the checked values **onto the workshop's own form**, so the heading, the 20 lines, the car outline and the footer are exactly where staff expect them.
+
+</div>
+
+---
+
+# The invoice
+
+<div class="grid grid-cols-2 gap-6 pt-2">
+<div>
+
+**Before:** total and GST 9% written by hand at the bottom of the sheet.
+
+**Now:** GST worked out once on the total, in dollars and cents. The invoice is saved and cannot be edited afterwards.
+
+**Not done yet:** the invoice still uses a plain layout. We were not given a sample of the workshop's own invoice, so there is nothing to match it to. Once we have one, it gets the same treatment as the job sheet.
+
+</div>
+<div>
+  <img src="/app-invoice.png" class="border shadow" style="height:380px;margin:auto" />
+</div>
+</div>
+
+---
+
+# Before and after
+
+| | Paper today | Web app |
+|---|---|---|
+| Record | One handwritten page | Typed record with the photo attached |
+| Unclear writing | Stays unclear on the page | Marked unclear; never guessed |
+| Corrections | Crossed out | New version; old versions kept |
+| Finding an old job | Flip through the book | Search by customer, vehicle, job or date |
+| Totals and GST | By hand | Calculated, to the cent |
+| Print-out | The paper itself | Same form, filled in by the app |
+| Accident forms | Paper | Not built yet |
+
+<div class="pt-4 text-sm opacity-70">
+So far tested with fictional records only. No real job sheet has been entered, and no time saving has been measured.
+</div>
+
+---
+layout: section
+---
+
+# Part 3 — The pipeline
+
+How one job sheet moves through the app, step by step
 
 ---
 

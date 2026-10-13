@@ -154,3 +154,9 @@ No real company pilot has been deployed. The local account/origin boundary, guid
 Use [WORKSHOP_INVOICING_GUIDE.md](WORKSHOP_INVOICING_GUIDE.md) for the completed-work→preview→issue→print workflow, Decimal rules and private billing profile. Inclusive is the UI default per user answer. Keep real issuance off until exact supplier settings/selected company operation are established. There is no InvoiceNow transmission, payment receipt, credit-note handling or GST-return preparation. Source record CSV v1 remains unchanged.
 
 Final F13 checks are recorded in the master and verification report: full326-test regression including18 workshop PG cases, fresh Chrome invoice/old-workflow checks and actual browser PDF output; the final UTC fix is covered by JSON equality across PostgreSQL issue/read/retry/restore and fresh restarted HTTP verification.
+
+## Print a job sheet in the paper layout
+
+Each reviewed version in the history has a **Print job sheet (paper layout)** link. It opens the workshop's own form with the checked values filled in; use the browser's Print / Save as PDF.
+
+To show the real form, save a PNG or JPEG of the blank job sheet in the private `car mechanic assistant/runtime/workshop/` folder and set `WORKSHOP_SHEET_TEMPLATE` to its full path, then restart. Without it the values still print, on a plain page with a notice. Keep the form image out of Git. If the workshop changes its printed form, the field positions at the top of `app/services/workshop_sheet.py` need adjusting.

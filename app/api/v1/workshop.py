@@ -12,6 +12,7 @@ from app.schemas.workshop import WorkshopDraft, WorkshopDraftUpdate, WorkshopJob
 from app.services.workshop_extraction import extract_source
 from app.services.workshop import create_job, get_job, update_job, attach_document, get_document, document_file, MAX_UPLOAD_BYTES, confirm_job, list_revisions, generate_export, get_export, export_file, lookup_jobs
 from app.schemas.workshop_invoice import InvoiceRequest, InvoiceIssueRequest, InvoicePreview, InvoiceResponse, InvoiceSettingsResponse
+from app.services.workshop_sheet import job_sheet_html
 from app.services.workshop_invoice import preview_invoice, issue_invoice, get_invoice, job_invoice, invoice_response, invoice_html
 
 
@@ -95,6 +96,14 @@ def download_demo_export(export_id: UUID, db: Session = Depends(get_db)):
         export_file(export), media_type="text/csv; charset=utf-8", filename=f"workshop-demo-{export.id}.csv",
         headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
     )
+
+
+@router.get("/revisions/{revision_id}/sheet", response_class=HTMLResponse)
+def print_job_sheet(revision_id: UUID, db: Session = Depends(get_db)):
+    return HTMLResponse(job_sheet_html(db, revision_id), headers={
+        "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff",
+        "Content-Security-Policy": "default-src 'none'; img-src data:; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'",
+    })
 
 
 @router.get("/billing-settings", response_model=InvoiceSettingsResponse)

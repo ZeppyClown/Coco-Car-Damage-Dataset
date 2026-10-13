@@ -79,3 +79,7 @@ test.db
 # Slidev deck
 node_modules/
 slides/dist/
+
+# Real workshop documents shown only in the local deck
+slides/public/private/
+.context/

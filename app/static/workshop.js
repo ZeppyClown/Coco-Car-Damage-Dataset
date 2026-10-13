@@ -145,6 +145,8 @@ function renderHistory() {
     }));
     details.append(element("p", "Demo output only. Unknown amounts stay empty; cancelled rows contain literal text without interpreted values."));
     details.append(download);
+    const sheet = element("a", `Print job sheet (paper layout) · version ${revision.version}`);
+    sheet.href = api + "/revisions/" + revision.id + "/sheet"; sheet.target = "_blank"; sheet.rel = "noopener"; details.append(sheet);
     if (record.record_stage === "completed_work") {
       const bill = element("button", `Prepare invoice · version ${revision.version}`); bill.type = "button";
       bill.addEventListener("click", () => action(() => prepareInvoice(revision))); details.append(bill);

@@ -291,6 +291,8 @@ function showIssuedInvoice(invoice) {
   container.append(element("p", `${invoice.number} · SGD ${invoice.preview.total} payable · GST SGD ${invoice.preview.gst} · issued by ${invoice.issued_by}`));
   const link = element("a", "Open issued invoice / Print / Save as PDF");
   link.href = api + "/invoices/" + invoice.id + "/print"; link.target = "_blank"; link.rel = "noopener"; container.append(link);
+  const form = element("a", "Print invoice on the workshop form");
+  form.href = api + "/invoices/" + invoice.id + "/sheet"; form.target = "_blank"; form.rel = "noopener"; container.append(element("br"), form);
   $("billing-state").textContent = invoice.preview.data_origin === "synthetic_demo" ? "Fictional DEMO invoice saved. Not for payment or tax claims." : "Invoice saved. This is not a payment receipt or an IRAS submission.";
   updateIssueButton();
 }

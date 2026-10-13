@@ -375,7 +375,7 @@ Allowed statuses: `READY`, `IN_PROGRESS`, `IMPLEMENTED_UNVERIFIED`, `VERIFIED`, 
 | F11 | Extraction evaluation; optional benefit measurement | IMPLEMENTED_UNVERIFIED for real accuracy | F06/F07; F09 for destination checks | Synthetic evaluator/CLI verified; independent labels/provider quality pending Q08; baseline timing/adoption optional, usefulness assumed |
 | F12 | Workshop access/recovery/guide and later pilot | VERIFIED locally; company pilot pending | User-assumed usefulness; selected operating scope | Initial217/final full326-test suites plus live HTTP/Chrome verify access, saving/corrections, invoice output and actual disposable recovery; company operation/retention/pilot pending Q06/Q07/Q09 |
 | F13 | Standalone SGD invoicing/GST | VERIFIED locally; real operation pending | F05/F12; explicitly selected12October | Money/API33 passed; PG18 passed including invoice concurrency/recovery; full326 passed; Chrome preview/issue/reopen/print/PDF/access passed; user GST-registered/inclusive answer recorded; Q11 supplier/InvoiceNow pending |
-| F14 | Paper-layout job-sheet print-out | VERIFIED locally on a fictional record; staff check pending | F05; private blank-form image | `GET /revisions/{id}/sheet` draws reviewed values onto the configured blank form (`WORKSHOP_SHEET_TEMPLATE`); 5 unit/API cases, full 312 passed/19 PG skipped; rendered sheet inspected. Knock/spray/servicing, fuel gauge and contact are not captured yet and stay blank. Invoice layout unchanged: no company invoice sample supplied |
+| F14 | Paper-layout job-sheet and invoice print-out | VERIFIED locally on a fictional record; staff check pending | F05; private blank-form image | `GET /revisions/{id}/sheet` draws reviewed values onto the configured blank form (`WORKSHOP_SHEET_TEMPLATE`); 8 unit/API cases, full 315 passed/19 PG skipped; rendered sheet inspected. Knock/spray/servicing, fuel gauge and contact are not captured yet and stay blank. Issued invoices print on the same form via `GET /invoices/{id}/sheet` with totals in the last rows; stored invoice HTML is unchanged |
 
 If a feature takes several turns, add subrows such as `F03.a upload validation` and `F03.b preview route`. Each subrow needs its own status and verification notes. Do not wait until the parent feature is finished to record partial work.
 
@@ -849,6 +849,16 @@ remain recorded and unanswered.
 ```
 
 ## 16. Work log
+
+### 13 October 2026 — F14.b invoice printed on the workshop form
+
+- **User correction:** the Yap Motor form is also what the workshop hands over as its invoice, so the invoice must use it instead of the plain layout.
+- **Delivered:** `render_invoice_sheet` and `GET /api/v1/workshop/invoices/{invoice_id}/sheet`. Invoice lines fill the numbered rows; **Total, GST 9%, Grand total** (plus **Less discount** when used) fill the last rows of the final sheet; invoice title/number/date, price basis and issuer print beside the car outline; vehicle, dates and make/model come from the reviewed version that was billed and the owner line shows the billed customer. More lines than fit continue on another sheet with the totals on the last one. A non-GST-registered supplier prints "INVOICE" with a single grand total. The issued-invoice panel in `/workshop` gains "Print invoice on the workshop form".
+- **Unchanged on purpose:** the stored immutable invoice HTML, its checksum and the existing `/print` route. The form view is drawn from the stored invoice figures each time and refuses (503) when the stored copy fails its integrity check. No migration, dependency or new setting.
+- **Verification:** 3 added cases (totals in rows 18–20 with exact amounts, discount, non-registered supplier, overflow to a second sheet, route 200/404/503). These were written after the implementation and passed on first run, so they were not seen failing first. `tests/unit/test_workshop_sheet.py` **8 passed**; full suite `env -u YAP_TEST_POSTGRES_URL .venv/bin/python -m pytest -q tests` result is recorded in BUILD_STATUS. A fictional invoice was rendered on the real blank form in headless Chrome and inspected; the first placement overlapped the printed heading and was moved beside the car outline.
+- **Limits:** the supplied blank form has no printed Total/GST boxes (the sheets in use do), so totals use rows 18–20 and the row numbers show beside them. The form's printed label still reads "Quotation Date". The GST registration number shown is the one printed on the form footer, not the configured supplier value; check they agree before real issuance (Q11). Whether this layout meets IRAS tax-invoice content rules has not been checked. Not checked: PostgreSQL run, click-through in a running app, paper printing, staff review.
+- **Slides:** the invoice slide now shows a real handwritten sheet beside the app's invoice on the form.
+
 
 ### 13 October 2026 — F14 paper-layout job sheet and before/after slides
 

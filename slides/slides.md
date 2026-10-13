@@ -208,21 +208,23 @@ The app prints the checked values **onto the workshop's own form**, so the headi
 
 ---
 
-# The invoice
+# The invoice — on the same form
 
 <div class="grid grid-cols-2 gap-6 pt-2">
-<div>
-
-**Before:** total and GST 9% written by hand at the bottom of the sheet.
-
-**Now:** GST worked out once on the total, in dollars and cents. The invoice is saved and cannot be edited afterwards.
-
-**Not done yet:** the invoice still uses a plain layout. We were not given a sample of the workshop's own invoice, so there is nothing to match it to. Once we have one, it gets the same treatment as the job sheet.
-
+  <div class="text-center">
+    <img src="/private/job-sheet-1.jpg" class="border shadow" style="height:330px;margin:auto" />
+    <div class="text-sm pt-1">Today: total and GST 9% written by hand</div>
+  </div>
+  <div class="text-center">
+    <img src="/private/invoice-new.png" class="border shadow" style="height:330px;margin:auto" />
+    <div class="text-sm pt-1">Web app: invoice printed on the workshop form (fictional)</div>
+  </div>
 </div>
-<div>
-  <img src="/app-invoice.png" class="border shadow" style="height:380px;margin:auto" />
-</div>
+
+<div class="text-sm pt-2">
+
+The work lines sit in the numbered rows; **Total, GST 9% and Grand total** fill the last three rows, worked out to the cent. The invoice number and date print beside the car outline. Once issued, an invoice cannot be edited.
+
 </div>
 
 ---
@@ -236,7 +238,7 @@ The app prints the checked values **onto the workshop's own form**, so the headi
 | Corrections | Crossed out | New version; old versions kept |
 | Finding an old job | Flip through the book | Search by customer, vehicle, job or date |
 | Totals and GST | By hand | Calculated, to the cent |
-| Print-out | The paper itself | Same form, filled in by the app |
+| Job sheet and invoice print-out | The paper itself | Same form, filled in by the app |
 | Accident forms | Paper | Not built yet |
 
 <div class="pt-4 text-sm opacity-70">

@@ -12,7 +12,7 @@ from app.schemas.workshop import WorkshopDraft, WorkshopDraftUpdate, WorkshopJob
 from app.services.workshop_extraction import extract_source
 from app.services.workshop import create_job, get_job, update_job, attach_document, get_document, document_file, MAX_UPLOAD_BYTES, confirm_job, list_revisions, generate_export, get_export, export_file, lookup_jobs
 from app.schemas.workshop_invoice import InvoiceRequest, InvoiceIssueRequest, InvoicePreview, InvoiceResponse, InvoiceSettingsResponse
-from app.services.workshop_sheet import job_sheet_html
+from app.services.workshop_sheet import job_sheet_html, invoice_sheet_html
 from app.services.workshop_invoice import preview_invoice, issue_invoice, get_invoice, job_invoice, invoice_response, invoice_html
 
 
@@ -100,10 +100,7 @@ def download_demo_export(export_id: UUID, db: Session = Depends(get_db)):
 
 @router.get("/revisions/{revision_id}/sheet", response_class=HTMLResponse)
 def print_job_sheet(revision_id: UUID, db: Session = Depends(get_db)):
-    return HTMLResponse(job_sheet_html(db, revision_id), headers={
-        "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff",
-        "Content-Security-Policy": "default-src 'none'; img-src data:; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'",
-    })
+    return HTMLResponse(job_sheet_html(db, revision_id), headers=SHEET_HEADERS)
 
 
 @router.get("/billing-settings", response_model=InvoiceSettingsResponse)
@@ -138,3 +135,14 @@ def print_bill(invoice_id: UUID, db: Session = Depends(get_db)):
         "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff",
         "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'",
     })
+
+
+SHEET_HEADERS = {
+    "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff",
+    "Content-Security-Policy": "default-src 'none'; img-src data:; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'",
+}
+
+
+@router.get("/invoices/{invoice_id}/sheet", response_class=HTMLResponse)
+def print_bill_on_form(invoice_id: UUID, db: Session = Depends(get_db)):
+    return HTMLResponse(invoice_sheet_html(db, invoice_id), headers=SHEET_HEADERS)

@@ -160,3 +160,5 @@ Final F13 checks are recorded in the master and verification report: full326-tes
 Each reviewed version in the history has a **Print job sheet (paper layout)** link. It opens the workshop's own form with the checked values filled in; use the browser's Print / Save as PDF.
 
 To show the real form, save a PNG or JPEG of the blank job sheet in the private `car mechanic assistant/runtime/workshop/` folder and set `WORKSHOP_SHEET_TEMPLATE` to its full path, then restart. Without it the values still print, on a plain page with a notice. Keep the form image out of Git. If the workshop changes its printed form, the field positions at the top of `app/services/workshop_sheet.py` need adjusting.
+
+An issued invoice has the same option: **Print invoice on the workshop form**. Work lines fill the numbered rows and Total, GST 9% and Grand total fill the last rows. The plain invoice print is still available and is the stored copy.

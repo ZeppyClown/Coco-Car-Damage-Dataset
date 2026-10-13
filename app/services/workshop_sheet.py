@@ -1,4 +1,4 @@
-"""Print a reviewed record onto the workshop's own blank job sheet.
+"""Print a reviewed record or issued invoice onto the workshop's own blank job sheet.
 
 The configured blank form is the page background and reviewed values are placed
 where staff would write them, so the print-out reads like the paper sheet.
@@ -15,8 +15,10 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.models import WorkshopJobRevision
-from app.schemas.workshop import WorkshopRevisionResponse
+from app.schemas.workshop import WorkshopReviewedDraft, WorkshopRevisionResponse
+from app.schemas.workshop_invoice import InvoiceResponse
 from app.services.workshop import _revision_response
+from app.services.workshop_invoice import get_invoice, invoice_html, invoice_response
 
 ROWS_PER_SHEET = 20
 # Positions are percentages of the blank form (yap-motor quotation/job sheet scan).
@@ -31,8 +33,9 @@ STYLE = """body{margin:0;background:#888;font:13px Arial,Helvetica,sans-serif;co
 .sheet img{position:absolute;inset:0;width:100%;height:100%}
 .sheet span{position:absolute;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:bold}
 .item{left:7%;width:32.5%}.amount{left:40.3%;width:9.6%;text-align:right}
-.notes{left:51.5%;top:22.5%;width:41%;white-space:pre-wrap!important;font-size:11px}
+.notes{left:51.5%;top:22.5%;width:41%;white-space:pre-wrap!important;overflow-wrap:anywhere;font-size:11px}
 .page{right:6%;top:1.2%;font-size:10px;color:#000}
+.total{color:#000}.item:has(.total){text-align:right}
 @media print{body{background:#fff}.sheet{margin:0;page-break-after:always}.screen{display:none}}
 @page{size:A4;margin:0}"""
 
@@ -41,57 +44,114 @@ def _day(value: date | None) -> str:
     return value.strftime("%d/%m/%Y") if value else ""
 
 
-def render_job_sheet(revision: WorkshopRevisionResponse, template: bytes | None) -> str:
-    def e(value: object) -> str:
-        return escape(str(value or ""), quote=True)
+def _e(value: object) -> str:
+    return escape(str(value or ""), quote=True)
 
-    record = revision.record
+
+def _document(title: str, pages: list[str], notices: list[str], template: bytes | None) -> str:
     background = ""
     if template:
         kind = "png" if template.startswith(b"\x89PNG") else "jpeg"
         background = f'<img alt="" src="data:image/{kind};base64,{b64encode(template).decode()}">'
+    else:
+        notices = [*notices, "Blank job-sheet image is not configured, so only the values are shown."]
+    sheets = "".join(f'<section class="sheet">{background}{page}</section>' for page in pages)
+    return (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><title>{_e(title)}</title>'
+            f'<style>{STYLE}</style></head><body><p class="note screen">{" ".join(notices)}</p>{sheets}</body></html>')
+
+
+def _header(record: WorkshopReviewedDraft, owner: str | None = None) -> str:
     values = {
         "quotation": _day(record.quotation_date), "vehicle": record.vehicle_reference,
-        "make_model": " ".join(filter(None, (record.make, record.model))), "owner": record.customer_reference,
+        "make_model": " ".join(filter(None, (record.make, record.model))),
+        "owner": owner or record.customer_reference,
         "date_in": _day(record.date_in), "date_out": _day(record.date_out),
     }
-    header = "".join(f'<span style="left:{left}%;top:{top}%">{e(values[name])}</span>'
-                     for name, (left, top) in FIELDS.items())
+    return "".join(f'<span style="left:{left}%;top:{top}%">{_e(values[name])}</span>'
+                   for name, (left, top) in FIELDS.items())
+
+
+def _row(index: int, text: str, amount: str) -> str:
+    top = FIRST_ROW_TOP + ROW_PITCH * index
+    return (f'<span class="item" style="top:{top:.2f}%">{text}</span>'
+            f'<span class="amount" style="top:{top:.2f}%">{amount}</span>')
+
+
+def _demo_notices(data_origin: str, kind: str) -> list[str]:
+    demo = [f"DEMO ONLY — fictional {kind}."] if data_origin == "synthetic_demo" else []
+    return [*demo, "Use your browser's Print / Save as PDF."]
+
+
+def render_job_sheet(revision: WorkshopRevisionResponse, template: bytes | None) -> str:
+    record = revision.record
     totals = [f"{label}: {value:.2f}" for label, value in (
         ("Total", record.written_total), ("Adjustment", record.written_adjustment),
         ("Grand total", record.written_grand_total)) if value is not None]
     notes = "\n".join(filter(None, (record.diagram_notes or record.diagram_notes_raw, *totals)))
     items = list(record.items) or [None]
-    pages = [items[start:start + ROWS_PER_SHEET] for start in range(0, len(items), ROWS_PER_SHEET)]
-    sheets = []
-    for number, rows in enumerate(pages, 1):
-        cells = []
-        for index, row in enumerate(filter(None, rows)):
-            top = FIRST_ROW_TOP + ROW_PITCH * index
-            text = f"<s>{e(row.description_raw)}</s>" if row.cancelled else e(row.description or row.description_raw)
-            amount = "" if row.cancelled or row.amount is None else f"{row.amount:.2f}"
-            cells.append(f'<span class="item" style="top:{top:.2f}%">{text}</span>'
-                         f'<span class="amount" style="top:{top:.2f}%">{amount}</span>')
-        sheets.append(f'<section class="sheet">{background}{header}{"".join(cells)}'
-                      f'<span class="notes">{e(notes)}</span>'
-                      f'<span class="page">Sheet {number} of {len(pages)} · {e(record.job_reference)} v{revision.version}</span></section>')
-    notices = ["Use your browser's Print / Save as PDF."]
-    if record.data_origin == "synthetic_demo":
-        notices.insert(0, "DEMO ONLY — fictional record.")
-    if not template:
-        notices.append("Blank job-sheet image is not configured, so only the values are shown.")
-    return (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Job sheet {e(record.job_reference)}</title>'
-            f'<style>{STYLE}</style></head><body><p class="note screen">{" ".join(notices)}</p>{"".join(sheets)}</body></html>')
+    chunks = [items[start:start + ROWS_PER_SHEET] for start in range(0, len(items), ROWS_PER_SHEET)]
+    pages = []
+    for number, rows in enumerate(chunks, 1):
+        cells = "".join(_row(
+            index, f"<s>{_e(row.description_raw)}</s>" if row.cancelled else _e(row.description or row.description_raw),
+            "" if row.cancelled or row.amount is None else f"{row.amount:.2f}",
+        ) for index, row in enumerate(filter(None, rows)))
+        pages.append(f'{_header(record)}{cells}<span class="notes">{_e(notes)}</span>'
+                     f'<span class="page">Sheet {number} of {len(chunks)} · {_e(record.job_reference)} v{revision.version}</span>')
+    return _document(f"Job sheet {record.job_reference}", pages, _demo_notices(record.data_origin, "record"), template)
 
 
-def job_sheet_html(db: Session, revision_id: UUID) -> str:
-    revision = db.scalar(select(WorkshopJobRevision).where(WorkshopJobRevision.id == revision_id))
-    if revision is None:
-        raise HTTPException(status_code=404, detail="Reviewed workshop revision not found")
+def render_invoice_sheet(invoice: InvoiceResponse, record: WorkshopReviewedDraft, template: bytes | None) -> str:
+    """The issued invoice on the same form: work lines, then the totals in the last rows."""
+    preview, request = invoice.preview, invoice.preview.request
+    registered = request.supplier.gst_status == "registered"
+    totals = [("TOTAL", preview.net), ("GST 9%", preview.gst), ("GRAND TOTAL", preview.total)] if registered \
+        else [("GRAND TOTAL", preview.total)]
+    if request.discount:
+        totals.insert(0, ("LESS DISCOUNT", request.discount))
+    room = ROWS_PER_SHEET - len(totals)
+    lines = list(preview.lines)
+    chunks = [lines[start:start + ROWS_PER_SHEET] for start in range(0, len(lines), ROWS_PER_SHEET)] or [[]]
+    if len(chunks[-1]) > room:
+        chunks.append([])
+    title = "TAX INVOICE" if registered else "INVOICE"
+    basis = f"Prices are GST-{request.pricing_basis}." if registered else "No GST charged."
+    notes = "\n".join(filter(None, (
+        title, f"No: {invoice.number}", f"Date: {_day(request.invoice_date)}", basis,
+        f"Issued by {invoice.issued_by}", record.diagram_notes)))
+    pages = []
+    for number, rows in enumerate(chunks, 1):
+        cells = "".join(_row(index, _e(line.description), f"{line.amount:.2f}") for index, line in enumerate(rows))
+        if number == len(chunks):
+            cells += "".join(_row(room + index, f'<b class="total">{label}</b>', f"{amount:.2f}")
+                             for index, (label, amount) in enumerate(totals))
+        pages.append(f'{_header(record, request.customer.name)}{cells}<span class="notes">{_e(notes)}</span>'
+                     f'<span class="page">Sheet {number} of {len(chunks)} · {_e(preview.job_reference)}</span>')
+    return _document(f"{invoice.number} — {title}", pages, _demo_notices(preview.data_origin, "invoice"), template)
+
+
+def _template() -> bytes | None:
     template: Path | None = settings.WORKSHOP_SHEET_TEMPLATE
     try:
         # An empty WORKSHOP_SHEET_TEMPLATE= line parses as Path("."), which means "not configured".
-        content = template.read_bytes() if template and template != Path(".") else None
+        return template.read_bytes() if template and template != Path(".") else None
     except OSError:
         raise HTTPException(status_code=503, detail="Configured blank job-sheet image cannot be read")
-    return render_job_sheet(_revision_response(revision), content)
+
+
+def _revision(db: Session, revision_id: UUID) -> WorkshopRevisionResponse:
+    revision = db.scalar(select(WorkshopJobRevision).where(WorkshopJobRevision.id == revision_id))
+    if revision is None:
+        raise HTTPException(status_code=404, detail="Reviewed workshop revision not found")
+    return _revision_response(revision)
+
+
+def job_sheet_html(db: Session, revision_id: UUID) -> str:
+    return render_job_sheet(_revision(db, revision_id), _template())
+
+
+def invoice_sheet_html(db: Session, invoice_id: UUID) -> str:
+    invoice = get_invoice(db, invoice_id)
+    invoice_html(invoice)  # refuse to restyle an invoice whose stored copy fails its integrity check
+    response = invoice_response(invoice)
+    return render_invoice_sheet(response, _revision(db, response.preview.revision_id).record, _template())

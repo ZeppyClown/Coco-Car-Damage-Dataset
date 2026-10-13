@@ -4,12 +4,16 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 import pytest
 
 from app.core.config import settings
+from app.db.models import WorkshopInvoice, WorkshopJobRevision
 from app.schemas.workshop import WorkshopRevisionResponse
-from app.services.workshop_sheet import ROWS_PER_SHEET, render_job_sheet
+from app.schemas.workshop_invoice import InvoiceRequest, InvoiceResponse
+from app.services.workshop_invoice import calculate_invoice
+from app.services.workshop_sheet import ROWS_PER_SHEET, render_invoice_sheet, render_job_sheet
 
 
 EXAMPLE = json.loads((Path(__file__).parents[1] / "fixtures/workshop/examples.json").read_text())["examples"][0]["record"]
@@ -92,3 +96,64 @@ def test_sheet_route_serves_reviewed_versions_only(sheet_client, monkeypatch, te
     assert sheet_client.get(API + f"/revisions/{snapshot['id']}/sheet").status_code == 503
     monkeypatch.setattr(settings, "WORKSHOP_ENABLED", False)
     assert sheet_client.get(API + f"/revisions/{snapshot['id']}/sheet").status_code == 404
+
+
+def billing(**changes):
+    return {
+        "supplier": {"name": "Fictional Workshop", "address": "1 Fictional Street, Singapore (DEMO)",
+                     "gst_status": "registered", "gst_registration_number": "FICTIONAL-NOT-A-REGISTRATION"},
+        "customer": {"name": "Fictional Customer", "address": "2 Fictional Street (DEMO)"},
+        "invoice_date": "2026-10-12", "pricing_basis": "inclusive", "discount": "0.00", **changes,
+    }
+
+
+def invoice(amounts, **changes):
+    record = {**deepcopy(EXAMPLE), "record_stage": "completed_work",
+              "items": [item(f"Line {n}", amount) for n, amount in enumerate(amounts, 1)]}
+    snapshot = WorkshopJobRevision(id=UUID(int=1), job_id=UUID(int=2), version=1, record=record,
+                                   reviewer="Fictional reviewer", reviewed_at=datetime(2026, 10, 11, tzinfo=timezone.utc))
+    preview = calculate_invoice(snapshot, InvoiceRequest.model_validate(billing(**changes)))
+    response = InvoiceResponse(id=UUID(int=3), number="DEMO-INV-1", preview=preview, issued_by="fictional-operator",
+                               issued_at=datetime(2026, 10, 12, tzinfo=timezone.utc), checksum="0" * 64)
+    return render_invoice_sheet(response, revision(**record).record, FAKE_FORM)
+
+
+def test_invoice_uses_the_form_with_totals_in_the_last_rows():
+    html = invoice(["109.00"])
+    assert html.count('<section class="sheet">') == 1
+    for value in ("TAX INVOICE", "No: DEMO-INV-1", "Date: 12/10/2026", "Fictional Customer", "Line 1",
+                  "Prices are GST-inclusive.", "DEMO ONLY"):
+        assert value in html
+    last_three = [f"top:{22.9 + 3.1 * index:.2f}%" for index in (17, 18, 19)]
+    for position, label, amount in zip(last_three, ("TOTAL", "GST 9%", "GRAND TOTAL"), ("100.00", "9.00", "109.00")):
+        assert f'<span class="item" style="{position}"><b class="total">{label}</b></span>' in html
+        assert f'<span class="amount" style="{position}">{amount}</span>' in html
+
+
+def test_invoice_discount_non_registered_and_overflow():
+    html = invoice(["109.00"], discount="9.00")
+    assert "LESS DISCOUNT" in html and ">9.00<" in html and ">100.00<" in html
+    plain = invoice(["50.00"], supplier={"name": "Fictional Workshop", "address": "1 Fictional Street (DEMO)",
+                                         "gst_status": "not_registered"})
+    assert "TAX INVOICE" not in plain and "INVOICE\nNo: DEMO-INV-1" in plain and "GST 9%" not in plain and "No GST charged." in plain
+    full = invoice(["1.00"] * 18)
+    assert full.count('<section class="sheet">') == 2 and full.count("GRAND TOTAL") == 1 and "Sheet 2 of 2" in full
+
+
+def test_invoice_sheet_route(sheet_client, test_db):
+    record = {**deepcopy(EXAMPLE), "record_stage": "completed_work"}
+    job = sheet_client.post(API + "/jobs", json=record).json()
+    snapshot = sheet_client.post(API + f"/jobs/{job['id']}/confirm", json={
+        "expected_version": 1, "reviewer": "Fictional reviewer", "acknowledged": True}).json()
+    today = datetime.now(ZoneInfo("Asia/Singapore")).date().isoformat()
+    issued = sheet_client.post(API + f"/revisions/{snapshot['id']}/invoice",
+                               json={"invoice": billing(invoice_date=today), "acknowledged": True})
+    assert issued.status_code == 200
+    page = sheet_client.get(API + f"/invoices/{issued.json()['id']}/sheet")
+    assert page.status_code == 200 and "img-src data:" in page.headers["content-security-policy"]
+    assert issued.json()["number"] in page.text and "GRAND TOTAL" in page.text and "25.10" in page.text
+    assert sheet_client.get(API + f"/invoices/{job['id']}/sheet").status_code == 404
+    stored = test_db.get(WorkshopInvoice, UUID(issued.json()["id"]))
+    stored.checksum = "0" * 64
+    test_db.commit()
+    assert sheet_client.get(API + f"/invoices/{issued.json()['id']}/sheet").status_code == 503

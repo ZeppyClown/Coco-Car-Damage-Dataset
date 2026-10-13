@@ -2,84 +2,127 @@
 const api = document.querySelector('meta[name="workshop-api"]').content;
 const reviewerAccount = document.querySelector('meta[name="workshop-user"]').content;
 const $ = id => document.getElementById(id);
-const states = ["missing", "unclear", "proposed", "confirmed"];
-const scalarFields = [
-  ["job_reference", "Job reference"], ["customer_reference", "Customer reference"],
-  ["vehicle_reference", "Vehicle reference"], ["make", "Make"], ["model", "Model"],
-  ["quotation_date", "Quotation date", "date"], ["date_in", "Date in", "date"], ["date_out", "Date out", "date"],
-  ["currency", "Currency (three uppercase letters)"], ["diagram_notes", "Clarified diagram meaning", "textarea"],
-  ["written_total", "Written total", "money"], ["written_adjustment", "Written adjustment", "money"],
-  ["written_grand_total", "Written grand total", "money"],
-];
-const rawFields = [["date_note_raw", "Literal date note"], ["diagram_notes_raw", "Literal diagram / panel notes"], ["written_totals_raw", "Literal total / adjustment notes"]];
-let job = null, sourceId = null, aiProvenance = null, dirty = false, zoom = 1, rotation = 0, reviewed = [];
+const JSON_POST = body => ({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+
+// Fields typed on step 1. The record keeps a review state for each of these.
+const headerFields = ["job_reference", "vehicle_reference", "make", "model", "customer_reference", "quotation_date", "date_in", "date_out"];
+// Older records may carry these; the simple screen keeps them untouched.
+const keptFields = ["diagram_notes", "written_total", "written_adjustment", "written_grand_total", "date_note_raw", "diagram_notes_raw", "written_totals_raw"];
+const fuelLevels = ["empty", "1/5", "2/5", "3/5", "4/5", "full"];
+const sections = {
+  knock: { title: "2 · Knock", hint: "One line for each knocking job, as written on the sheet. Then click the car on the right to show where.", next: ["repair", "Next: Repair & parts →"] },
+  repair: { title: "3 · Repair & parts", hint: "Servicing, repairs and parts to change, for example radiator, fan motor or front oil seal.", next: ["spray", "Next: Spray →"] },
+  spray: { title: "4 · Spray", hint: "Spray painting lines, as written on the sheet. Click the car to show which panels.", next: ["check", "Next: Check & save →"] },
+};
+const stageNames = { quote: "Quotation", approved_scope: "Agreed job", completed_work: "Finished job" };
+
+let step = "car", job = null, sourceId = null, aiProvenance = null, kept = {}, marks = [], fuel = null;
+let dirty = false, zoom = 1, rotation = 0, reviewed = [];
 let lookupParams = new URLSearchParams(), lookupOffset = 0;
 let billingRevision = null, billingPreview = null, billingIssued = null, billingAllowed = false, billingDirty = false;
 
-function element(tag, text) { const node = document.createElement(tag); if (text) node.textContent = text; return node; }
-function control(parent, id, labelText, type = "text", limit = 200) {
-  const label = element("label", labelText);
-  const input = element(type === "textarea" ? "textarea" : "input");
-  input.id = id; input.maxLength = limit;
-  if (type !== "textarea") input.type = type === "money" ? "text" : type;
-  if (type === "money") input.inputMode = "decimal";
-  label.append(input); parent.append(label); return input;
+function element(tag, text, className) {
+  const node = document.createElement(tag);
+  if (text) node.textContent = text;
+  if (className) node.className = className;
+  return node;
 }
-function stateControl(parent, id, labelText) {
-  const label = element("label", labelText); label.className = "field-state";
-  const select = element("select"); select.id = id;
-  select.setAttribute("aria-label", labelText);
-  for (const state of states) { const option = element("option", state); option.value = state; select.append(option); }
-  label.append(select); parent.append(label); return select;
-}
-function markDirty() {
-  dirty = true; $("dirty-label").textContent = "Unsaved changes";
-  $("confirm-record").disabled = true; $("review-ack").checked = false;
-  updateIssueButton();
-}
-function watchValue(input, state) {
-  input.addEventListener("input", () => { state.value = input.value.trim() ? "proposed" : "missing"; markDirty(); });
-}
-for (const [name, label, type] of scalarFields) {
-  const group = element("div");
-  const primary = ["job_reference", "customer_reference", "vehicle_reference", "currency"].includes(name);
-  $(primary ? "scalar-fields" : "optional-fields").append(group);
-  const input = control(group, name, label, type, type === "textarea" ? 2000 : 200);
-  const state = stateControl(group, name + "-state", label + " review state"); watchValue(input, state);
-}
-for (const [name, label] of rawFields) control($("raw-fields"), name, label, "textarea", 10000);
+function status(message, error = false) { $("status").textContent = message; $("status").classList.toggle("error", error); }
+function markDirty() { dirty = true; $("dirty-label").textContent = "Unsaved changes"; updateIssueButton(); }
 
-function addItem(item = {}) {
-  const rows = $("items"); if (rows.children.length >= 50) return;
-  const index = crypto.randomUUID(); const card = element("section"); card.className = "item";
-  card.append(element("h4", "Item"));
-  control(card, index + "-raw", "Literal item description", "textarea", 10000).value = item.description_raw || "";
-  const description = control(card, index + "-description", "Clarified description", "textarea", 2000); description.value = item.description || "";
-  const descriptionState = stateControl(card, index + "-description-state", "Description review state"); descriptionState.value = item.description_state || "missing";
-  control(card, index + "-amount-raw", "Literal amount text").value = item.amount_raw || "";
-  const amount = control(card, index + "-amount", "Parsed amount (empty means unknown)", "money"); amount.value = item.amount ?? "";
-  const amountState = stateControl(card, index + "-amount-state", "Amount review state"); amountState.value = item.amount_state || "missing";
-  const cancelled = control(card, index + "-cancelled", "Cancelled / crossed out", "checkbox"); cancelled.checked = item.cancelled || false;
-  card.classList.toggle("cancelled", cancelled.checked);
-  cancelled.addEventListener("change", () => card.classList.toggle("cancelled", cancelled.checked));
-  watchValue(description, descriptionState); watchValue(amount, amountState);
-  const remove = element("button", "Remove item"); remove.type = "button";
-  remove.addEventListener("click", () => { if (window.confirm("Remove this item from the draft?")) { card.remove(); markDirty(); $("add-item").disabled = false; } });
-  card.append(remove); card.dataset.key = index; rows.append(card); $("add-item").disabled = rows.children.length >= 50;
-}
-function readDraft() {
-  const draft = { data_origin: $("data-origin").value, source_document_id: sourceId, record_stage: $("record-stage").value,
-    manual_provenance: $("manual-provenance").value.trim() || null, ai_provenance: aiProvenance, field_states: {}, items: [] };
-  for (const [name] of scalarFields) { draft[name] = $(name).value.trim() || null; draft.field_states[name] = $(name + "-state").value; }
-  for (const [name] of rawFields) draft[name] = $(name).value;
-  for (const card of $("items").children) {
-    const key = card.dataset.key;
-    draft.items.push({ description_raw: $(key + "-raw").value, description: $(key + "-description").value.trim() || null,
-      description_state: $(key + "-description-state").value, amount_raw: $(key + "-amount-raw").value,
-      amount: $(key + "-amount").value.trim() || null, amount_state: $(key + "-amount-state").value, cancelled: $(key + "-cancelled").checked });
+// ---- steps -----------------------------------------------------------------
+function showStep(name) {
+  step = name;
+  const panel = sections[name] ? "lines" : name;
+  for (const node of document.querySelectorAll("[data-panel]")) node.hidden = node.dataset.panel !== panel;
+  for (const button of document.querySelectorAll("#steps button, .tools [data-step]")) button.classList.toggle("active", button.dataset.step === name);
+  $("draft-form").hidden = name === "find" || name === "help";
+  $("side").hidden = name === "print";
+  if (sections[name]) {
+    $("lines-title").textContent = sections[name].title; $("lines-hint").textContent = sections[name].hint;
+    $("lines-next").textContent = sections[name].next[1]; showRows();
   }
-  return draft;
+  if (name === "check") renderSummary();
+  viewImage(); window.scrollTo(0, 0);
 }
+for (const button of document.querySelectorAll("[data-step]")) button.addEventListener("click", () => showStep(button.dataset.step));
+$("lines-next").addEventListener("click", () => showStep(sections[step].next[0]));
+
+// ---- fuel gauge ------------------------------------------------------------
+for (const level of fuelLevels) {
+  const button = element("button", level === "empty" ? "Empty" : level === "full" ? "Full" : level); button.type = "button"; button.dataset.level = level;
+  button.addEventListener("click", () => { fuel = fuel === level ? null : level; showFuel(); markDirty(); });
+  $("fuel").append(button);
+}
+function showFuel() { for (const button of $("fuel").querySelectorAll("button")) button.classList.toggle("active", button.dataset.level === fuel); }
+
+// ---- work lines ------------------------------------------------------------
+function parseAmount(text) {
+  const cleaned = text.replace(/[$,\s]|\/-|sgd/gi, "");
+  return /^\d{1,10}(\.\d{1,2})?$/.test(cleaned) ? cleaned : null;
+}
+function addRow(item = {}, section = step) {
+  const row = element("div", "", "row"); row.dataset.section = item.section || section;
+  row.dataset.raw = item.description_raw || ""; row.dataset.loaded = item.description || item.description_raw || "";
+  const number = element("span", "", "number");
+  const text = element("input"); text.maxLength = 2000; text.className = "text"; text.value = row.dataset.loaded; text.setAttribute("aria-label", "Comments or remarks / items");
+  const amount = element("input"); amount.maxLength = 200; amount.className = "amount"; amount.inputMode = "decimal"; amount.setAttribute("aria-label", "Amount");
+  amount.value = item.amount ?? item.amount_raw ?? "";
+  const unsure = element("input"); unsure.type = "checkbox"; unsure.className = "unsure"; unsure.setAttribute("aria-label", "Not sure");
+  unsure.checked = item.description_state === "unclear" || item.amount_state === "unclear";
+  const crossed = element("input"); crossed.type = "checkbox"; crossed.className = "crossed"; crossed.setAttribute("aria-label", "Crossed out"); crossed.checked = Boolean(item.cancelled);
+  const remove = element("button", "✕"); remove.type = "button"; remove.title = "Remove this line";
+  remove.addEventListener("click", () => { if (!text.value.trim() || window.confirm("Remove this line?")) { row.remove(); markDirty(); showRows(); } });
+  crossed.addEventListener("change", () => row.classList.toggle("cancelled", crossed.checked));
+  row.classList.toggle("cancelled", crossed.checked);
+  row.append(number, text, amount, unsure, crossed, remove); $("items").append(row); return row;
+}
+function showRows() {
+  let shown = 0;
+  for (const row of $("items").children) {
+    row.hidden = row.dataset.section !== step;
+    if (!row.hidden) row.querySelector(".number").textContent = ++shown;
+  }
+  $("no-lines").hidden = shown > 0; $("add-item").disabled = $("items").children.length >= 50;
+}
+$("add-item").addEventListener("click", () => { addRow().querySelector(".text").focus(); markDirty(); showRows(); });
+function readRows(confirmed) {
+  return [...$("items").children].map(row => {
+    const text = row.querySelector(".text").value.trim(), typed = row.querySelector(".amount").value.trim();
+    const unsure = row.querySelector(".unsure").checked, amount = parseAmount(typed), done = confirmed ? "confirmed" : "proposed";
+    return {
+      section: row.dataset.section, cancelled: row.querySelector(".crossed").checked,
+      description_raw: text === row.dataset.loaded && row.dataset.raw ? row.dataset.raw : text,
+      description: text || null, description_state: !text ? "missing" : unsure ? "unclear" : done,
+      amount_raw: typed, amount, amount_state: amount === null ? (typed ? "unclear" : "missing") : unsure ? "unclear" : done,
+    };
+  }).filter(item => item.description_raw || item.amount_raw);
+}
+
+// ---- car marks -------------------------------------------------------------
+function showMarks() {
+  for (const old of $("car").querySelectorAll(".mark")) old.remove();
+  $("marks").replaceChildren();
+  marks.forEach((mark, index) => {
+    const dot = element("span", String(index + 1), "mark"); dot.style.left = mark.x + "%"; dot.style.top = mark.y + "%"; $("car").append(dot);
+    const line = element("li"); const note = element("input"); note.maxLength = 200; note.value = mark.note; note.placeholder = "What is it? e.g. rear bumper dent";
+    note.addEventListener("input", () => { mark.note = note.value; });
+    const remove = element("button", "✕"); remove.type = "button"; remove.title = "Remove this mark";
+    remove.addEventListener("click", () => { marks.splice(index, 1); showMarks(); markDirty(); });
+    line.append(note, remove); $("marks").append(line);
+  });
+}
+$("car").addEventListener("click", event => {
+  if (event.target.classList.contains("mark")) return;
+  if (marks.length >= 30) return status("30 marks is the most one sheet can hold.", true);
+  const box = $("car").getBoundingClientRect();
+  marks.push({ x: Math.round((event.clientX - box.left) / box.width * 1000) / 10, y: Math.round((event.clientY - box.top) / box.height * 1000) / 10, note: "" });
+  showMarks(); markDirty(); $("marks").lastChild.querySelector("input").focus();
+});
+$("car-outline").addEventListener("error", () => { $("car-outline").hidden = true; $("car").classList.add("blank"); });
+$("car-outline").src = api + "/sheet-diagram";
+
+// ---- photo of the paper sheet ---------------------------------------------
 function viewImage() {
   const image = $("source-image"); if (image.hidden || !image.naturalWidth) return;
   const fit = Math.min(1, (document.querySelector(".viewer").clientWidth - 24) / image.naturalWidth);
@@ -92,171 +135,199 @@ function viewImage() {
 }
 function showSource() {
   const image = $("source-image"); zoom = 1; rotation = 0;
-  image.hidden = !sourceId; $("source-identity").textContent = sourceId ? "Source ID: " + sourceId : "No source attached. Manual entry is available.";
-  if (sourceId) image.src = api + "/documents/" + encodeURIComponent(sourceId) + "/preview";
-  else { image.removeAttribute("src"); $("image-stage").style.height = "0px"; }
+  image.hidden = !sourceId; $("photo").hidden = !sourceId;
+  $("source-identity").textContent = sourceId ? "Photo attached." : "No photo attached.";
+  if (sourceId) image.src = api + "/documents/" + encodeURIComponent(sourceId) + "/preview"; else image.removeAttribute("src");
 }
+
+// ---- record <-> screen -----------------------------------------------------
 function render(record = { data_origin: "synthetic_demo", items: [] }) {
   resetBilling();
-  $("reviewer").value = reviewerAccount;
+  $("reviewer").textContent = reviewerAccount;
   aiProvenance = record.ai_provenance || null; $("ai-send-ack").checked = false;
-  $("ai-provenance").textContent = aiProvenance ? `Initial AI proposal: ${aiProvenance.model} · ${aiProvenance.prompt_version} · source ${aiProvenance.source_document_id}. Review every value; this is not an accuracy result.` : "";
+  $("ai-provenance").textContent = aiProvenance ? `First draft suggested by AI (${aiProvenance.model}). Check every value.` : "";
   sourceId = record.source_document_id || null; $("data-origin").value = record.data_origin; $("data-origin").disabled = Boolean(job);
-  $("record-stage").value = record.record_stage || "unknown"; $("manual-provenance").value = record.manual_provenance || "";
-  for (const [name] of scalarFields) { $(name).value = record[name] ?? ""; $(name + "-state").value = record.field_states?.[name] || (record[name] == null ? "missing" : "proposed"); }
-  for (const [name] of rawFields) $(name).value = record[name] || "";
-  $("items").replaceChildren(); for (const item of record.items || []) addItem(item);
-  $("add-item").disabled = $("items").children.length >= 50; dirty = false; $("dirty-label").textContent = "No unsaved changes";
-  $("source-file").value = "";
-  $("record-identity").textContent = job ? `Job ID: ${job.id} · editable draft version ${job.draft_version}` : "New, unsaved draft";
-  $("open-id").value = job?.id || ""; showSource();
-  $("review-ack").checked = false; $("confirm-record").disabled = !job;
+  $("record-stage").value = stageNames[record.record_stage] ? record.record_stage : "quote";
+  $("manual-provenance").value = record.manual_provenance || "";
+  for (const name of headerFields) $(name).value = record[name] ?? "";
+  $("contact").value = record.contact ?? "";
+  kept = { states: {} };
+  for (const name of keptFields) kept[name] = record[name] ?? (name.endsWith("_raw") ? "" : null);
+  for (const name of keptFields.slice(0, 4)) if (record.field_states?.[name]) kept.states[name] = record.field_states[name];
+  kept.currency = record.currency ?? null;
+  fuel = record.fuel_level || null; showFuel();
+  marks = (record.diagram_marks || []).map(mark => ({ ...mark })); showMarks();
+  $("items").replaceChildren(); for (const item of record.items || []) addRow(item, "repair");
+  showRows(); dirty = false; $("dirty-label").textContent = "No unsaved changes"; $("source-file").value = "";
+  $("record-identity").textContent = job ? `${record.job_reference || "Job without a number"} · saved version ${job.draft_version}` : "New job, not saved yet";
+  $("open-id").value = job?.id || ""; showSource(); $("review-ack").checked = false;
 }
-function renderHistory() {
-  const container = $("reviewed-history"); container.replaceChildren();
-  const current = reviewed.find(revision => revision.version === job?.draft_version);
-  $("review-state").textContent = !job ? "No record opened." : current ? "This saved draft version has been reviewed. Edit and save to create a correction; earlier snapshots remain unchanged." : "This draft version has not been reviewed.";
-  for (const revision of reviewed) {
-    const details = element("details"); const record = revision.record;
-    const stages = { quote: "Quote", approved_scope: "Approved scope", completed_work: "Completed work" };
-    details.append(element("summary", `Reviewed version ${revision.version} · ${stages[record.record_stage]} · ${record.job_reference}`));
-    details.append(element("p", `Reviewer: ${revision.reviewer} (${revision.reviewer_identity === "authenticated" ? "authenticated account" : "self-reported legacy identity"}) · ${new Date(revision.reviewed_at).toLocaleString()}`));
-    if (record.ai_provenance) details.append(element("p", `Initial AI proposal: ${record.ai_provenance.model} · ${record.ai_provenance.prompt_version} · source ${record.ai_provenance.source_document_id}`));
-    if (record.diagram_notes && !record.manual_provenance) details.append(element("p", "This older version has no stated diagram clarification context. Add it to a new draft and review again."));
-    for (const [name, label] of scalarFields) if (record[name] != null) details.append(element("p", label + ": " + record[name]));
-    for (const [name, label] of rawFields) if (record[name]) details.append(element("pre", label + ": " + record[name]));
-    for (const item of record.items) {
-      details.append(element("pre", (item.cancelled ? "Cancelled row" : "Reviewed item") + ": " + (item.description || "Unknown description") +
-        "\nLiteral text: " + item.description_raw + "\nAmount: " + (item.amount ?? "Unknown") + (record.currency ? " " + record.currency : "") + "\nLiteral amount: " + item.amount_raw));
+function readDraft(confirmed = false) {
+  const done = confirmed ? "confirmed" : "proposed", items = readRows(confirmed);
+  const draft = {
+    data_origin: $("data-origin").value, source_document_id: sourceId, ai_provenance: aiProvenance,
+    record_stage: $("record-stage").value, items, field_states: {},
+    manual_provenance: $("manual-provenance").value.trim() || (sourceId ? null : "Typed in by workshop staff; no photo attached."),
+    contact: $("contact").value.trim() || null, fuel_level: fuel, diagram_marks: marks.map(mark => ({ ...mark, note: mark.note.trim() })),
+  };
+  for (const name of headerFields) { draft[name] = $(name).value.trim() || null; draft.field_states[name] = draft[name] ? done : "missing"; }
+  for (const name of keptFields) draft[name] = kept[name];
+  for (const [name, state] of Object.entries(kept.states)) draft.field_states[name] = confirmed && state === "proposed" ? "confirmed" : state;
+  const priced = items.some(item => item.amount !== null) || kept.written_total !== null || kept.written_grand_total !== null;
+  draft.currency = priced ? "SGD" : kept.currency; draft.field_states.currency = draft.currency ? done : "missing";
+  return draft;
+}
+function renderSummary() {
+  const draft = readDraft(), box = $("summary"); box.replaceChildren();
+  const head = [["Job no.", draft.job_reference], ["Vehicle", [draft.vehicle_reference, draft.make, draft.model].filter(Boolean).join(" · ")],
+    ["Owner", [draft.customer_reference, draft.contact].filter(Boolean).join(" · ")], ["Date in / out", [draft.date_in, draft.date_out].filter(Boolean).join(" → ")],
+    ["Fuel", draft.fuel_level]];
+  const top = element("p"); top.textContent = head.map(([label, value]) => `${label}: ${value || "—"}`).join("   |   "); box.append(top);
+  const table = element("table"); let total = 0, problems = [];
+  for (const [name, label] of [["knock", "Knock"], ["repair", "Repair & parts"], ["spray", "Spray"]]) {
+    const rows = draft.items.filter(item => item.section === name); if (!rows.length) continue;
+    const title = table.insertRow(); title.className = "group"; title.insertCell().textContent = label; title.insertCell();
+    for (const item of rows) {
+      const line = table.insertRow(); if (item.cancelled) line.className = "cancelled";
+      line.insertCell().textContent = item.description_raw + (item.cancelled ? " (crossed out)" : "");
+      line.insertCell().textContent = item.cancelled ? "" : item.amount ?? (item.amount_raw ? item.amount_raw + " ?" : "—");
+      if (item.cancelled) continue;
+      if (item.amount !== null) total += Number(item.amount);
+      if (item.description_state === "unclear" || item.amount_state === "unclear") problems.push(item.description_raw || item.amount_raw);
     }
-    if (record.source_document_id) {
-      const source = element("a", "Open this version's original source");
-      source.href = api + "/documents/" + encodeURIComponent(record.source_document_id) + "/preview"; source.target = "_blank"; source.rel = "noopener"; details.append(source);
-    } else details.append(element("p", "Manual provenance: " + record.manual_provenance));
-    const download = element("button", `Download demo CSV · version ${revision.version}`); download.type = "button";
-    download.addEventListener("click", () => action(async () => {
-      const exported = await request("/revisions/" + revision.id + "/exports", { method: "POST" });
-      const response = await fetch(api + "/exports/" + exported.id + "/download");
-      if (!response.ok) throw new Error("Demo CSV download failed. The reviewed version remains saved.");
-      const url = URL.createObjectURL(await response.blob());
-      const link = element("a"); link.href = url; link.download = `workshop-demo-${job.id}-v${revision.version}.csv`;
-      document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000);
-      status(`Demo CSV generated for reviewed version ${revision.version}. It has not been imported into accounting software.`);
-    }));
-    details.append(element("p", "Demo output only. Unknown amounts stay empty; cancelled rows contain literal text without interpreted values."));
-    details.append(download);
-    const sheet = element("a", `Print job sheet (paper layout) · version ${revision.version}`);
-    sheet.href = api + "/revisions/" + revision.id + "/sheet"; sheet.target = "_blank"; sheet.rel = "noopener"; details.append(sheet);
-    if (record.record_stage === "completed_work") {
-      const bill = element("button", `Prepare invoice · version ${revision.version}`); bill.type = "button";
-      bill.addEventListener("click", () => action(() => prepareInvoice(revision))); details.append(bill);
-    }
-    container.append(details);
   }
+  const sum = table.insertRow(); sum.className = "group"; sum.insertCell().textContent = "Total of the amounts typed in"; sum.insertCell().textContent = total.toFixed(2);
+  box.append(table);
+  if (draft.diagram_marks.length) box.append(element("p", "Car marks: " + draft.diagram_marks.map((mark, index) => `${index + 1} ${mark.note || "(no note)"}`).join("; ")));
+  if (!draft.job_reference) problems.unshift("Job no. is empty");
+  if (!draft.items.some(item => !item.cancelled && item.description)) problems.unshift("No work lines yet");
+  if (problems.length) box.append(element("p", "Clear up before confirming: " + problems.join("; "), "notice"));
 }
-async function refreshHistory(append = false) {
-  if (!job) { reviewed = []; $("more-history").hidden = true; renderHistory(); return; }
-  if (!append) { reviewed = []; $("reviewed-history").replaceChildren(); $("review-state").textContent = "Loading reviewed history…"; }
-  let rows;
-  try { rows = await request("/jobs/" + job.id + "/revisions?limit=20&offset=" + (append ? reviewed.length : 0)); }
-  catch (error) { $("review-state").textContent = "Reviewed history could not load. Reopen the record to retry."; throw error; }
-  if (!append) await loadJobInvoice();
-  reviewed = append ? reviewed.concat(rows) : rows; $("more-history").hidden = rows.length < 20; renderHistory();
-}
-async function historyStatus(message) {
-  try { await refreshHistory(); status(message); }
-  catch (error) { status(message + " Reviewed history could not load: " + error.message, true); }
-}
-function status(message, error = false) { $("status").textContent = message; $("status").classList.toggle("error", error); }
+
+// ---- server calls ----------------------------------------------------------
 async function request(path, options = {}) {
   const response = await fetch(api + path, options);
   const data = await response.json();
   if (!response.ok) {
-    const detail = Array.isArray(data.detail) ? data.detail.slice(0, 20).map(error => error.loc.join(".") + ": " + error.msg).join("\n") : data.detail || data.error;
-    throw new Error(detail || "Request failed. Your draft remains on screen.");
+    const detail = Array.isArray(data.detail) ? data.detail.slice(0, 20).map(error => error.msg.replace(/^Value error, /, "")).join("\n") : data.detail || data.error;
+    throw new Error(detail || "That did not work. What you typed is still on screen.");
   }
   return data;
 }
 async function action(task) {
   const controls = [...document.querySelectorAll("button,input,select,textarea")].map(node => [node, node.disabled]);
   controls.forEach(([node]) => node.disabled = true);
-  try { await task(); } catch (error) { status(error.message || "Request failed. Your draft remains on screen.", true); }
-  finally { controls.forEach(([node, disabled]) => node.disabled = disabled); $("data-origin").disabled = Boolean(job); $("add-item").disabled = $("items").children.length >= 50; $("confirm-record").disabled = !job || dirty; $("invoice-gst-status").disabled = billingRevision?.record.data_origin === "private_source"; updateIssueButton(); }
+  try { await task(); } catch (error) { status(error.message || "That did not work. What you typed is still on screen.", true); }
+  finally { controls.forEach(([node, disabled]) => node.disabled = disabled); $("data-origin").disabled = Boolean(job); showRows(); updateIssueButton(); }
 }
-function draftChanged(event) { if (!event.target.closest(".review-controls")) markDirty(); }
+async function save(confirmed = false) {
+  const draft = readDraft(confirmed);
+  job = await request(job ? "/jobs/" + job.id : "/jobs", { ...JSON_POST(job ? { expected_version: job.draft_version, draft } : draft), method: job ? "PATCH" : "POST" });
+  render(job.draft); history.replaceState(null, "", "/workshop?job=" + encodeURIComponent(job.id));
+}
+$("draft-form").addEventListener("submit", event => {
+  event.preventDefault();
+  if (billingDirty && !window.confirm("Discard the invoice details you typed and save the job?")) return;
+  action(async () => { await save(); showStep(step); await historyStatus("Saved. Not confirmed yet."); });
+});
+$("confirm-record").addEventListener("click", () => {
+  if (!$("review-ack").checked) return status("Tick the box to say you checked it first.", true);
+  const draft = readDraft(true), active = draft.items.filter(item => !item.cancelled);
+  const unsure = active.filter(item => item.description_state === "unclear" || item.amount_state === "unclear");
+  if (!draft.job_reference) return status("Type the job no. on step 1 before confirming.", true);
+  if (!active.some(item => item.description)) return status("Add at least one work line before confirming.", true);
+  if (unsure.length) return status("Clear up these lines before confirming (untick “Not sure” or fix the amount): " + unsure.map(item => item.description_raw || item.amount_raw).join("; "), true);
+  if (active.some(item => !item.description)) return status("A line has an amount but no words. Type what it is, or cross it out.", true);
+  action(async () => {
+    await save(true);
+    const revision = await request("/jobs/" + job.id + "/confirm", JSON_POST({ expected_version: job.draft_version, reviewer: reviewerAccount, acknowledged: true }));
+    await historyStatus(`Confirmed as checked (version ${revision.version}). You can print it now.`); showStep("print");
+  });
+});
+function draftChanged(event) { if (!event.target.closest('.review-controls,[data-panel="print"],#photo-box')) markDirty(); }
 $("draft-form").addEventListener("input", draftChanged);
 $("draft-form").addEventListener("change", draftChanged);
 $("data-origin").addEventListener("change", markDirty);
-$("add-item").addEventListener("click", () => { addItem(); markDirty(); });
-$("new-record").addEventListener("click", () => { if (!(dirty || billingDirty) || window.confirm("Discard unsaved changes and start a new record?")) { job = null; render(); refreshHistory(); history.replaceState(null, "", "/workshop"); status("New draft. No saved record was deleted."); } });
-$("open-record").addEventListener("click", () => {
-  if ((dirty || billingDirty) && !window.confirm("Discard unsaved changes and open another record?")) return;
-  const id = $("open-id").value.trim(); if (!id) return status("Enter a saved job ID.", true);
-  action(async () => { const loaded = await request("/jobs/" + encodeURIComponent(id)); job = loaded; render(job.draft); await historyStatus("Loaded editable draft version " + job.draft_version + "."); });
+$("new-record").addEventListener("click", () => {
+  if ((dirty || billingDirty) && !window.confirm("Discard unsaved changes and start a new job?")) return;
+  job = null; render(); refreshHistory(); history.replaceState(null, "", "/workshop"); showStep("car"); status("New job. Nothing saved was deleted.");
 });
-$("draft-form").addEventListener("submit", event => {
-  event.preventDefault();
-  if (billingDirty && !window.confirm("Discard unsaved invoice details and save the job?")) return;
-  const draft = readDraft();
-  action(async () => {
-    const payload = job ? { expected_version: job.draft_version, draft } : draft;
-    const saved = await request(job ? "/jobs/" + job.id : "/jobs", { method: job ? "PATCH" : "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload) });
-    job = saved; render(job.draft); history.replaceState(null, "", "/workshop?job=" + encodeURIComponent(job.id));
-    await historyStatus("Draft saved. Copy the job ID to reopen it. It has not been reviewed.");
-  });
-});
+function openJob(id) {
+  if ((dirty || billingDirty) && !window.confirm("Discard unsaved changes and open another job?")) return;
+  action(async () => { job = await request("/jobs/" + encodeURIComponent(id)); render(job.draft); showStep("check"); await historyStatus("Job opened."); });
+}
+$("open-record").addEventListener("click", () => { const id = $("open-id").value.trim(); if (id) openJob(id); else status("Paste a job ID first.", true); });
 $("attach-source").addEventListener("click", () => {
-  const file = $("source-file").files[0]; if (!file) return status("Choose a JPEG/PNG source first.", true);
+  const file = $("source-file").files[0]; if (!file) return status("Choose a JPEG or PNG photo first.", true);
   const data = new FormData(); data.append("file", file); data.append("data_origin", $("data-origin").value);
-  action(async () => { const source = await request("/documents", { method: "POST", body: data }); sourceId = source.id; showSource(); markDirty(); status(source.duplicate ? "These bytes already exist; reused the source. Jobs were not merged. Save the draft to retain this attachment." : "Source attached. Save the draft to retain this attachment."); });
+  action(async () => { const source = await request("/documents", { method: "POST", body: data }); sourceId = source.id; showSource(); markDirty(); status("Photo attached. Save the job to keep it."); });
 });
-$("detach-source").addEventListener("click", () => { sourceId = null; showSource(); markDirty(); status("Detached from this draft; the stored source was not deleted."); });
+$("detach-source").addEventListener("click", () => { sourceId = null; showSource(); markDirty(); status("Photo removed from this job. The stored photo was not deleted."); });
 $("extract-source").addEventListener("click", () => {
-  const draft = readDraft();
-  if (!sourceId) return status("Attach a fictional image first.", true);
-  if (job || draft.items.length || draft.manual_provenance || draft.record_stage !== "unknown" ||
-      scalarFields.some(([name]) => draft[name] != null) || rawFields.some(([name]) => draft[name])) {
-    return status("AI suggestions require a new empty draft. Your entered or saved values were kept.", true);
+  if (!sourceId) return status("Attach a practice photo first.", true);
+  if (job || $("items").children.length || headerFields.some(name => $(name).value.trim())) return status("AI suggestions only work on a new empty job. What you typed was kept.", true);
+  if (!$("ai-send-ack").checked) return status("Tick the box to allow sending this practice photo to Gemini first.", true);
+  action(async () => { const proposed = await request("/documents/" + sourceId + "/extract", JSON_POST({ send_to_gemini: true })); render(proposed); markDirty(); status("AI suggestion loaded, not saved. Check every value."); });
+});
+
+// ---- history, printing and CSV --------------------------------------------
+function link(text, href) { const node = element("a", text, "button"); node.href = href; node.target = "_blank"; node.rel = "noopener"; return node; }
+function renderHistory() {
+  const container = $("reviewed-history"); container.replaceChildren();
+  const current = reviewed.find(revision => revision.version === job?.draft_version);
+  $("review-state").textContent = !job ? "No job opened." : current ? "The saved job is confirmed. To correct it, change it, save and confirm again; older versions stay as they were."
+    : reviewed.length ? "The job was changed after it was last confirmed. Confirm again on step 5 to print the new version." : "This job is not confirmed yet. Confirm it on step 5 to print or invoice.";
+  for (const revision of reviewed) {
+    const record = revision.record, card = element("section", "", "version");
+    card.append(element("h3", `Version ${revision.version} · ${stageNames[record.record_stage]} · ${record.job_reference}`));
+    card.append(element("p", `Checked by ${revision.reviewer} on ${new Date(revision.reviewed_at).toLocaleString()} · ${record.items.filter(item => !item.cancelled).length} work lines`, "hint"));
+    card.append(link("Print job sheet", api + "/revisions/" + revision.id + "/sheet"));
+    if (record.record_stage === "completed_work") {
+      const bill = element("button", "Make invoice"); bill.type = "button"; bill.addEventListener("click", () => action(() => prepareInvoice(revision))); card.append(bill);
+    }
+    const download = element("button", "Download CSV"); download.type = "button";
+    download.addEventListener("click", () => action(async () => {
+      const exported = await request("/revisions/" + revision.id + "/exports", { method: "POST" });
+      const response = await fetch(api + "/exports/" + exported.id + "/download");
+      if (!response.ok) throw new Error("CSV download failed. The job is still saved.");
+      const url = URL.createObjectURL(await response.blob()), anchor = element("a"); anchor.href = url; anchor.download = `job-${record.job_reference}-v${revision.version}.csv`;
+      document.body.append(anchor); anchor.click(); anchor.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000);
+      status("CSV downloaded. It is a demo layout, not matched to any accounting software.");
+    }));
+    card.append(download);
+    if (record.source_document_id) card.append(link("Open photo", api + "/documents/" + encodeURIComponent(record.source_document_id) + "/preview"));
+    container.append(card);
   }
-  if (Object.values(draft.field_states).some(state => state !== "missing")) return status("Your review states were kept. Start a new empty draft for AI suggestions.", true);
-  if (!$("ai-send-ack").checked) return status("Acknowledge sending this fictional image to Gemini first.", true);
-  action(async () => {
-    const proposed = await request("/documents/" + sourceId + "/extract", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ send_to_gemini: true }) });
-    render(proposed); markDirty(); status("AI proposal loaded without saving. Check literal text, resolve unclear values, choose the stage and review all interpretations.");
-  });
-});
-$("confirm-record").addEventListener("click", () => {
-  if (!job || dirty) return status("Save the draft before confirming.", true);
-  const reviewer = $("reviewer").value.trim();
-  if (!reviewer || !$("review-ack").checked) return status("Acknowledge checking the values before confirming as your authenticated account.", true);
-  action(async () => {
-    const revision = await request("/jobs/" + job.id + "/confirm", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ expected_version: job.draft_version, reviewer, acknowledged: true }) });
-    $("review-ack").checked = false;
-    await historyStatus(`Saved reviewed version ${revision.version}. This preserves its selected stage; it does not create an invoice or completed repair.`);
-  });
-});
+}
+async function refreshHistory(append = false) {
+  if (!job) { reviewed = []; $("more-history").hidden = true; renderHistory(); return; }
+  let rows;
+  try { rows = await request("/jobs/" + job.id + "/revisions?limit=20&offset=" + (append ? reviewed.length : 0)); }
+  catch (error) { $("review-state").textContent = "History could not load. Open the job again to retry."; throw error; }
+  if (!append) await loadJobInvoice();
+  reviewed = append ? reviewed.concat(rows) : rows; $("more-history").hidden = rows.length < 20; renderHistory();
+}
+async function historyStatus(message) {
+  try { await refreshHistory(); status(message); } catch (error) { status(message + " History could not load: " + error.message, true); }
+}
 $("more-history").addEventListener("click", () => action(() => refreshHistory(true)));
+
+// ---- find job --------------------------------------------------------------
 async function runLookup(offset, filters = lookupParams) {
   const params = new URLSearchParams(filters); params.set("limit", "20"); params.set("offset", offset);
   let data;
   try { data = await request("/jobs?" + params); }
-  catch (error) { $("lookup-state").textContent = "Search failed. Any results below belong to the previous successful search."; throw error; }
+  catch (error) { $("lookup-state").textContent = "Search failed. Results below are from the last search that worked."; throw error; }
   lookupParams = new URLSearchParams(filters); lookupOffset = offset;
   const container = $("lookup-results"); container.replaceChildren();
-  $("lookup-state").textContent = data.results.length ? `Showing ${offset + 1}–${offset + data.results.length} reviewed jobs.` : "No reviewed records match.";
+  $("lookup-state").textContent = data.results.length ? `Showing ${offset + 1}–${offset + data.results.length}.` : "Nothing found.";
   $("lookup-previous").hidden = offset === 0; $("lookup-next").hidden = !data.has_more;
   for (const result of data.results) {
-    const card = element("section"); card.className = "lookup-result";
-    card.append(element("h3", result.record.job_reference));
-    card.append(element("p", `Customer: ${result.record.customer_reference || "Unknown"} · Vehicle: ${result.record.vehicle_reference || "Unknown"}`));
-    card.append(element("p", `Reviewed version ${result.version} · ${result.record.record_stage} · ${new Date(result.reviewed_at).toLocaleString()}`));
-    card.append(element("p", result.has_unreviewed_changes ? `Editable draft version ${result.draft_version} has newer unreviewed changes.` : "Editable draft matches this reviewed version."));
-    const open = element("button", "Open job and history"); open.type = "button";
-    open.addEventListener("click", () => { $("open-id").value = result.job_id; $("open-record").click(); }); card.append(open);
-    if (result.record.source_document_id) {
-      const source = element("a", "Open reviewed source"); source.href = api + "/documents/" + result.record.source_document_id + "/preview";
-      source.target = "_blank"; source.rel = "noopener"; card.append(source);
-    }
+    const record = result.record, card = element("section", "", "version");
+    card.append(element("h3", `${record.job_reference} · ${stageNames[record.record_stage]}`));
+    card.append(element("p", `Owner: ${record.customer_reference || "—"} · Vehicle: ${record.vehicle_reference || "—"} · confirmed ${new Date(result.reviewed_at).toLocaleDateString()}`));
+    if (result.has_unreviewed_changes) card.append(element("p", "Changed since it was last confirmed.", "hint"));
+    const open = element("button", "Open job"); open.type = "button"; open.addEventListener("click", () => openJob(result.job_id)); card.append(open);
     container.append(card);
   }
 }
@@ -273,13 +344,13 @@ $("zoom-in").addEventListener("click", () => { zoom = Math.min(3, zoom + .25); v
 $("zoom-out").addEventListener("click", () => { zoom = Math.max(.25, zoom - .25); viewImage(); });
 $("rotate-source").addEventListener("click", () => { rotation = (rotation + 90) % 360; viewImage(); });
 $("source-image").addEventListener("load", viewImage);
-$("source-image").addEventListener("error", () => status("Source preview could not load. The draft remains editable; check its source before review.", true));
+$("source-image").addEventListener("error", () => status("The photo could not load. The job can still be edited.", true));
 
+// ---- invoice ---------------------------------------------------------------
 function resetBilling() {
   billingRevision = null; billingPreview = null; billingIssued = null; billingAllowed = false; billingDirty = false;
   $("invoice-form").hidden = true; $("issued-invoice").replaceChildren(); $("invoice-preview").textContent = "";
-  $("invoice-ack").checked = false;
-  $("billing-state").textContent = "Choose Prepare invoice on a completed-work version in history.";
+  $("invoice-ack").checked = false; $("billing-state").textContent = "Choose “Make invoice” on a finished job above.";
   updateIssueButton();
 }
 function updateIssueButton() {
@@ -288,19 +359,16 @@ function updateIssueButton() {
 function showIssuedInvoice(invoice) {
   billingIssued = invoice; billingPreview = null; billingDirty = false; $("invoice-form").hidden = true;
   const container = $("issued-invoice"); container.replaceChildren();
-  container.append(element("p", `${invoice.number} · SGD ${invoice.preview.total} payable · GST SGD ${invoice.preview.gst} · issued by ${invoice.issued_by}`));
-  const link = element("a", "Open issued invoice / Print / Save as PDF");
-  link.href = api + "/invoices/" + invoice.id + "/print"; link.target = "_blank"; link.rel = "noopener"; container.append(link);
-  const form = element("a", "Print invoice on the workshop form");
-  form.href = api + "/invoices/" + invoice.id + "/sheet"; form.target = "_blank"; form.rel = "noopener"; container.append(element("br"), form);
-  $("billing-state").textContent = invoice.preview.data_origin === "synthetic_demo" ? "Fictional DEMO invoice saved. Not for payment or tax claims." : "Invoice saved. This is not a payment receipt or an IRAS submission.";
+  container.append(element("p", `${invoice.number} · total $${invoice.preview.total} · GST $${invoice.preview.gst} · issued by ${invoice.issued_by}`));
+  container.append(link("Print invoice on the workshop form", api + "/invoices/" + invoice.id + "/sheet"), link("Plain copy", api + "/invoices/" + invoice.id + "/print"));
+  $("billing-state").textContent = invoice.preview.data_origin === "synthetic_demo" ? "DEMO invoice saved. Not for payment or tax claims." : "Invoice saved. It is not a payment receipt.";
   updateIssueButton();
 }
 async function loadJobInvoice() {
   if (!job) return;
   const response = await fetch(api + "/jobs/" + job.id + "/invoice");
   if (response.status === 404) return;
-  if (!response.ok) throw new Error("Invoice history could not load. Reopen the job before issuing.");
+  if (!response.ok) throw new Error("The invoice could not load. Open the job again before issuing.");
   showIssuedInvoice(await response.json());
 }
 function singaporeDate() {
@@ -309,27 +377,23 @@ function singaporeDate() {
   return `${part("year")}-${part("month")}-${part("day")}`;
 }
 async function prepareInvoice(revision) {
-  if (dirty) throw new Error("Save and review your current draft before preparing an invoice.");
-  if (billingIssued) { showIssuedInvoice(billingIssued); $("billing-panel").scrollIntoView(); return; }
-  if (revision.version !== job.draft_version) throw new Error("Choose the current saved and reviewed completed-work version.");
-  if (billingDirty && !window.confirm("Discard unsaved invoice details and prepare this version?")) return;
+  if (dirty) throw new Error("Save and confirm your changes before making an invoice.");
+  if (billingIssued) return showIssuedInvoice(billingIssued);
+  if (revision.version !== job.draft_version) throw new Error("Use the newest confirmed version of this job.");
   const config = await request("/billing-settings");
   billingRevision = revision; billingPreview = null; billingDirty = false; $("invoice-ack").checked = false;
   const real = revision.record.data_origin === "private_source";
   billingAllowed = !real || (config.real_invoices_enabled && Boolean(config.supplier));
   const supplier = real ? config.supplier : null;
-  $("invoice-supplier-name").value = supplier?.name || "";
-  $("invoice-supplier-address").value = supplier?.address || "";
-  $("invoice-gst-status").value = supplier?.gst_status || "registered";
-  $("invoice-gst-number").value = supplier?.gst_registration_number || "";
+  $("invoice-supplier-name").value = supplier?.name || ""; $("invoice-supplier-address").value = supplier?.address || "";
+  $("invoice-gst-status").value = supplier?.gst_status || "registered"; $("invoice-gst-number").value = supplier?.gst_registration_number || "";
   for (const name of ["name", "address"]) $("invoice-supplier-" + name).readOnly = real;
   $("invoice-gst-number").readOnly = real; $("invoice-gst-status").disabled = real;
-  $("invoice-customer-name").value = revision.record.customer_reference || "";
-  $("invoice-customer-address").value = ""; $("invoice-date").value = singaporeDate();
-  $("invoice-basis").value = "inclusive"; $("invoice-discount").value = "0.00";
+  $("invoice-customer-name").value = revision.record.customer_reference || ""; $("invoice-customer-address").value = "";
+  $("invoice-date").value = singaporeDate(); $("invoice-basis").value = "inclusive"; $("invoice-discount").value = "0.00";
   $("invoice-preview").textContent = ""; $("invoice-form").hidden = false;
-  $("billing-state").textContent = billingAllowed ? `Billing reviewed version ${revision.version}. Preview first; fictional supplier details must be explicitly entered for a demo.` : "Real issuance is disabled or the company supplier profile is missing. Continue using fictional invoices until configured.";
-  updateIssueButton(); $("billing-panel").scrollIntoView();
+  $("billing-state").textContent = billingAllowed ? "Fill in the boxes, then work out the totals." : "Real invoices are switched off or the company billing details are missing.";
+  updateIssueButton(); $("billing-heading").scrollIntoView();
 }
 function invoiceRequest() {
   return { supplier: { name: $("invoice-supplier-name").value.trim(), address: $("invoice-supplier-address").value.trim(),
@@ -337,35 +401,28 @@ function invoiceRequest() {
     customer: { name: $("invoice-customer-name").value.trim(), address: $("invoice-customer-address").value.trim() },
     invoice_date: $("invoice-date").value, pricing_basis: $("invoice-basis").value, discount: $("invoice-discount").value.trim() };
 }
-$("invoice-form").addEventListener("input", event => {
-  if (event.target.id !== "invoice-ack") { billingDirty = true; billingPreview = null; $("invoice-preview").textContent = "Billing details changed. Preview again."; $("invoice-ack").checked = false; }
+function billingChanged(event) {
+  if (event.target.id !== "invoice-ack") { billingDirty = true; billingPreview = null; $("invoice-preview").textContent = "Details changed. Work out the totals again."; $("invoice-ack").checked = false; }
   updateIssueButton();
-});
-$("invoice-form").addEventListener("change", event => {
-  if (event.target.id !== "invoice-ack") { billingDirty = true; billingPreview = null; $("invoice-ack").checked = false; }
-  updateIssueButton();
-});
-$("invoice-form").addEventListener("submit", event => {
-  event.preventDefault(); if (!billingRevision || billingIssued) return;
+}
+$("invoice-form").addEventListener("input", billingChanged);
+$("invoice-form").addEventListener("change", billingChanged);
+$("preview-invoice").addEventListener("click", () => {
+  if (!billingRevision || billingIssued) return;
   billingPreview = null; $("invoice-ack").checked = false; updateIssueButton();
   action(async () => {
-    billingPreview = await request("/revisions/" + billingRevision.id + "/invoice-preview", {
-      method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(invoiceRequest()) });
-    $("invoice-preview").textContent = `DRAFT · SGD\nSubtotal (${billingPreview.request.pricing_basis}): ${billingPreview.subtotal}\nDiscount: ${billingPreview.request.discount}\nTotal excluding GST: ${billingPreview.net}\nGST (${billingPreview.gst_rate}): ${billingPreview.gst}\nTotal payable: ${billingPreview.total}\nCancelled items excluded. Nothing issued yet.`;
+    billingPreview = await request("/revisions/" + billingRevision.id + "/invoice-preview", JSON_POST(invoiceRequest()));
+    $("invoice-preview").textContent = `Not issued yet\nAmounts typed in (${billingPreview.request.pricing_basis} of GST): ${billingPreview.subtotal}\nDiscount: ${billingPreview.request.discount}\nTotal before GST: ${billingPreview.net}\nGST (${billingPreview.gst_rate}): ${billingPreview.gst}\nGrand total: ${billingPreview.total}`;
   });
 });
 $("issue-invoice").addEventListener("click", () => {
   if (!billingPreview || !billingAllowed || billingIssued || dirty || !$("invoice-ack").checked) return;
   const preview = billingPreview;
-  action(async () => {
-    const invoice = await request("/revisions/" + preview.revision_id + "/invoice", { method: "POST", headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({ invoice: preview.request, acknowledged: true }) });
-    showIssuedInvoice(invoice); status("Invoice saved with an immutable copy. Open it to print or save as PDF.");
-  });
+  action(async () => { showIssuedInvoice(await request("/revisions/" + preview.revision_id + "/invoice", JSON_POST({ invoice: preview.request, acknowledged: true }))); status("Invoice issued. Print it on the workshop form."); });
 });
+
 window.addEventListener("resize", viewImage);
 window.addEventListener("beforeunload", event => { if (dirty || billingDirty) { event.preventDefault(); event.returnValue = ""; } });
-render();
-renderHistory();
+render(); renderHistory(); showStep("car");
 const initialJob = new URLSearchParams(location.search).get("job");
-if (initialJob) { $("open-id").value = initialJob; $("open-record").click(); }
+if (initialJob) openJob(initialJob);

@@ -162,3 +162,7 @@ Each reviewed version in the history has a **Print job sheet (paper layout)** li
 To show the real form, save a PNG or JPEG of the blank job sheet in the private `car mechanic assistant/runtime/workshop/` folder and set `WORKSHOP_SHEET_TEMPLATE` to its full path, then restart. Without it the values still print, on a plain page with a notice. Keep the form image out of Git. If the workshop changes its printed form, the field positions at the top of `app/services/workshop_sheet.py` need adjusting.
 
 An issued invoice has the same option: **Print invoice on the workshop form**. Work lines fill the numbered rows and Total, GST 9% and Grand total fill the last rows. The plain invoice print is still available and is the stored copy.
+
+## New screen (13 October 2026)
+
+The numbered walk-through under “Complete one fictional job” above describes the earlier screen. The current screen has a step bar along the top and its own guide: open `/workshop` and click **How to use**. In short: New job → 1 Car & customer → 2 Knock → 3 Repair & parts → 4 Spray (add lines, click the car to mark damage) → 5 Check & save (Save, then tick and confirm) → 6 Print & invoice. The car picture needs `WORKSHOP_SHEET_TEMPLATE` set; without it a plain box is shown and marks still work.

@@ -2,7 +2,7 @@ from uuid import UUID
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -12,7 +12,7 @@ from app.schemas.workshop import WorkshopDraft, WorkshopDraftUpdate, WorkshopJob
 from app.services.workshop_extraction import extract_source
 from app.services.workshop import create_job, get_job, update_job, attach_document, get_document, document_file, MAX_UPLOAD_BYTES, confirm_job, list_revisions, generate_export, get_export, export_file, lookup_jobs
 from app.schemas.workshop_invoice import InvoiceRequest, InvoiceIssueRequest, InvoicePreview, InvoiceResponse, InvoiceSettingsResponse
-from app.services.workshop_sheet import job_sheet_html, invoice_sheet_html
+from app.services.workshop_sheet import job_sheet_html, invoice_sheet_html, car_outline
 from app.services.workshop_invoice import preview_invoice, issue_invoice, get_invoice, job_invoice, invoice_response, invoice_html
 
 
@@ -146,3 +146,8 @@ SHEET_HEADERS = {
 @router.get("/invoices/{invoice_id}/sheet", response_class=HTMLResponse)
 def print_bill_on_form(invoice_id: UUID, db: Session = Depends(get_db)):
     return HTMLResponse(invoice_sheet_html(db, invoice_id), headers=SHEET_HEADERS)
+
+
+@router.get("/sheet-diagram")
+def car_outline_picture():
+    return Response(car_outline(), media_type="image/png", headers={"Cache-Control": "no-store"})

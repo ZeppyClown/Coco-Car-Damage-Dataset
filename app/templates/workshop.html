@@ -10,110 +10,167 @@
   <script src="/static/workshop.js" defer></script>
 </head>
 <body>
-<header><a href="/">Automotive assistant</a><h1>Workshop job sheets</h1>
-  <p>Capture what is written. Keep unclear values visible. Review before reuse.</p>
-  <p class="notice">Local demonstration. Use fictional records until company processing is agreed. A saved draft is not reviewed work or an invoice.</p>
+<header class="topbar">
+  <strong class="brand">Job sheet</strong>
+  <nav id="steps" aria-label="Job steps">
+    <button type="button" data-step="car"><b>1</b> Car &amp; customer</button>
+    <button type="button" data-step="knock"><b>2</b> Knock</button>
+    <button type="button" data-step="repair"><b>3</b> Repair &amp; parts</button>
+    <button type="button" data-step="spray"><b>4</b> Spray</button>
+    <button type="button" data-step="check"><b>5</b> Check &amp; save</button>
+    <button type="button" data-step="print"><b>6</b> Print &amp; invoice</button>
+  </nav>
+  <nav class="tools" aria-label="Other pages">
+    <button type="button" id="new-record">New job</button>
+    <button type="button" data-step="find">Find job</button>
+    <button type="button" data-step="help">How to use</button>
+  </nav>
 </header>
+<p id="record-identity" class="jobline">New job, not saved yet</p>
+<p id="status" role="status" aria-live="polite">Start at step 1. Click “How to use” for a walk-through.</p>
 <main>
-  <section class="card record-actions" aria-label="Record controls">
-    <button type="button" id="new-record">New record</button>
-    <label>Job ID to reopen<input id="open-id" autocomplete="off" placeholder="Paste the saved job ID"></label>
-    <button type="button" id="open-record">Open record</button>
-    <p id="record-identity">New, unsaved draft</p>
-  </section>
-  <details class="card" id="lookup-panel"><summary>Find reviewed records</summary>
-    <p class="hint">Search the latest reviewed version of each job. Draft-only records are excluded. Review-date filters use UTC.</p>
-    <form id="lookup-form">
+<form id="draft-form" class="layout">
+  <div class="panels">
+    <section class="card step" data-panel="car">
+      <h2>1 · Car &amp; customer</h2>
+      <p class="hint">Copy the top of the paper job sheet. Leave a box empty if you do not know it.</p>
       <div class="form-grid">
-        <label>Keyword<input id="lookup-q" maxlength="200"></label>
-        <label>Customer reference contains<input id="lookup-customer" maxlength="200"></label>
-        <label>Vehicle reference contains<input id="lookup-vehicle" maxlength="200"></label>
-        <label>Job reference contains<input id="lookup-reference" maxlength="200"></label>
-        <label>Reviewed stage<select id="lookup-stage"><option value="">Any stage</option><option value="quote">Quote</option><option value="approved_scope">Approved scope</option><option value="completed_work">Completed work</option></select></label>
-        <label>Reviewed from (UTC)<input id="lookup-reviewed_from" type="date"></label>
-        <label>Reviewed to (UTC)<input id="lookup-reviewed_to" type="date"></label>
+        <label>Job no.<input id="job_reference" maxlength="200" autocomplete="off"></label>
+        <label>Vehicle no.<input id="vehicle_reference" maxlength="200" autocomplete="off"></label>
+        <label>Vehicle make<input id="make" maxlength="200"></label>
+        <label>Model<input id="model" maxlength="200"></label>
+        <label>Owner<input id="customer_reference" maxlength="200" autocomplete="off"></label>
+        <label>Contact<input id="contact" maxlength="200" autocomplete="off"></label>
+        <label>Date in<input id="date_in" type="date"></label>
+        <label>Date out<input id="date_out" type="date"></label>
+        <label>Quotation date<input id="quotation_date" type="date"></label>
       </div>
-      <button type="submit">Search reviewed records</button>
-    </form>
-    <p id="lookup-state" role="status">No search run yet.</p><div id="lookup-results"></div>
-    <button type="button" id="lookup-previous" hidden>Previous results</button><button type="button" id="lookup-next" hidden>More results</button>
-  </details>
-  <p id="status" role="status" aria-live="polite">Enter a draft manually or attach a JPEG/PNG sheet.</p>
-  <div class="workspace">
-    <section class="card source-panel" aria-labelledby="source-heading">
-      <h2 id="source-heading">Source sheet</h2>
-      <label>Record origin<select id="data-origin" aria-label="Record origin"><option value="synthetic_demo">Fictional demonstration</option><option value="private_source">Permitted private source</option></select></label>
-      <label>JPEG/PNG image<input id="source-file" type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png"></label>
-      <button id="attach-source" type="button">Attach source</button>
-      <p class="hint">One image, up to 8 MiB, 6,000 pixels per side and 20 megapixels. Attaching keeps the original bytes.</p>
-      <p id="source-identity">No source attached. Manual entry is available.</p>
-      <label><input id="ai-send-ack" type="checkbox">Allow this fictional image to be sent to Google Gemini for an unverified draft.</label>
-      <button id="extract-source" type="button">Suggest fields with AI</button>
-      <p class="hint">Optional. Use only on a new empty draft. Private-source AI processing awaits company permission.</p>
-      <p id="ai-provenance" class="hint"></p>
-      <div class="viewer-tools" aria-label="Image view controls">
-        <button type="button" id="zoom-out" aria-label="Zoom out">−</button>
-        <output id="zoom-label">100%</output>
-        <button type="button" id="zoom-in" aria-label="Zoom in">+</button>
-        <button type="button" id="rotate-source">Rotate view</button>
-        <button type="button" id="detach-source">Detach from draft</button>
-      </div>
-      <div class="viewer"><div id="image-stage"><img id="source-image" alt="Attached job sheet for comparison with the draft" hidden></div></div>
-    </section>
-    <form id="draft-form" class="card">
-      <h2>Editable draft</h2>
-      <p class="hint">Missing means unknown, including amounts. Confirm only values you have checked. Editing a confirmed value makes it proposed again.</p>
-      <label>Record stage<select id="record-stage" aria-label="Record stage"><option value="unknown">Unknown</option><option value="quote">Quote</option><option value="approved_scope">Approved scope</option><option value="completed_work">Completed work</option></select></label>
-      <label>Manual provenance / clarification<textarea id="manual-provenance" maxlength="2000" placeholder="Required if no source is attached or diagram meaning is supplied"></textarea></label>
-      <p class="hint">For diagram meaning, state who clarified it, what was established and the vehicle left/right convention if relevant. A marked area alone does not authorise a repair.</p>
-      <h3>References</h3><div id="scalar-fields" class="form-grid"></div>
-      <h3>Items</h3><p class="hint">Keep crossed-out rows and mark them cancelled. Leave unclear interpretations or amounts unresolved.</p>
-      <div id="items"></div><button type="button" id="add-item">Add item</button>
-      <details id="optional-details"><summary>Vehicle details, dates, notes and written totals</summary>
-        <div id="optional-fields" class="form-grid"></div>
-        <h3>Literal notes</h3><div id="raw-fields"></div>
+      <fieldset id="fuel"><legend>Fuel gauge</legend></fieldset>
+      <details id="photo-box"><summary>Photo of the paper sheet (optional)</summary>
+        <label>This job is<select id="data-origin" aria-label="Record origin"><option value="synthetic_demo">Practice (made-up job)</option><option value="private_source">Real job</option></select></label>
+        <label>JPEG/PNG photo<input id="source-file" type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png"></label>
+        <button id="attach-source" type="button">Attach photo</button>
+        <button type="button" id="detach-source">Remove photo from this job</button>
+        <p id="source-identity" class="hint">No photo attached.</p>
+        <label class="inline"><input id="ai-send-ack" type="checkbox">Allow this practice photo to be sent to Google Gemini for a suggested draft.</label>
+        <button id="extract-source" type="button">Suggest from photo (AI)</button>
+        <p class="hint">AI is optional, only for practice photos on a new empty job, and switched off unless configured.</p>
+        <p id="ai-provenance" class="hint"></p>
       </details>
-      <div class="save-bar"><button type="submit" id="save-draft">Save draft</button><span id="dirty-label">No unsaved changes</span></div>
-      <section class="review-controls" aria-labelledby="review-heading">
-        <h3 id="review-heading">Confirm a saved version</h3>
-        <p class="hint">Save first. Check the source and every interpreted value, including its review state. Confirming a quote keeps it a quote.</p>
-        <label>Authenticated reviewer account<input id="reviewer" maxlength="200" readonly></label>
-        <label><input id="review-ack" type="checkbox">I checked the interpreted values against the source or stated clarification.</label>
-        <button type="button" id="confirm-record" disabled>Confirm saved draft</button>
-      </section>
-    </form>
-  </div>
-  <section class="card history-panel" aria-labelledby="history-heading">
-    <h2 id="history-heading">Reviewed history and demo output</h2><p id="review-state">No record opened.</p>
-    <p class="hint">CSV uses a fictional demo mapping. It does not match or write to the workshop's financial software. Formula-like cells are escaped for spreadsheet safety; stored values stay unchanged.</p>
-    <div id="reviewed-history"></div><button type="button" id="more-history" hidden>Older reviewed versions</button>
-  </section>
-  <section class="card history-panel" id="billing-panel" aria-labelledby="billing-heading">
-    <h2 id="billing-heading">Invoicing and GST</h2>
-    <p class="hint">Prepare an invoice from reviewed completed work. Each captured item amount is a line total. Prices include GST by default, as instructed. Check the supplier, customer, price basis and any discount before issuing.</p>
-    <p class="notice">Fictional records produce DEMO invoices. Real issuance requires configured company billing details. Printed invoices do not submit data to IRAS or InvoiceNow.</p>
-    <p id="billing-state" role="status">Choose Prepare invoice on a completed-work version in history.</p>
-    <div id="issued-invoice"></div>
-    <form id="invoice-form" hidden>
+      <div class="next"><button type="button" data-step="knock">Next: Knock →</button></div>
+    </section>
+
+    <section class="card step" data-panel="lines">
+      <h2 id="lines-title"></h2>
+      <p class="hint" id="lines-hint"></p>
+      <div class="rows-head"><span>#</span><span>Comments or Remarks / Items</span><span>Amount ($)</span><span>Not sure</span><span>Crossed out</span><span></span></div>
+      <div id="items"></div>
+      <p id="no-lines" class="hint">No lines in this part yet.</p>
+      <button type="button" id="add-item">+ Add line</button>
+      <div class="next"><button type="button" id="lines-next"></button></div>
+    </section>
+
+    <section class="card step" data-panel="check">
+      <h2>5 · Check &amp; save</h2>
+      <p class="hint">Read it against the paper or the car. Then save. A saved job can still be changed; a confirmed job is kept for good.</p>
+      <div id="summary"></div>
       <div class="form-grid">
-        <label>Supplier name<input id="invoice-supplier-name" maxlength="200" required></label>
-        <label>Supplier address<textarea id="invoice-supplier-address" maxlength="2000" required></textarea></label>
-        <label>Supplier GST status<select id="invoice-gst-status"><option value="registered">GST-registered</option><option value="not_registered">Not GST-registered</option></select></label>
-        <label>Supplier GST registration number<input id="invoice-gst-number" maxlength="200"></label>
-        <label>Customer billing name<input id="invoice-customer-name" maxlength="200" required></label>
-        <label>Customer billing address<textarea id="invoice-customer-address" maxlength="2000" required></textarea></label>
-        <label>Invoice date (Singapore)<input id="invoice-date" type="date" required readonly></label>
-        <label>Captured line prices<select id="invoice-basis"><option value="inclusive">Include GST</option><option value="exclusive">Exclude GST</option></select></label>
-        <label>Invoice discount (same price basis, SGD)<input id="invoice-discount" value="0.00" inputmode="decimal" required></label>
+        <label>This sheet is a<select id="record-stage" aria-label="Record stage"><option value="quote">Quotation</option><option value="approved_scope">Job the customer agreed to</option><option value="completed_work">Finished job (ready to invoice)</option></select></label>
+        <label>Where the details came from<input id="manual-provenance" maxlength="2000" placeholder="e.g. Typed in at the counter with the customer"></label>
       </div>
-      <p class="hint">Source written totals and adjustments remain source observations. Billing uses active reviewed line amounts and the explicit discount above; it does not infer a discount from handwriting. Cancelled items are excluded.</p>
-      <button type="submit">Preview invoice totals</button>
-      <pre id="invoice-preview" aria-live="polite"></pre>
-      <label><input id="invoice-ack" type="checkbox">I checked the billing details, completed work, prices, GST basis and discount. This is a current local supply under the displayed GST treatment. Issue one immutable invoice for this job.</label>
-      <button type="button" id="issue-invoice" disabled>Issue invoice</button>
-      <p class="hint">An issued invoice cannot be edited or reissued from a corrected job. Credit notes, payments and GST returns require further scope.</p>
-    </form>
-  </section>
+      <button id="save-draft">Save</button> <span id="dirty-label">No unsaved changes</span>
+      <div class="review-controls">
+        <label class="inline"><input id="review-ack" type="checkbox">I checked every line, amount and mark against the paper or the car.</label>
+        <button type="button" id="confirm-record">Save and confirm as checked</button>
+        <p class="hint">Confirming as <output id="reviewer"></output>. Lines ticked “Not sure” must be cleared up first.</p>
+      </div>
+    </section>
+
+    <section class="card step" data-panel="print">
+      <h2>6 · Print &amp; invoice</h2>
+      <p id="review-state" role="status">No job opened.</p>
+      <div id="reviewed-history"></div><button type="button" id="more-history" hidden>Older checked versions</button>
+      <h3 id="billing-heading">Invoice</h3>
+      <p class="notice">Practice jobs produce DEMO invoices. Real invoices are switched off until the company billing details are set.</p>
+      <p id="billing-state" role="status">Choose “Make invoice” on a finished job above.</p>
+      <div id="issued-invoice"></div>
+      <div id="invoice-form" hidden>
+        <div class="form-grid">
+          <label>Supplier name<input id="invoice-supplier-name" maxlength="200"></label>
+          <label>Supplier address<textarea id="invoice-supplier-address" maxlength="2000"></textarea></label>
+          <label>Supplier GST status<select id="invoice-gst-status"><option value="registered">GST-registered</option><option value="not_registered">Not GST-registered</option></select></label>
+          <label>Supplier GST registration number<input id="invoice-gst-number" maxlength="200"></label>
+          <label>Customer billing name<input id="invoice-customer-name" maxlength="200"></label>
+          <label>Customer billing address<textarea id="invoice-customer-address" maxlength="2000"></textarea></label>
+          <label>Invoice date (Singapore)<input id="invoice-date" type="date" readonly></label>
+          <label>Amounts typed in<select id="invoice-basis"><option value="inclusive">Include GST</option><option value="exclusive">Exclude GST</option></select></label>
+          <label>Discount ($)<input id="invoice-discount" value="0.00" inputmode="decimal"></label>
+        </div>
+        <button type="button" id="preview-invoice">Work out totals</button>
+        <pre id="invoice-preview" aria-live="polite"></pre>
+        <label class="inline"><input id="invoice-ack" type="checkbox">I checked the customer, the work, the amounts, GST and discount. Issue one invoice for this job; it cannot be changed afterwards.</label>
+        <button type="button" id="issue-invoice" disabled>Issue invoice</button>
+      </div>
+    </section>
+  </div>
+
+  <aside class="side card" id="side">
+    <h2>Car</h2>
+    <p class="hint">Click the car where the damage is. Each click adds a number; write what it is beside the number.</p>
+    <div id="car"><img id="car-outline" alt="Car outline: top, left side, right side, front and back"></div>
+    <ol id="marks"></ol>
+    <div id="photo" hidden>
+      <h2>Paper sheet</h2>
+      <div class="viewer-tools"><button type="button" id="zoom-out" aria-label="Zoom out">−</button><output id="zoom-label">100%</output><button type="button" id="zoom-in" aria-label="Zoom in">+</button><button type="button" id="rotate-source">Turn</button></div>
+      <div class="viewer"><div id="image-stage"><img id="source-image" alt="Photo of the paper job sheet" hidden></div></div>
+    </div>
+  </aside>
+</form>
+
+<section class="card step" data-panel="find">
+  <h2>Find job</h2>
+  <p class="hint">Finds confirmed jobs. Type any one box and search.</p>
+  <form id="lookup-form">
+    <div class="form-grid">
+      <label>Any word<input id="lookup-q" maxlength="200"></label>
+      <label>Owner<input id="lookup-customer" maxlength="200"></label>
+      <label>Vehicle no.<input id="lookup-vehicle" maxlength="200"></label>
+      <label>Job no.<input id="lookup-reference" maxlength="200"></label>
+      <label>Kind<select id="lookup-stage"><option value="">Any</option><option value="quote">Quotation</option><option value="approved_scope">Agreed job</option><option value="completed_work">Finished job</option></select></label>
+      <label>Confirmed from<input id="lookup-reviewed_from" type="date"></label>
+      <label>Confirmed to<input id="lookup-reviewed_to" type="date"></label>
+    </div>
+    <button type="submit">Search</button>
+  </form>
+  <p id="lookup-state" role="status">No search yet.</p><div id="lookup-results"></div>
+  <button type="button" id="lookup-previous" hidden>Previous</button><button type="button" id="lookup-next" hidden>More</button>
+  <details><summary>Open by job ID</summary>
+    <label>Job ID<input id="open-id" autocomplete="off" placeholder="Paste the saved job ID"></label>
+    <button type="button" id="open-record">Open</button>
+  </details>
+</section>
+
+<section class="card step" data-panel="help">
+  <h2>How to use</h2>
+  <p>The steps along the top follow the paper job sheet, left to right. You can click any step at any time.</p>
+  <ol class="guide">
+    <li><b>Car &amp; customer.</b> Click <i>New job</i>. Type the job no., vehicle no., make and model, owner, contact and dates. Click the fuel level. If you have a photo of the paper sheet you can attach it; it is optional.</li>
+    <li><b>Knock.</b> Click <i>+ Add line</i> for each knocking job and type what is written and the amount. Then click the car picture on the right where the damage is. A number appears; type what it is, for example “rear bumper dent”.</li>
+    <li><b>Repair &amp; parts.</b> Same thing for servicing, repairs and parts, for example “radiator fan motor” or “front oil seal”.</li>
+    <li><b>Spray.</b> Same thing for spray painting, one line per panel or as written on the sheet.</li>
+    <li><b>Check &amp; save.</b> Read the summary. Choose whether it is a quotation, an agreed job or a finished job. Click <i>Save</i>. When you have checked it against the paper or the car, tick the box and click <i>Save and confirm as checked</i>.</li>
+    <li><b>Print &amp; invoice.</b> Click <i>Print job sheet</i> to get the workshop form filled in. For a finished job click <i>Make invoice</i>, work out the totals, issue it, then <i>Print invoice on the workshop form</i>.</li>
+  </ol>
+  <h3>Good to know</h3>
+  <ul class="guide">
+    <li><b>No amount yet?</b> Leave it empty. Empty means “not known”, never zero.</li>
+    <li><b>Cannot read it or not sure what it means?</b> Type what you see and tick <i>Not sure</i>. You can save, but not confirm, until someone clears it up.</li>
+    <li><b>Line crossed out on the paper?</b> Add it anyway and tick <i>Crossed out</i>. It is kept but not charged.</li>
+    <li><b>Made a mistake after confirming?</b> Open the job, fix it, save and confirm again. The old version stays in the history.</li>
+    <li><b>Looking for an old job?</b> Click <i>Find job</i> and search by owner, vehicle no., job no. or any word.</li>
+    <li><b>Invoices.</b> One per job, only for finished jobs, and it cannot be changed once issued.</li>
+  </ul>
+</section>
 </main>
 </body>
 </html>

@@ -13,6 +13,8 @@ from pydantic import (
 FieldState = Literal["missing", "unclear", "proposed", "confirmed"]
 RecordStage = Literal["unknown", "quote", "approved_scope", "completed_work"]
 DataOrigin = Literal["synthetic_demo", "private_source"]
+ItemSection = Literal["knock", "repair", "spray"]
+FuelLevel = Literal["empty", "1/5", "2/5", "3/5", "4/5", "full"]
 ReviewField = Literal[
     "job_reference", "customer_reference", "vehicle_reference", "make", "model",
     "quotation_date", "date_in", "date_out", "currency", "diagram_notes",
@@ -60,6 +62,7 @@ class WorkshopItem(_WorkshopSchema):
     amount: Money | None = None
     amount_state: FieldState = "missing"
     cancelled: bool = False
+    section: ItemSection | None = None
 
     @model_validator(mode="after")
     def consistent_states(self):
@@ -70,6 +73,13 @@ class WorkshopItem(_WorkshopSchema):
     @field_serializer("amount", when_used="json")
     def serialize_amount(self, value) -> str | None:
         return None if value is None else format(value, ".2f")
+
+
+class DiagramMark(_WorkshopSchema):
+    """A numbered point on the car outline, as percentages of the outline; the note is literal."""
+    x: float = Field(ge=0, le=100)
+    y: float = Field(ge=0, le=100)
+    note: Annotated[str, Field(max_length=200)] = ""
 
 
 class WorkshopAIProvenance(_WorkshopSchema):
@@ -97,6 +107,9 @@ class WorkshopDraft(_WorkshopSchema):
     date_note_raw: RawNote = ""
     currency: Currency | None = None
     items: list[WorkshopItem] = Field(default_factory=list, max_length=50)
+    contact: Reference | None = None
+    fuel_level: FuelLevel | None = None
+    diagram_marks: list[DiagramMark] = Field(default_factory=list, max_length=30)
     diagram_notes_raw: RawNote = ""
     diagram_notes: Description | None = None
     written_totals_raw: RawNote = ""

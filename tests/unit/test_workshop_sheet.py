@@ -1,17 +1,20 @@
 """Reviewed record printed onto the workshop's own job-sheet layout."""
 from copy import deepcopy
 from datetime import datetime, timezone
+from io import BytesIO
 import json
 from pathlib import Path
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
+from PIL import Image
 import pytest
 
 from app.core.config import settings
 from app.db.models import WorkshopInvoice, WorkshopJobRevision
 from app.schemas.workshop import WorkshopRevisionResponse
 from app.schemas.workshop_invoice import InvoiceRequest, InvoiceResponse
+from app.services.workshop_extraction import extraction_schema
 from app.services.workshop_invoice import calculate_invoice
 from app.services.workshop_sheet import ROWS_PER_SHEET, render_invoice_sheet, render_job_sheet
 
@@ -157,3 +160,42 @@ def test_invoice_sheet_route(sheet_client, test_db):
     stored.checksum = "0" * 64
     test_db.commit()
     assert sheet_client.get(API + f"/invoices/{issued.json()['id']}/sheet").status_code == 503
+
+
+def test_sections_ticks_fuel_contact_and_marks_print_where_staff_expect_them():
+    html = render_job_sheet(revision(
+        contact="9000 0000 (fictional)", fuel_level="3/5",
+        diagram_marks=[{"x": 50, "y": 100, "note": "Rear bumper dent"}, {"x": 0, "y": 0, "note": ""}],
+        items=[item("Spray rear bumper", "300.00", section="spray"), item("Knock rear bumper", "200.00", section="knock")],
+    ), FAKE_FORM)
+    assert html.index("Knock rear bumper") < html.index("Spray rear bumper")
+    assert "9000 0000 (fictional)" in html
+    assert html.count('class="tick"') == 4  # knock yes, spray yes, servicing no, fuel 3/5
+    for left in ("11.4", "27", "47.9", "84.4"):
+        assert f'class="tick" style="left:{left}%' in html
+    assert '<span class="mark" style="left:72.25%;top:82.50%">1</span>' in html
+    assert '<span class="mark" style="left:50.50%;top:26.00%">2</span>' in html
+    assert "1 Rear bumper dent" in html
+
+
+def test_new_sheet_fields_are_optional_bounded_and_kept_out_of_the_ai_schema():
+    assert revision().record.diagram_marks == [] and revision().record.fuel_level is None
+    for bad in ({"diagram_marks": [{"x": 101, "y": 0}]}, {"fuel_level": "half"},
+                {"items": [item("Line", section="polish")]}, {"diagram_marks": [{"x": 1, "y": 1}] * 31}):
+        with pytest.raises(ValueError):
+            revision(**bad)
+    schema = extraction_schema()
+    assert not {"contact", "fuel_level", "diagram_marks"} & set(schema["properties"])
+    assert "section" not in schema["$defs"]["WorkshopItem"]["properties"] and "DiagramMark" not in schema["$defs"]
+
+
+def test_car_outline_is_cut_from_the_configured_form(sheet_client, monkeypatch, tmp_path):
+    assert sheet_client.get(API + "/sheet-diagram").status_code == 503  # FAKE_FORM is not a real image
+    form = tmp_path / "real.png"
+    Image.new("RGB", (896, 1319), "white").save(form)
+    monkeypatch.setattr(settings, "WORKSHOP_SHEET_TEMPLATE", form)
+    picture = sheet_client.get(API + "/sheet-diagram")
+    assert picture.status_code == 200 and picture.headers["content-type"] == "image/png"
+    assert Image.open(BytesIO(picture.content)).size == (390, 745)
+    monkeypatch.setattr(settings, "WORKSHOP_SHEET_TEMPLATE", None)
+    assert sheet_client.get(API + "/sheet-diagram").status_code == 404

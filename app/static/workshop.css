@@ -92,10 +92,18 @@ pre { white-space: pre-wrap; background: #eef2f4; padding: .75rem; border-radius
 .chip { margin: 0; padding: .3rem .6rem; border-radius: 999px; border-color: #b9c4c9; background: #eef2f4; font-size: .85rem; }
 #car-history ul { margin: .4rem 0 0; padding-left: 1.2rem; } #car-history button { padding: .1rem .5rem; }
 .scroll { overflow-x: auto; }
-#books-table { border-collapse: collapse; width: 100%; margin: .75rem 0; font-size: .9rem; white-space: nowrap; }
-#books-table th, #books-table td { border-bottom: 1px solid #cfd8dc; padding: .35rem .5rem; text-align: right; }
-#books-table th:nth-child(-n+5), #books-table td:nth-child(-n+5) { text-align: left; }
-#books-table th { border-bottom: 2px solid #12313d; } #books-table .group td { font-weight: 700; background: #eef2f4; }
+#books-table, .sheet { border-collapse: collapse; width: 100%; margin: .75rem 0; font-size: .9rem; white-space: nowrap; }
+#books-table th, #books-table td, .sheet th, .sheet td { border-bottom: 1px solid #cfd8dc; padding: .35rem .5rem; text-align: right; }
+#books-table th:nth-child(-n+5), #books-table td:nth-child(-n+5), #expenses-table th:nth-child(-n+6), #expenses-table td:nth-child(-n+6), #profit-table td:first-child { text-align: left; }
+#books-table th, .sheet th { border-bottom: 2px solid #12313d; } #books-table .group td, .sheet .group td { font-weight: 700; background: #eef2f4; }
+/* The first column stays put while the money columns slide sideways on a narrow screen. */
+#books-table th:first-child, #books-table td:first-child { position: sticky; left: 0; background: #fff; }
+#books-table .group td:first-child { background: #eef2f4; }
+.scroll { border: 1px solid #cfd8dc; border-radius: 6px; } .scroll table { margin: 0; }
+.swipe { display: none; } @media (max-width: 1250px) { .swipe { display: block; } }
+.sheet.narrow { width: auto; min-width: min(100%, 26rem); } #profit-table .loss td { color: #8c1d18; }
+#books-table th, #books-table td { padding: .35rem .4rem; }
+#expense-form { margin: .5rem 0; } #expense-form > * { min-width: 0; max-width: 100%; } #expense-amount, #expense-gst { width: 8rem; }
 #books-table button { padding: .2rem .5rem; margin: 0; }
 .pay { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; } .pay input, .pay select { width: auto; } .pay button { margin: 0; }
 #books-payment, #invoice-payment { margin-top: 1rem; }
@@ -105,3 +113,4 @@ dialog#guide::backdrop { background: #000a; }
 .guide-bar strong { flex: 1; } .guide-bar button { margin: 0; }
 #guide-picture { display: block; width: 100%; } #guide-empty { padding: 1rem; }
 label.inline > input:not([type=checkbox]) { display: inline-block; width: auto; margin: 0 .25rem; }
+#profit-table { white-space: normal; } #profit-table td:last-child { white-space: nowrap; }

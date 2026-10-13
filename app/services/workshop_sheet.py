@@ -96,15 +96,25 @@ def _mark_notes(record: WorkshopReviewedDraft) -> list[str]:
     return [f"{number} {mark.note}" for number, mark in enumerate(record.diagram_marks, 1) if mark.note]
 
 
+CLAIMS = {"own_damage": "own damage claim", "third_party": "third-party claim", "private_settlement": "private settlement",
+          "report_only": "report only"}
+
+
+def _accident_note(record: WorkshopReviewedDraft) -> str | None:
+    accident = record.accident
+    if accident is None:
+        return None
+    return " · ".join(filter(None, ("Accident: " + CLAIMS[accident.claim_type], accident.insurer, accident.report_number,
+                                    accident.excess is not None and f"excess {accident.excess:.2f}")))
+
+
 def _row(index: int, text: str, amount: str) -> str:
     top = FIRST_ROW_TOP + ROW_PITCH * index
     return (f'<span class="item" style="top:{top:.2f}%">{text}</span>'
             f'<span class="amount" style="top:{top:.2f}%">{amount}</span>')
 
 
-def _demo_notices(data_origin: str, kind: str) -> list[str]:
-    demo = [f"DEMO ONLY — fictional {kind}."] if data_origin == "synthetic_demo" else []
-    return [*demo, "Use your browser's Print / Save as PDF."]
+PRINT_HINT = ["Use your browser's Print / Save as PDF."]
 
 
 def render_job_sheet(revision: WorkshopRevisionResponse, template: bytes | None) -> str:
@@ -112,7 +122,7 @@ def render_job_sheet(revision: WorkshopRevisionResponse, template: bytes | None)
     totals = [f"{label}: {value:.2f}" for label, value in (
         ("Total", record.written_total), ("Adjustment", record.written_adjustment),
         ("Grand total", record.written_grand_total)) if value is not None]
-    notes = "\n".join(filter(None, (record.diagram_notes or record.diagram_notes_raw, *_mark_notes(record), *totals)))
+    notes = "\n".join(filter(None, (record.diagram_notes or record.diagram_notes_raw, _accident_note(record), *_mark_notes(record), *totals)))
     items = sorted(record.items, key=lambda item: SECTION_ORDER[item.section]) or [None]
     chunks = [items[start:start + ROWS_PER_SHEET] for start in range(0, len(items), ROWS_PER_SHEET)]
     pages = []
@@ -123,7 +133,7 @@ def render_job_sheet(revision: WorkshopRevisionResponse, template: bytes | None)
         ) for index, row in enumerate(filter(None, rows)))
         pages.append(f'{_header(record)}{cells}<span class="notes">{_e(notes)}</span>'
                      f'<span class="page">Sheet {number} of {len(chunks)} · {_e(record.job_reference)} v{revision.version}</span>')
-    return _document(f"Job sheet {record.job_reference}", pages, _demo_notices(record.data_origin, "record"), template)
+    return _document(f"Job sheet {record.job_reference}", pages, PRINT_HINT, template)
 
 
 def render_invoice_sheet(invoice: InvoiceResponse, record: WorkshopReviewedDraft, template: bytes | None) -> str:
@@ -152,7 +162,7 @@ def render_invoice_sheet(invoice: InvoiceResponse, record: WorkshopReviewedDraft
                              for index, (label, amount) in enumerate(totals))
         pages.append(f'{_header(record, request.customer.name)}{cells}<span class="notes">{_e(notes)}</span>'
                      f'<span class="page">Sheet {number} of {len(chunks)} · {_e(preview.job_reference)}</span>')
-    return _document(f"{invoice.number} — {title}", pages, _demo_notices(preview.data_origin, "invoice"), template)
+    return _document(f"{invoice.number} — {title}", pages, PRINT_HINT, template)
 
 
 def _template() -> bytes | None:

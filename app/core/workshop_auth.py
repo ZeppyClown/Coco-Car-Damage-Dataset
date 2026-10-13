@@ -58,7 +58,7 @@ def _configuration():
 
 def _check_request(request: Request):
     if not settings.WORKSHOP_ENABLED:
-        raise HTTPException(status_code=404, detail="Workshop demo is disabled")
+        raise HTTPException(status_code=404, detail="The workshop app is switched off")
     configuration = _configuration()
     expected = configuration[3]
     try:

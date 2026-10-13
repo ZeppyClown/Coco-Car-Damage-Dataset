@@ -47,11 +47,11 @@ def test_create_read_replace_and_stale_save(workshop_client):
     assert workshop_client.get(path).json()["draft"]["diagram_notes_raw"] == draft["diagram_notes_raw"]
 
 
-def test_incomplete_drafts_and_same_name_jobs_are_separate(workshop_client):
+def test_incomplete_drafts_and_same_customer_jobs_are_separate(workshop_client):
     empty = workshop_client.post(PREFIX, json={"data_origin": "synthetic_demo"})
     assert empty.status_code == 201 and empty.json()["draft"]["record_stage"] == "unknown"
     left = workshop_client.post(PREFIX, json=EXAMPLE).json()
-    right = workshop_client.post(PREFIX, json=EXAMPLE).json()
+    right = workshop_client.post(PREFIX, json={**EXAMPLE, "job_reference": "DEMO-JOB-001B"}).json()
     assert left["id"] != right["id"]
     assert left["draft"]["customer_reference"] == right["draft"]["customer_reference"]
 

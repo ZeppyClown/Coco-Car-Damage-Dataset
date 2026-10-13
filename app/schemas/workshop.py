@@ -15,6 +15,8 @@ RecordStage = Literal["unknown", "quote", "approved_scope", "completed_work"]
 DataOrigin = Literal["synthetic_demo", "private_source"]
 ItemSection = Literal["knock", "repair", "spray"]
 FuelLevel = Literal["empty", "1/5", "2/5", "3/5", "4/5", "full"]
+# The choices on the insurers' accident report: claim own insurer, claim the other party, report for record only, or settle privately.
+ClaimType = Literal["own_damage", "third_party", "report_only", "private_settlement"]
 ReviewField = Literal[
     "job_reference", "customer_reference", "vehicle_reference", "make", "model",
     "quotation_date", "date_in", "date_out", "currency", "diagram_notes",
@@ -82,6 +84,25 @@ class DiagramMark(_WorkshopSchema):
     note: Annotated[str, Field(max_length=200)] = ""
 
 
+class AccidentDetails(_WorkshopSchema):
+    """What an accident or insurance job needs on file, as typed by staff; nothing is sent to an insurer."""
+    claim_type: ClaimType
+    accident_date: date | None = None
+    accident_place: Reference | None = None
+    insurer: Reference | None = None
+    policy_number: Reference | None = None
+    report_number: Reference | None = None
+    other_vehicle: Reference | None = None
+    other_party: Reference | None = None
+    other_insurer: Reference | None = None
+    excess: Money | None = None
+    notes: Annotated[str, Field(max_length=2000)] = ""
+
+    @field_serializer("excess", when_used="json")
+    def serialize_excess(self, value) -> str | None:
+        return None if value is None else format(value, ".2f")
+
+
 class WorkshopAIProvenance(_WorkshopSchema):
     provider: Literal["google_gemini"] = "google_gemini"
     model: Reference
@@ -110,6 +131,7 @@ class WorkshopDraft(_WorkshopSchema):
     contact: Reference | None = None
     fuel_level: FuelLevel | None = None
     diagram_marks: list[DiagramMark] = Field(default_factory=list, max_length=30)
+    accident: AccidentDetails | None = None
     diagram_notes_raw: RawNote = ""
     diagram_notes: Description | None = None
     written_totals_raw: RawNote = ""

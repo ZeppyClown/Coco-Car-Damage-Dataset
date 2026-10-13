@@ -97,7 +97,7 @@ app.include_router(valuation.router, prefix=f"/api/{settings.API_VERSION}", tags
 app.include_router(paint_code.router, prefix=f"/api/{settings.API_VERSION}", tags=["Paint Code"])
 app.include_router(specifications.router, prefix=f"/api/{settings.API_VERSION}", tags=["Specifications"])
 app.include_router(diagnostics.router, prefix=f"/api/{settings.API_VERSION}", tags=["Diagnostics"])
-app.include_router(workshop.router, prefix=f"/api/{settings.API_VERSION}", tags=["Workshop demo"])
+app.include_router(workshop.router, prefix=f"/api/{settings.API_VERSION}", tags=["Workshop"])
 
 
 @app.get("/workshop", dependencies=[Depends(workshop.require_workshop_enabled)], include_in_schema=False)

@@ -312,6 +312,8 @@ class WorkshopJob(Base):
     source_document_id = Column(Uuid, ForeignKey("workshop_documents.id"))
     draft = Column(JSON, nullable=False)
     draft_version = Column(Integer, nullable=False, default=1, server_default="1")
+    # Letters and digits of the job no., upper case; the unique index is what stops two jobs sharing a number.
+    job_number = Column(String(200), unique=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
@@ -374,5 +376,36 @@ class WorkshopPayment(Base):
     method = Column(String(20), nullable=False)
     paid_on = Column(Date, nullable=False)
     note = Column(String(500), nullable=False)
+    recorded_by = Column(String(200), nullable=False)
+    recorded_at = Column(DateTime(timezone=True), nullable=False)
+
+
+class WorkshopCompany(Base):
+    """The workshop's own details, typed once on first use and printed on every invoice."""
+    __tablename__ = "workshop_company"
+    __table_args__ = (CheckConstraint("id = 1", name="ck_workshop_company_single"),)
+
+    id = Column(Integer, primary_key=True, default=1)
+    name = Column(String(200), nullable=False)
+    address = Column(String(2000), nullable=False)
+    gst_registration_number = Column(String(200))
+    phone = Column(String(200), nullable=False, default="", server_default="")
+    updated_by = Column(String(200), nullable=False)
+    updated_at = Column(DateTime(timezone=True), nullable=False)
+
+
+class WorkshopExpense(Base):
+    """Money paid out to a supplier or for running costs; entries are added, never edited."""
+    __tablename__ = "workshop_expenses"
+
+    id = Column(Uuid, primary_key=True, default=uuid4)
+    spent_on = Column(Date, nullable=False, index=True)
+    supplier = Column(String(200), nullable=False)
+    category = Column(String(20), nullable=False)
+    description = Column(String(500), nullable=False)
+    supplier_invoice = Column(String(200), nullable=False)
+    job_reference = Column(String(200), nullable=False)
+    amount = Column(Numeric(12, 2), nullable=False)
+    gst = Column(Numeric(12, 2), nullable=False)
     recorded_by = Column(String(200), nullable=False)
     recorded_at = Column(DateTime(timezone=True), nullable=False)

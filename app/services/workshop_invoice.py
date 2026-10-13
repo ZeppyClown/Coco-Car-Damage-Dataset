@@ -7,18 +7,28 @@ from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException
-from sqlalchemy import select
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.db.models import WorkshopJob, WorkshopJobRevision, WorkshopInvoice
+from app.db.models import WorkshopCompany, WorkshopJob, WorkshopJobRevision, WorkshopInvoice
 from app.schemas.workshop import WorkshopReviewedDraft
-from app.schemas.workshop_invoice import InvoiceRequest, InvoicePreview, InvoiceResponse
+from app.schemas.workshop_invoice import InvoiceRequest, InvoicePreview, InvoiceResponse, InvoiceSupplier
 
 
 CENT = Decimal("0.01")
 RATE = Decimal("0.09")
+
+
+def billing_supplier(db: Session) -> InvoiceSupplier | None:
+    """The workshop details typed into the app, else the ones in the server settings."""
+    company = db.get(WorkshopCompany, 1)
+    if company is not None:
+        number = company.gst_registration_number
+        return InvoiceSupplier(name=company.name, address=company.address, gst_registration_number=number,
+                               gst_status="registered" if number else "not_registered")
+    return settings.WORKSHOP_BILLING_SUPPLIER if settings.WORKSHOP_REAL_INVOICES_ENABLED else None
 
 
 def calculate_invoice(revision: WorkshopJobRevision, request: InvoiceRequest) -> InvoicePreview:
@@ -97,7 +107,6 @@ def render_invoice(number: str, preview: InvoicePreview, actor: str, issued_at: 
     req = preview.request
     registered = req.supplier.gst_status == "registered"
     title = "Tax Invoice" if registered else "Invoice"
-    notice = "DEMO ONLY — fictional invoice, not for payment or tax claims." if preview.data_origin == "synthetic_demo" else "Issued invoice — not a payment receipt."
     lines = "".join(f"<tr><td>{e(line.description)}</td><td>{line.amount:.2f}</td></tr>" for line in preview.lines)
     gst_label = "GST @ 9%" if registered else "GST not applicable (supplier not GST-registered)"
     gst_number = f"<p>GST registration number: {e(req.supplier.gst_registration_number)}</p>" if registered else ""
@@ -106,8 +115,8 @@ def render_invoice(number: str, preview: InvoicePreview, actor: str, issued_at: 
 <style>body{{font:16px system-ui;max-width:850px;margin:2rem auto;padding:1rem;color:#20343c}}
 table{{border-collapse:collapse;width:100%}}td,th{{padding:.6rem;border-bottom:1px solid #ccc;text-align:left}}
 td:last-child,th:last-child{{text-align:right}}p,td{{white-space:pre-wrap;overflow-wrap:anywhere}}
-.notice{{border:2px solid #b67913;padding:1rem}}@media print{{body{{margin:0;max-width:none}}.print-hint{{display:none}}}}</style></head>
-<body><p class="notice">{notice}</p><h1>{title}</h1><p class="print-hint">Use your browser's Print / Save as PDF.</p>
+@media print{{body{{margin:0;max-width:none}}.print-hint{{display:none}}}}</style></head>
+<body><h1>{title}</h1><p class="print-hint">Use your browser's Print / Save as PDF.</p>
 <h2>{e(req.supplier.name)}</h2><p>{e(req.supplier.address)}</p>{gst_number}
 <p>Invoice number: {e(number)}<br>Invoice date: {req.invoice_date.isoformat()}<br>Currency: SGD</p>
 <h2>Bill to</h2><p>{e(req.customer.name)}<br>{e(req.customer.address)}</p>
@@ -124,6 +133,23 @@ Job ID: {preview.job_id}<br>Reviewed revision: {preview.revision_id}<br>Calculat
 </body></html>"""
 
 
+def store_invoice(db: Session, job_id: UUID, revision: WorkshopJobRevision, request: InvoiceRequest, actor: str,
+                  issued_at: datetime) -> InvoiceResponse:
+    """Add one invoice with the next running number for its year; the caller commits."""
+    preview = calculate_invoice(revision, request)
+    prefix = f"INV-{request.invoice_date.year}-"
+    # ponytail: next number = count + 1; the unique number column refuses a clash and the user clicks again.
+    count = db.scalar(select(func.count()).select_from(WorkshopInvoice).where(WorkshopInvoice.number.startswith(prefix)))
+    number = f"{prefix}{count + 1:04d}"
+    html = render_invoice(number, preview, actor, issued_at)
+    invoice = WorkshopInvoice(id=uuid4(), job_id=job_id, revision_id=revision.id, number=number,
+                              snapshot=preview.model_dump(mode="json"), issued_by=actor, issued_at=issued_at,
+                              html=html, checksum=sha256(html.encode("utf-8")).hexdigest())
+    db.add(invoice)
+    db.flush()
+    return invoice_response(invoice)
+
+
 def issue_invoice(db: Session, revision_id: UUID, request: InvoiceRequest, actor: str) -> InvoiceResponse:
     try:
         revision = db.get(WorkshopJobRevision, revision_id)
@@ -133,12 +159,13 @@ def issue_invoice(db: Session, revision_id: UUID, request: InvoiceRequest, actor
         job = db.scalar(select(WorkshopJob).where(WorkshopJob.id == revision.job_id)
                         .with_for_update().execution_options(populate_existing=True))
         if revision.record["data_origin"] == "private_source":
-            if not settings.WORKSHOP_REAL_INVOICES_ENABLED:
-                raise HTTPException(403, "Real invoice issuance is disabled pending company billing settings")
-            if settings.WORKSHOP_BILLING_SUPPLIER is None:
+            supplier = billing_supplier(db)
+            if supplier is None:
+                if not settings.WORKSHOP_REAL_INVOICES_ENABLED:
+                    raise HTTPException(403, "Fill in the workshop details (Workshop details in the top bar) before issuing invoices")
                 raise HTTPException(503, "Configure the verified company billing supplier before real issuance")
-            if request.supplier != settings.WORKSHOP_BILLING_SUPPLIER:
-                raise HTTPException(422, "Supplier must match the configured company billing profile")
+            if request.supplier != supplier:
+                raise HTTPException(422, "Supplier must match the saved workshop details")
         existing = db.scalar(select(WorkshopInvoice).where(WorkshopInvoice.job_id == job.id))
         if existing is not None:
             if existing.revision_id != revision_id or existing.snapshot["request"] != request.model_dump(mode="json"):
@@ -152,19 +179,12 @@ def issue_invoice(db: Session, revision_id: UUID, request: InvoiceRequest, actor
         today = datetime.now(ZoneInfo("Asia/Singapore")).date()
         if request.invoice_date != today:
             raise HTTPException(422, "Issuance uses today's Singapore date; backdated or future invoices are unsupported")
-        preview = calculate_invoice(revision, request)
-        invoice_id = uuid4()
-        number = ("DEMO-INV-" if preview.data_origin == "synthetic_demo" else "INV-") + invoice_id.hex.upper()
-        issued_at = datetime.now(timezone.utc)
-        html = render_invoice(number, preview, actor, issued_at)
-        invoice = WorkshopInvoice(id=invoice_id, job_id=job.id, revision_id=revision_id, number=number,
-                                  snapshot=preview.model_dump(mode="json"), issued_by=actor, issued_at=issued_at,
-                                  html=html, checksum=sha256(html.encode("utf-8")).hexdigest())
-        db.add(invoice)
-        db.flush()
-        response = invoice_response(invoice)
+        response = store_invoice(db, job.id, revision, request, actor, datetime.now(timezone.utc))
         db.commit()
         return response
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "Another invoice was issued at the same moment. Click Issue invoice again.") from None
     except (SQLAlchemyError, HTTPException):
         db.rollback()
         raise

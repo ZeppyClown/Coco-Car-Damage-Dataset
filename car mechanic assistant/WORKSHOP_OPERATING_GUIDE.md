@@ -170,3 +170,7 @@ The numbered walk-through under “Complete one fictional job” above describes
 ## Books, payments and the paper guide (13 October 2026)
 
 Run `python -m alembic upgrade head` once to add the payments table (`20261013_payments`). **Books** in the top bar lists each month's invoices with GST, paid and balance, and downloads them for Excel. Record payments on step 6 or from a Books row; a refund is a minus amount. To show reference pictures in the **Paper guide** pop-up, put PNG/JPEG files in a private folder (for example `car mechanic assistant/runtime/workshop/guide/`, named `01 …`, `02 …` for order) and set `WORKSHOP_GUIDE_DIR` to its full path. Keep that folder out of Git.
+
+## First-time setup, expenses and accident jobs (13 October 2026)
+
+Run `python -m alembic upgrade head` once to add the workshop-details and expenses tables (`20261014_company_expenses`). The first time `/workshop` is opened it shows **Workshop details**: type the workshop name, address, telephone and GST registration no. (leave the GST no. empty if not registered) and save. Invoices cannot be issued until this is saved. **Add example jobs** fills an empty app with made-up jobs, invoices, payments and expenses; they cannot be removed, so use it only on a trial copy. Record supplier bills, wages and rent in **Books → Money paid out**; the profit and loss is at the bottom of Books. For an accident job, open **Accident or insurance job** on step 1. The app keeps the details only; it does not report to an insurer.

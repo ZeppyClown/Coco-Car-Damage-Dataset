@@ -12,15 +12,16 @@ from app.schemas.workshop import WorkshopDraft, WorkshopDraftUpdate, WorkshopJob
 from app.services.workshop_extraction import extract_source
 from app.services.workshop import create_job, get_job, update_job, attach_document, get_document, document_file, MAX_UPLOAD_BYTES, confirm_job, list_revisions, generate_export, get_export, export_file, lookup_jobs
 from app.schemas.workshop_invoice import InvoiceRequest, InvoiceIssueRequest, InvoicePreview, InvoiceResponse, InvoiceSettingsResponse
-from app.schemas.workshop_books import PaymentRequest
-from app.services.workshop_books import month_sheet, month_csv, payments, add_payment, vehicle_history, guide_pictures, guide_picture
+from app.schemas.workshop_books import CompanyRequest, ExpenseRequest, PaymentRequest
+from app.services.workshop_books import month_sheet, month_csv, payments, add_payment, vehicle_history, guide_pictures, guide_picture, expense_sheet, expense_csv, add_expense, profit_and_loss
+from app.services.workshop_setup import setup_state, save_company, add_example_data
 from app.services.workshop_sheet import job_sheet_html, invoice_sheet_html, car_outline
-from app.services.workshop_invoice import preview_invoice, issue_invoice, get_invoice, job_invoice, invoice_response, invoice_html
+from app.services.workshop_invoice import billing_supplier, preview_invoice, issue_invoice, get_invoice, job_invoice, invoice_response, invoice_html
 
 
 def require_workshop_enabled(request: Request):
     if not settings.WORKSHOP_ENABLED:
-        raise HTTPException(status_code=404, detail="Workshop demo is disabled")
+        raise HTTPException(status_code=404, detail="The workshop app is switched off")
     if not getattr(request.state, "workshop_user", None):
         raise HTTPException(status_code=503, detail="Workshop authentication boundary is unavailable")
     return request.state.workshop_user
@@ -87,15 +88,15 @@ def read_revisions(job_id: UUID, limit: int = Query(20, ge=1, le=100), offset: i
 
 
 @router.post("/revisions/{revision_id}/exports", response_model=WorkshopExportResponse)
-def create_demo_export(revision_id: UUID, db: Session = Depends(get_db)):
+def create_job_download(revision_id: UUID, db: Session = Depends(get_db)):
     return generate_export(db, revision_id)
 
 
 @router.get("/exports/{export_id}/download")
-def download_demo_export(export_id: UUID, db: Session = Depends(get_db)):
+def download_job_file(export_id: UUID, db: Session = Depends(get_db)):
     export = get_export(db, export_id)
     return FileResponse(
-        export_file(export), media_type="text/csv; charset=utf-8", filename=f"workshop-demo-{export.id}.csv",
+        export_file(export), media_type="text/csv; charset=utf-8", filename=f"workshop-job-{export.id}.csv",
         headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
     )
 
@@ -106,9 +107,9 @@ def print_job_sheet(revision_id: UUID, db: Session = Depends(get_db)):
 
 
 @router.get("/billing-settings", response_model=InvoiceSettingsResponse)
-def billing_settings():
-    return InvoiceSettingsResponse(real_invoices_enabled=settings.WORKSHOP_REAL_INVOICES_ENABLED,
-                                   supplier=settings.WORKSHOP_BILLING_SUPPLIER)
+def billing_settings(db: Session = Depends(get_db)):
+    supplier = billing_supplier(db)
+    return InvoiceSettingsResponse(real_invoices_enabled=supplier is not None, supplier=supplier)
 
 
 @router.post("/revisions/{revision_id}/invoice-preview", response_model=InvoicePreview)
@@ -190,3 +191,40 @@ def guide_list():
 def guide_file(name: str):
     path, media_type = guide_picture(name)
     return FileResponse(path, media_type=media_type, headers={"Cache-Control": "no-store"})
+
+
+MONTH = Query(pattern=r"^\d{4}-(0[1-9]|1[0-2])$")
+
+
+@router.get("/expenses")
+def read_expenses(month: str = MONTH, format: str = Query("json", pattern="^(json|csv)$"), db: Session = Depends(get_db)):
+    sheet = expense_sheet(db, month)
+    if format == "json":
+        return sheet
+    return Response(expense_csv(sheet), media_type="text/csv; charset=utf-8", headers={
+        "Cache-Control": "no-store", "Content-Disposition": f'attachment; filename="workshop-expenses-{month}.csv"'})
+
+
+@router.post("/expenses", status_code=201)
+def record_expense(request: ExpenseRequest, db: Session = Depends(get_db), actor: str = Depends(require_workshop_enabled)):
+    return add_expense(db, request, actor)
+
+
+@router.get("/profit")
+def read_profit(month: str = MONTH, db: Session = Depends(get_db)):
+    return profit_and_loss(db, month)
+
+
+@router.get("/setup")
+def read_setup(db: Session = Depends(get_db)):
+    return setup_state(db)
+
+
+@router.put("/setup")
+def write_setup(request: CompanyRequest, db: Session = Depends(get_db), actor: str = Depends(require_workshop_enabled)):
+    return save_company(db, request, actor)
+
+
+@router.post("/setup/example-jobs", status_code=201)
+def example_jobs(db: Session = Depends(get_db), actor: str = Depends(require_workshop_enabled)):
+    return add_example_data(db, actor)

@@ -21,12 +21,15 @@ const quickLines = {
   repair: ["Servicing", "Engine oil", "Radiator", "Coolant", "Fan motor", "Front oil seal", "Windscreen replace", "Headlight", "Rear lamp", "Side mirror", "Labour"],
   spray: [...panels.map(name => "Spray " + name.toLowerCase()), "Spray rim", "Polish"],
 };
+const accidentFields = ["claim_type", "accident_date", "accident_place", "insurer", "policy_number", "report_number", "other_vehicle", "other_party", "other_insurer", "excess", "notes"];
+const claimNames = { own_damage: "claim own insurance", third_party: "claim the other party's insurance", private_settlement: "private settlement", report_only: "report for record only" };
+const expenseTypes = [["parts", "Parts"], ["paint", "Paint & materials"], ["subcontract", "Outside work"], ["wages", "Wages"], ["rent", "Rent"], ["utilities", "Utilities"], ["tools", "Tools & equipment"], ["other", "Other"]];
 const stageNames = { quote: "Quotation", approved_scope: "Agreed job", completed_work: "Finished job" };
 
 let step = "car", job = null, sourceId = null, aiProvenance = null, kept = {}, marks = [], fuel = null;
 let dirty = false, zoom = 1, rotation = 0, reviewed = [];
 let lookupParams = new URLSearchParams(), lookupOffset = 0;
-let billingRevision = null, billingPreview = null, billingIssued = null, billingAllowed = false, billingDirty = false;
+let billingRevision = null, billingPreview = null, billingIssued = null, billingAllowed = false, billingDirty = false, billingSupplier = null;
 
 function element(tag, text, className) {
   const node = document.createElement(tag);
@@ -43,7 +46,7 @@ function showStep(name) {
   const panel = sections[name] ? "lines" : name;
   for (const node of document.querySelectorAll("[data-panel]")) node.hidden = node.dataset.panel !== panel;
   for (const button of document.querySelectorAll("#steps button, .tools [data-step]")) button.classList.toggle("active", button.dataset.step === name);
-  $("draft-form").hidden = ["find", "help", "books"].includes(name);
+  $("draft-form").hidden = ["find", "help", "books", "setup"].includes(name);
   $("side").hidden = name === "print";
   if (sections[name]) {
     $("lines-title").textContent = sections[name].title; $("lines-hint").textContent = sections[name].hint;
@@ -178,10 +181,19 @@ function showSource() {
 }
 
 // ---- record <-> screen -----------------------------------------------------
-function render(record = { data_origin: "synthetic_demo", items: [] }) {
+function readAccident() {
+  if (!$("accident-claim_type").value) return null;
+  const accident = {};
+  for (const name of accidentFields) accident[name] = $("accident-" + name).value.trim() || (name === "notes" ? "" : null);
+  if (accident.excess !== null) accident.excess = parseAmount(accident.excess) ?? accident.excess;
+  return accident;
+}
+function render(record = { data_origin: "private_source", items: [] }) {
   resetBilling();
   $("reviewer").textContent = reviewerAccount;
-  aiProvenance = record.ai_provenance || null; $("ai-send-ack").checked = false;
+  aiProvenance = record.ai_provenance || null;
+  for (const name of accidentFields) $("accident-" + name).value = record.accident?.[name] ?? "";
+  $("accident-box").open = Boolean(record.accident);
   $("ai-provenance").textContent = aiProvenance ? `First draft suggested by AI (${aiProvenance.model}). Check every value.` : "";
   sourceId = record.source_document_id || null; $("data-origin").value = record.data_origin; $("data-origin").disabled = Boolean(job);
   $("record-stage").value = stageNames[record.record_stage] ? record.record_stage : "quote";
@@ -206,6 +218,7 @@ function readDraft(confirmed = false) {
     record_stage: $("record-stage").value, items, field_states: {},
     manual_provenance: $("manual-provenance").value.trim() || (sourceId ? null : "Typed in by workshop staff; no photo attached."),
     contact: $("contact").value.trim() || null, fuel_level: fuel, diagram_marks: marks.map(mark => ({ ...mark, note: mark.note.trim() })),
+    accident: readAccident(),
   };
   for (const name of headerFields) { draft[name] = $(name).value.trim() || null; draft.field_states[name] = draft[name] ? done : "missing"; }
   for (const name of keptFields) draft[name] = kept[name];
@@ -236,6 +249,9 @@ function renderSummary() {
   const sum = table.insertRow(); sum.className = "group"; sum.insertCell().textContent = "Total of the amounts typed in"; sum.insertCell().textContent = total.toFixed(2);
   box.append(table);
   if (draft.diagram_marks.length) box.append(element("p", "Car marks: " + draft.diagram_marks.map((mark, index) => `${index + 1} ${mark.note || "(no note)"}`).join("; ")));
+  if (draft.accident) box.append(element("p", "Accident job: " + [claimNames[draft.accident.claim_type], draft.accident.insurer && "insurer " + draft.accident.insurer,
+    draft.accident.report_number && "report " + draft.accident.report_number, draft.accident.other_vehicle && "other vehicle " + draft.accident.other_vehicle,
+    draft.accident.excess && "excess $" + draft.accident.excess].filter(Boolean).join(" · ")));
   if (!draft.job_reference) problems.unshift("Job no. is empty");
   if (!draft.items.some(item => !item.cancelled && item.description)) problems.unshift("No work lines yet");
   if (problems.length) box.append(element("p", "Clear up before confirming: " + problems.join("; "), "notice"));
@@ -300,12 +316,6 @@ $("attach-source").addEventListener("click", () => {
   action(async () => { const source = await request("/documents", { method: "POST", body: data }); sourceId = source.id; showSource(); markDirty(); status("Photo attached. Save the job to keep it."); });
 });
 $("detach-source").addEventListener("click", () => { sourceId = null; showSource(); markDirty(); status("Photo removed from this job. The stored photo was not deleted."); });
-$("extract-source").addEventListener("click", () => {
-  if (!sourceId) return status("Attach a practice photo first.", true);
-  if (job || $("items").children.length || headerFields.some(name => $(name).value.trim())) return status("AI suggestions only work on a new empty job. What you typed was kept.", true);
-  if (!$("ai-send-ack").checked) return status("Tick the box to allow sending this practice photo to Gemini first.", true);
-  action(async () => { const proposed = await request("/documents/" + sourceId + "/extract", JSON_POST({ send_to_gemini: true })); render(proposed); markDirty(); status("AI suggestion loaded, not saved. Check every value."); });
-});
 
 // ---- history, printing and CSV --------------------------------------------
 function link(text, href) { const node = element("a", text, "button"); node.href = href; node.target = "_blank"; node.rel = "noopener"; return node; }
@@ -329,7 +339,7 @@ function renderHistory() {
       if (!response.ok) throw new Error("CSV download failed. The job is still saved.");
       const url = URL.createObjectURL(await response.blob()), anchor = element("a"); anchor.href = url; anchor.download = `job-${record.job_reference}-v${revision.version}.csv`;
       document.body.append(anchor); anchor.click(); anchor.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000);
-      status("CSV downloaded. It is a demo layout, not matched to any accounting software.");
+      status("CSV downloaded: one row for each line of this job.");
     }));
     card.append(download);
     if (record.source_document_id) card.append(link("Open photo", api + "/documents/" + encodeURIComponent(record.source_document_id) + "/preview"));
@@ -399,7 +409,7 @@ function showIssuedInvoice(invoice) {
   const container = $("issued-invoice"); container.replaceChildren();
   container.append(element("p", `${invoice.number} · total $${invoice.preview.total} · GST $${invoice.preview.gst} · issued by ${invoice.issued_by}`));
   container.append(link("Print invoice on the workshop form", api + "/invoices/" + invoice.id + "/sheet"), link("Plain copy", api + "/invoices/" + invoice.id + "/print"));
-  $("billing-state").textContent = invoice.preview.data_origin === "synthetic_demo" ? "DEMO invoice saved. Not for payment or tax claims." : "Invoice saved. It is not a payment receipt.";
+  $("billing-state").textContent = "Invoice issued. Record the payment below when the customer pays.";
   updateIssueButton(); paymentBox(invoice.id, $("invoice-payment")).catch(() => {});
 }
 async function loadJobInvoice() {
@@ -420,22 +430,16 @@ async function prepareInvoice(revision) {
   if (revision.version !== job.draft_version) throw new Error("Use the newest confirmed version of this job.");
   const config = await request("/billing-settings");
   billingRevision = revision; billingPreview = null; billingDirty = false; $("invoice-ack").checked = false;
-  const real = revision.record.data_origin === "private_source";
-  billingAllowed = !real || (config.real_invoices_enabled && Boolean(config.supplier));
-  const supplier = real ? config.supplier : null;
-  $("invoice-supplier-name").value = supplier?.name || ""; $("invoice-supplier-address").value = supplier?.address || "";
-  $("invoice-gst-status").value = supplier?.gst_status || "registered"; $("invoice-gst-number").value = supplier?.gst_registration_number || "";
-  for (const name of ["name", "address"]) $("invoice-supplier-" + name).readOnly = real;
-  $("invoice-gst-number").readOnly = real; $("invoice-gst-status").disabled = real;
+  billingSupplier = config.supplier; billingAllowed = Boolean(billingSupplier);
+  $("invoice-from").textContent = billingSupplier ? `Invoice from ${billingSupplier.name}` + (billingSupplier.gst_registration_number ? ` · GST reg. no. ${billingSupplier.gst_registration_number}` : " · not GST-registered, so no GST is added") : "";
   $("invoice-customer-name").value = revision.record.customer_reference || ""; $("invoice-customer-address").value = "";
   $("invoice-date").value = singaporeDate(); $("invoice-basis").value = "inclusive"; $("invoice-discount").value = "0.00";
   $("invoice-preview").textContent = ""; $("invoice-form").hidden = false;
-  $("billing-state").textContent = billingAllowed ? "Fill in the boxes, then work out the totals." : "Real invoices are switched off or the company billing details are missing.";
+  $("billing-state").textContent = billingAllowed ? "Fill in the boxes, then work out the totals." : "Fill in “Workshop details” (top bar) first. The invoice needs the workshop's name and address.";
   updateIssueButton(); $("billing-heading").scrollIntoView();
 }
 function invoiceRequest() {
-  return { supplier: { name: $("invoice-supplier-name").value.trim(), address: $("invoice-supplier-address").value.trim(),
-    gst_status: $("invoice-gst-status").value, gst_registration_number: $("invoice-gst-number").value.trim() || null },
+  return { supplier: billingSupplier,
     customer: { name: $("invoice-customer-name").value.trim(), address: $("invoice-customer-address").value.trim() },
     invoice_date: $("invoice-date").value, pricing_basis: $("invoice-basis").value, discount: $("invoice-discount").value.trim() };
 }
@@ -493,14 +497,53 @@ async function loadBooks() {
   for (const row of sheet.rows) {
     const line = table.insertRow();
     for (const [name] of bookColumns) { const cell = line.insertCell(); cell.textContent = name === "number" ? row.number.slice(0, 13) + (row.number.length > 13 ? "…" : "") : row[name]; if (name === "number") cell.title = row.number; }
-    const pay = element("button", Number(row.balance) > 0 ? "Record payment" : "Payments"); pay.type = "button";
+    const pay = element("button", Number(row.balance) > 0 ? "Pay" : "View"); pay.title = "Payments for this invoice"; pay.type = "button";
     pay.addEventListener("click", () => { $("books-payment").hidden = false; paymentBox(row.invoice_id, $("books-payment"), loadBooks).then(() => $("books-payment").scrollIntoView()).catch(error => status(error.message, true)); });
     line.insertCell().append(pay);
   }
   const foot = table.insertRow(); foot.className = "group";
   for (const [name] of bookColumns) foot.insertCell().textContent = name === "date" ? "TOTAL" : sheet.totals[name] ?? "";
   foot.insertCell();
+  await loadExpenses(month);
 }
+
+// ---- money paid out, and profit and loss ------------------------------------
+for (const [value, label] of expenseTypes) { const option = element("option", label); option.value = value; $("expense-category").append(option); }
+const expenseColumns = [["date", "Date"], ["supplier", "Paid to"], ["category", "Type"], ["description", "What for"], ["supplier_invoice", "Supplier invoice"], ["job_reference", "Job no."],
+  ["amount", "Paid"], ["gst", "GST in it"], ["net", "Before GST"]];
+async function loadExpenses(month) {
+  $("expenses-download").href = api + "/expenses?format=csv&month=" + month;
+  if (!$("expense-date").value.startsWith(month)) $("expense-date").value = month === singaporeDate().slice(0, 7) ? singaporeDate() : month + "-01";
+  const table = $("expenses-table"), profitTable = $("profit-table"); table.replaceChildren(); profitTable.replaceChildren();
+  let sheet, profit;
+  try { [sheet, profit] = await Promise.all([request("/expenses?month=" + month), request("/profit?month=" + month)]); }
+  catch (error) { table.insertRow().insertCell().textContent = "Expenses could not load: " + error.message; return; }
+  const head = table.insertRow(); for (const [, label] of expenseColumns) head.append(element("th", label));
+  for (const row of sheet.rows) {
+    const line = table.insertRow();
+    for (const [name] of expenseColumns) line.insertCell().textContent = name === "category" ? Object.fromEntries(expenseTypes)[row.category] : row[name];
+  }
+  const foot = table.insertRow(); foot.className = "group";
+  for (const [name] of expenseColumns) foot.insertCell().textContent = name === "date" ? "TOTAL" : sheet.totals[name] ?? "";
+  const line = (label, value, className) => { const row = profitTable.insertRow(); if (className) row.className = className; row.insertCell().textContent = label; row.insertCell().textContent = value; };
+  line("Sales (invoices, before GST)", profit.sales);
+  for (const cost of profit.costs) line("Less " + cost.label.toLowerCase(), cost.amount);
+  line("Total costs (before GST)", profit.total_costs);
+  line(Number(profit.profit) < 0 ? "LOSS for the month" : "PROFIT for the month", profit.profit, Number(profit.profit) < 0 ? "group loss" : "group");
+  line("GST collected on invoices", profit.gst_collected); line("GST paid on expenses", profit.gst_paid); line("GST difference (collected less paid)", profit.gst_owed);
+  line("Money received from customers this month", profit.money_in); line("Money paid out this month", profit.money_out);
+  line("Still owed by customers on this month's invoices", profit.unpaid_invoices);
+}
+$("add-expense").addEventListener("click", () => action(async () => {
+  const typed = $("expense-amount").value.trim(), amount = parseAmount(typed.replace(/^-/, "")), gst = $("expense-gst").value.trim() ? parseAmount($("expense-gst").value) : "0";
+  if (!$("expense-supplier").value.trim()) throw new Error("Type who was paid.");
+  if (!amount || gst === null) throw new Error("Type the amount paid, for example 250.00, and the GST in it if the bill shows GST.");
+  await request("/expenses", JSON_POST({ spent_on: $("expense-date").value, supplier: $("expense-supplier").value.trim(), category: $("expense-category").value,
+    description: $("expense-description").value.trim(), supplier_invoice: $("expense-bill").value.trim(), job_reference: $("expense-job").value.trim(),
+    amount: (typed.startsWith("-") ? "-" : "") + amount, gst }));
+  for (const name of ["supplier", "description", "bill", "job", "amount", "gst"]) $("expense-" + name).value = "";
+  const month = $("expense-date").value.slice(0, 7); $("books-month").value = month; await loadBooks(); status("Expense recorded.");
+}));
 $("books-show").addEventListener("click", loadBooks);
 $("books-month").addEventListener("change", loadBooks);
 
@@ -523,6 +566,30 @@ $("guide-close").addEventListener("click", () => $("guide").close());
 
 window.addEventListener("resize", viewImage);
 window.addEventListener("beforeunload", event => { if (dirty || billingDirty) { event.preventDefault(); event.returnValue = ""; } });
+// ---- first-time setup ------------------------------------------------------
+function showSetup(state) {
+  const company = state.company;
+  for (const [id, name] of [["company-name", "name"], ["company-phone", "phone"], ["company-gst", "gst_registration_number"], ["company-address", "address"]]) $(id).value = company?.[name] ?? "";
+  $("company-state").textContent = company ? "Saved." : "Not saved yet.";
+  $("add-examples").disabled = !company || state.jobs > 0;
+  $("example-state").textContent = state.jobs > 0 ? `The app already has ${state.jobs} job${state.jobs > 1 ? "s" : ""}, so examples cannot be added.` : company ? "" : "Save the workshop details first.";
+  $("setup-hint").hidden = Boolean(company) && state.jobs > 0;
+}
+async function loadSetup() { const state = await request("/setup"); showSetup(state); return state; }
+$("save-company").addEventListener("click", () => action(async () => {
+  if (!$("company-name").value.trim() || !$("company-address").value.trim()) throw new Error("Type the workshop name and address first.");
+  const state = await request("/setup", { ...JSON_POST({ name: $("company-name").value.trim(), address: $("company-address").value.trim(),
+    phone: $("company-phone").value.trim(), gst_registration_number: $("company-gst").value.trim() || null }), method: "PUT" });
+  status("Workshop details saved. They will be printed on every invoice from now on."); setTimeout(() => showSetup(state));
+}));
+$("add-examples").addEventListener("click", () => {
+  if (!window.confirm("Add three months of made-up jobs, invoices, payments and expenses? They cannot be removed afterwards.")) return;
+  action(async () => { const state = await request("/setup/example-jobs", { method: "POST" }); status(`${state.jobs} example jobs added. Open “Books” or “Find job” to see them.`); setTimeout(() => showSetup(state)); });
+});
+$("setup-start").addEventListener("click", () => { showStep("car"); $("job_reference").focus(); });
+document.querySelector('.tools [data-step="setup"]').addEventListener("click", () => loadSetup().catch(error => status(error.message, true)));
+
 render(); renderHistory(); showStep("car");
 const initialJob = new URLSearchParams(location.search).get("job");
 if (initialJob) openJob(initialJob);
+else loadSetup().then(state => { if (!state.company) { showStep("setup"); status("Welcome. Fill in the workshop details to begin."); } }).catch(() => {});

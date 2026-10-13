@@ -41,9 +41,10 @@ def extraction_schema():
     for name in ("description_state", "amount_state", "section"):
         schema["$defs"]["WorkshopItem"]["properties"].pop(name)
     # Sheet-entry fields are typed by staff; keep the provider schema as tested.
-    for name in ("contact", "fuel_level", "diagram_marks"):
+    for name in ("contact", "fuel_level", "diagram_marks", "accident"):
         schema["properties"].pop(name)
-    schema["$defs"].pop("DiagramMark")
+    for name in ("DiagramMark", "AccidentDetails"):
+        schema["$defs"].pop(name)
     return schema
 
 

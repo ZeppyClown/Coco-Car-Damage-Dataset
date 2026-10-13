@@ -134,7 +134,7 @@ def test_preview_issue_reopen_retry_html_and_corrections(billing_client, test_db
     first = issue(billing_client, revision, request)
     assert first.status_code == 200
     invoice = first.json()
-    assert invoice["number"].startswith("DEMO-INV-") and invoice["issued_by"] == "fictional-test-operator"
+    assert invoice["number"].startswith("INV-20") and invoice["number"].endswith("-0001") and invoice["issued_by"] == "fictional-test-operator"
     assert issue(billing_client, revision, request).json() == invoice
     assert billing_client.get(API + f"/jobs/{job['id']}/invoice").json() == invoice
     assert billing_client.get(API + f"/invoices/{invoice['id']}").json() == invoice
@@ -142,7 +142,7 @@ def test_preview_issue_reopen_retry_html_and_corrections(billing_client, test_db
     assert printed.headers["cache-control"] == "no-store" and "default-src 'none'" in printed.headers["content-security-policy"]
     assert sha256(printed.content).hexdigest() == invoice["checksum"]
     assert '<script>' not in printed.text and '&lt;script&gt;' in printed.text and "示例" in printed.text
-    assert "Cancelled example" not in printed.text and "DEMO ONLY" in printed.text and "Tax Invoice" in printed.text
+    assert "Cancelled example" not in printed.text and "DEMO ONLY" not in printed.text and "Tax Invoice" in printed.text
     assert issue(billing_client, revision, {**request, "discount": "1.00"}).status_code == 409
     corrected = {**job["draft"], "job_reference": "DEMO-CORRECTION"}
     billing_client.patch(API + f"/jobs/{job['id']}", json={"expected_version": 1, "draft": corrected})

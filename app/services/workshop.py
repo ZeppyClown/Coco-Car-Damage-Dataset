@@ -1,9 +1,10 @@
-"""Local source, draft, review and demo output; authentication comes later."""
+"""Job sheets: photo, draft, checked versions and the per-job download."""
 from uuid import UUID, uuid4
 from hashlib import sha256
 from io import BytesIO, StringIO
 import csv
 import os
+import re
 from datetime import date, datetime, time, timezone
 from pathlib import Path
 
@@ -150,12 +151,26 @@ def _validate_source(db: Session, draft: WorkshopDraft) -> None:
         raise HTTPException(status_code=422, detail="Source and draft origins must match")
 
 
+def job_number(draft: WorkshopDraft) -> str | None:
+    """One key per job no. however it is typed: letters and digits only, upper case."""
+    return re.sub(r"[^A-Z0-9]", "", (draft.job_reference or "").upper()) or None
+
+
+def _duplicate_number(draft: WorkshopDraft) -> HTTPException:
+    return HTTPException(status_code=409, detail=f"Job no. {draft.job_reference} is already used by another job. "
+                         "Use Find job to open it, or give this job a different number.")
+
+
 def create_job(db: Session, draft: WorkshopDraft) -> WorkshopJob:
     _validate_source(db, draft)
-    job = WorkshopJob(draft=draft.model_dump(mode="json"), source_document_id=draft.source_document_id)
+    job = WorkshopJob(draft=draft.model_dump(mode="json"), source_document_id=draft.source_document_id,
+                      job_number=job_number(draft))
     try:
         db.add(job)
         db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise _duplicate_number(draft) from None
     except SQLAlchemyError:
         db.rollback()
         raise
@@ -175,6 +190,7 @@ def update_job(db: Session, job_id: UUID, request: WorkshopDraftUpdate) -> Works
             .values(
                 draft=request.draft.model_dump(mode="json"),
                 source_document_id=request.draft.source_document_id,
+                job_number=job_number(request.draft),
                 draft_version=WorkshopJob.draft_version + 1,
                 updated_at=func.now(),
             )
@@ -184,6 +200,9 @@ def update_job(db: Session, job_id: UUID, request: WorkshopDraftUpdate) -> Works
             db.rollback()
             raise HTTPException(status_code=409, detail="Draft changed; reload before saving")
         db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise _duplicate_number(request.draft) from None
     except SQLAlchemyError:
         db.rollback()
         raise
@@ -341,7 +360,7 @@ def get_export(db: Session, export_id: UUID) -> WorkshopExport:
 
 
 def export_file(export: WorkshopExport) -> Path:
-    return _stored_file(export.storage_key, export.byte_size, export.checksum, "demo export")
+    return _stored_file(export.storage_key, export.byte_size, export.checksum, "job download")
 
 
 def _export_response(export: WorkshopExport):
@@ -368,7 +387,7 @@ def generate_export(db: Session, revision_id: UUID):
             WorkshopExport.revision_id == revision_id, WorkshopExport.mapping_version == DEMO_MAPPING_VERSION))
         if existing is not None:
             if existing.checksum != checksum:
-                raise HTTPException(status_code=503, detail="Demo mapping no longer matches its recorded output")
+                raise HTTPException(status_code=503, detail="Download layout no longer matches its recorded output")
             export_file(existing)
             response = _export_response(existing)
             db.commit()
@@ -395,5 +414,5 @@ def generate_export(db: Session, revision_id: UUID):
         if created:
             path.unlink(missing_ok=True)
         if isinstance(error, OSError):
-            raise HTTPException(status_code=503, detail="Demo export storage failed") from None
+            raise HTTPException(status_code=503, detail="Download storage failed") from None
         raise

@@ -17,8 +17,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.db.models import WorkshopInvoice, WorkshopJobRevision, WorkshopPayment
-from app.schemas.workshop_books import PaymentRequest
+from app.db.models import WorkshopExpense, WorkshopInvoice, WorkshopJobRevision, WorkshopPayment
+from app.schemas.workshop_books import ExpenseRequest, PaymentRequest
 from app.services.workshop_invoice import get_invoice
 
 SECTIONS = ("knock", "repair", "spray")
@@ -106,6 +106,70 @@ def add_payment(db: Session, invoice_id: UUID, request: PaymentRequest, actor: s
         db.rollback()
         raise
     return payments(db, invoice_id)
+
+
+EXPENSE_CATEGORIES = {"parts": "Parts", "paint": "Paint & materials", "subcontract": "Outside work", "wages": "Wages",
+                      "rent": "Rent", "utilities": "Utilities", "tools": "Tools & equipment", "other": "Other"}
+EXPENSE_HEADINGS = ("Date", "Supplier", "Type", "What for", "Supplier invoice no.", "Job no.", "Paid", "GST in it", "Before GST")
+
+
+def _month_range(month: str) -> tuple[date, date]:
+    year, number = int(month[:4]), int(month[5:])
+    return date(year, number, 1), date(year + number // 12, number % 12 + 1, 1)
+
+
+def expense_sheet(db: Session, month: str) -> dict:
+    start, end = _month_range(month)
+    rows, totals = [], dict.fromkeys(("amount", "gst", "net"), Decimal(0))
+    for row in db.scalars(select(WorkshopExpense).where(WorkshopExpense.spent_on >= start, WorkshopExpense.spent_on < end)
+                          .order_by(WorkshopExpense.spent_on, WorkshopExpense.recorded_at)):
+        amount, gst = Decimal(row.amount), Decimal(row.gst) * (-1 if row.amount < 0 else 1)
+        for name, value in (("amount", amount), ("gst", gst), ("net", amount - gst)):
+            totals[name] += value
+        rows.append({"date": row.spent_on.isoformat(), "supplier": row.supplier, "category": row.category,
+                     "description": row.description, "supplier_invoice": row.supplier_invoice, "job_reference": row.job_reference,
+                     "amount": _money(amount), "gst": _money(gst), "net": _money(amount - gst), "recorded_by": row.recorded_by})
+    return {"month": month, "rows": rows, "totals": {name: _money(value) for name, value in totals.items()}}
+
+
+def expense_csv(sheet: dict) -> bytes:
+    output = StringIO(newline="")
+    writer = csv.writer(output)
+    writer.writerow(EXPENSE_HEADINGS)
+    for row in sheet["rows"]:
+        writer.writerow([row["date"], row["supplier"], EXPENSE_CATEGORIES[row["category"]], row["description"],
+                         row["supplier_invoice"], row["job_reference"], row["amount"], row["gst"], row["net"]])
+    writer.writerow(["TOTAL", "", "", "", "", "", *(sheet["totals"][name] for name in ("amount", "gst", "net"))])
+    return b"\xef\xbb\xbf" + output.getvalue().encode("utf-8")
+
+
+def add_expense(db: Session, request: ExpenseRequest, actor: str) -> dict:
+    try:
+        db.add(WorkshopExpense(**request.model_dump(), recorded_by=actor, recorded_at=datetime.now(timezone.utc)))
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        raise
+    return expense_sheet(db, request.spent_on.isoformat()[:7])
+
+
+def profit_and_loss(db: Session, month: str) -> dict:
+    """Sales less costs for the month, all before GST, plus the GST collected and paid."""
+    sales, costs = month_sheet(db, month)["totals"], expense_sheet(db, month)
+    by_type = dict.fromkeys(EXPENSE_CATEGORIES, Decimal(0))
+    for row in costs["rows"]:
+        by_type[row["category"]] += Decimal(row["net"])
+    start, end = _month_range(month)
+    received = sum((Decimal(payment.amount) for payment in db.scalars(
+        select(WorkshopPayment).where(WorkshopPayment.paid_on >= start, WorkshopPayment.paid_on < end))), Decimal(0))
+    spent = Decimal(costs["totals"]["net"])
+    return {"month": month, "sales": sales["net"], "costs": [
+                {"category": name, "label": EXPENSE_CATEGORIES[name], "amount": _money(value)} for name, value in by_type.items() if value],
+            "total_costs": _money(spent), "profit": _money(Decimal(sales["net"]) - spent),
+            "gst_collected": sales["gst"], "gst_paid": costs["totals"]["gst"],
+            "gst_owed": _money(Decimal(sales["gst"]) - Decimal(costs["totals"]["gst"])),
+            "money_in": _money(received), "money_out": costs["totals"]["amount"],
+            "unpaid_invoices": sales["balance"]}
 
 
 def vehicle_history(db: Session, number: str) -> dict:

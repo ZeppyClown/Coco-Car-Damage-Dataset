@@ -45,7 +45,7 @@ def test_reviewed_values_sit_on_the_paper_form():
     for value in ("DEMO-VEHICLE-A", "Fictional Example Person", "Fictional Model A",
                   "01/10/2026", "03/10/2026", "Example filter replacement", "25.10"):
         assert value in html
-    assert "DEMO ONLY" in html
+    assert "DEMO ONLY" not in html
 
 
 def test_missing_form_still_prints_and_says_so():
@@ -125,7 +125,7 @@ def test_invoice_uses_the_form_with_totals_in_the_last_rows():
     html = invoice(["109.00"])
     assert html.count('<section class="sheet">') == 1
     for value in ("TAX INVOICE", "No: DEMO-INV-1", "Date: 12/10/2026", "Fictional Customer", "Line 1",
-                  "Prices are GST-inclusive.", "DEMO ONLY"):
+                  "Prices are GST-inclusive."):
         assert value in html
     last_three = [f"top:{22.9 + 3.1 * index:.2f}%" for index in (17, 18, 19)]
     for position, label, amount in zip(last_three, ("TOTAL", "GST 9%", "GRAND TOTAL"), ("100.00", "9.00", "109.00")):
@@ -199,3 +199,11 @@ def test_car_outline_is_cut_from_the_configured_form(sheet_client, monkeypatch, 
     assert Image.open(BytesIO(picture.content)).size == (390, 745)
     monkeypatch.setattr(settings, "WORKSHOP_SHEET_TEMPLATE", None)
     assert sheet_client.get(API + "/sheet-diagram").status_code == 404
+
+
+def test_accident_job_prints_one_short_line_beside_the_car():
+    accident = {"claim_type": "own_damage", "insurer": "Fictional Insurer", "report_number": "R-1", "excess": "600.00",
+                "other_party": "Private Person"}
+    html = render_job_sheet(revision(accident=accident), FAKE_FORM)
+    assert "Accident: own damage claim · Fictional Insurer · R-1 · excess 600.00" in html and "Private Person" not in html
+    assert "Accident:" not in render_job_sheet(revision(), FAKE_FORM)

@@ -850,6 +850,14 @@ remain recorded and unanswered.
 
 ## 16. Work log
 
+### 13 October 2026 — F14 live click-through in the running app
+
+- Started the existing disposable demo PostgreSQL 14 cluster (`runtime/workshop-f02-tests/postgres`, port 55441, already at head `20261012_invoices`; no migration run) and this branch's app on `127.0.0.1:18041` with the existing private demo login and `WORKSHOP_SHEET_TEMPLATE` set.
+- A scripted Chrome session (Playwright, ignored `.context/tour.cjs`) completed one fictional completed-work job end to end: attach fictional sheet → draft with two priced lines and one cancelled line → save → confirm → **job sheet on the workshop form** → invoice preview (925.10 inclusive, GST 76.38) → issue → **invoice on the workshop form** → lookup by job reference. All ten screenshots were inspected. This closes the "click-through in a running app" gap for both F14 routes; it adds one fictional `TUTORIAL-…` job and DEMO invoice to the demo database.
+- A staff tutorial with these screenshots was written outside the repository (two pictures show the real form). Still not checked: paper printing, staff review, tax-invoice content rules.
+- User asked whether damage can be marked by clicking the car outline: not implemented; diagram meaning is typed text that prints beside the outline.
+
+
 ### 13 October 2026 — F14.b invoice printed on the workshop form
 
 - **User correction:** the Yap Motor form is also what the workshop hands over as its invoice, so the invoice must use it instead of the plain layout.

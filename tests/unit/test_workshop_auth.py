@@ -24,18 +24,18 @@ def auth_client(client, monkeypatch):
     return client
 
 
-@pytest.mark.parametrize("path", ["/workshop", "/workshop/", API+"/jobs", API+"/documents/"+str(uuid4())+"/preview", API+"/exports/"+str(uuid4())+"/download"])
+@pytest.mark.parametrize("path", [API+"/jobs", API+"/documents/"+str(uuid4())+"/preview", API+"/exports/"+str(uuid4())+"/download"])
 def test_protected_surfaces_challenge_before_lookup(auth_client, path):
     response = auth_client.get(path, auth=None)
     assert response.status_code == 401
-    assert response.headers["www-authenticate"] == 'Basic realm="Workshop"'
+    assert "www-authenticate" not in response.headers  # no browser pop-up
     assert response.headers["cache-control"] == "no-store"
 
 
 @pytest.mark.parametrize("header", ["Basic !!!", "Basic dXNlcg==", "Bearer fictional", "Basic " + "A"*4096], ids=["invalid-base64","missing-colon","wrong-scheme","oversized"])
 def test_malformed_or_wrong_credentials_never_expose_data(auth_client, header):
     response = auth_client.get(API+"/jobs", auth=None, headers={"Authorization":header})
-    assert response.status_code == 401 and "www-authenticate" in response.headers
+    assert response.status_code == 401 and "www-authenticate" not in response.headers
     assert PASSWORD not in response.text
 
 

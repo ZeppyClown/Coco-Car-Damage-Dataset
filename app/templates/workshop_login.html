@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Sign in · Workshop job sheets</title>
+  <link rel="stylesheet" href="/static/workshop.css">
+</head>
+<body class="sign-in">
+<main>
+  <form method="post" action="{{workshop_api}}/login" class="card">
+    <h1>Job sheet</h1>
+    <p class="hint">Sign in with the login name and password the owner gave you.</p>
+    {{message}}
+    <label>Login name <input name="username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="200" required autofocus></label>
+    <label>Password <input name="password" type="password" autocomplete="current-password" maxlength="1024" required></label>
+    <button type="submit">Sign in</button>
+  </form>
+</main>
+</body>
+</html>

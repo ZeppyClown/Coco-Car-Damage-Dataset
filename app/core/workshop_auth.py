@@ -1,15 +1,17 @@
-"""The owner login from the server settings plus staff logins kept in the database; authenticate before parsing request bodies."""
+"""The owner login from the server settings plus staff logins kept in the database; authenticate before parsing request bodies.
+Browsers sign in once on the sign-in page and then carry a signed cookie; scripts may still send a username and password."""
 import base64
 import binascii
-from hashlib import scrypt
+import hmac
+from hashlib import scrypt, sha256
 from collections import deque
 from secrets import compare_digest, token_bytes
-from time import monotonic
+from time import monotonic, time
 from urllib.parse import urlsplit
 
-from fastapi import HTTPException, Request
+from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
-from fastapi.security import HTTPBasic
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from starlette.concurrency import run_in_threadpool
 
 from app.core.config import settings
@@ -25,7 +27,9 @@ STAFF_PASSWORD_LENGTH = 10
 # Wrong passwords from one address: after 10 in 5 minutes that address waits. Kept in memory, so it resets on restart.
 MAX_FAILURES, FAILURE_WINDOW = 10, 300
 FAILURES: dict[str, deque] = {}
-CHALLENGE = {"WWW-Authenticate": 'Basic realm="Workshop"'}
+# No WWW-Authenticate header is ever sent, so browsers show the sign-in page instead of their own password pop-up.
+SESSION_COOKIE, SESSION_SECONDS = "workshop_session", 12 * 3600
+LOGIN_PAGE = "/workshop/login"
 
 
 def hash_password(password: str, minimum: int = 16) -> str:
@@ -114,7 +118,7 @@ def _verify(credentials, configuration, app=None, address: str = ""):
     username, salt, expected, _ = configuration
     password = credentials.password if credentials else ""
     if not credentials or len(password) > 1024:
-        raise HTTPException(status_code=401, detail="Workshop authentication required", headers=CHALLENGE)
+        raise HTTPException(status_code=401, detail="Workshop authentication required")
     recent = FAILURES.setdefault(address, deque())
     while recent and monotonic() - recent[0] > FAILURE_WINDOW:
         recent.popleft()
@@ -129,8 +133,72 @@ def _verify(credentials, configuration, app=None, address: str = ""):
     candidate = scrypt(password.encode(), salt=salt, n=16384, r=8, p=5, dklen=32, maxmem=32*1024*1024)
     if not compare_digest(candidate, expected):
         recent.append(monotonic())
-        raise HTTPException(status_code=401, detail="Workshop authentication required", headers=CHALLENGE)
+        raise HTTPException(status_code=401, detail="Workshop authentication required")
     return credentials.username, role
+
+
+def _session_key(app, username: str, configuration) -> tuple[bytes, str] | None:
+    """Signing key and role for a login. The key changes when that login's password (or the owner's) changes, which ends its sessions."""
+    owner, _, owner_digest, _ = configuration
+    if username == owner:
+        return sha256(b"workshop-session\0" + owner_digest).digest(), "owner"
+    staff = _staff_login(app, username) if valid_username(username) else None
+    if staff is None:
+        return None
+    return sha256(b"workshop-session\0" + owner_digest + b"\0" + staff[1]).digest(), staff[2]
+
+
+def _signature(key: bytes, name: str, expires: str) -> str:
+    return hmac.new(key, f"{name}\n{expires}".encode(), sha256).hexdigest()
+
+
+def session_token(app, username: str, configuration) -> str:
+    key, _ = _session_key(app, username, configuration)
+    name, expires = base64.urlsafe_b64encode(username.encode()).decode(), str(int(time()) + SESSION_SECONDS)
+    return f"{name}.{expires}.{_signature(key, name, expires)}"
+
+
+def _session(app, token: str, configuration):
+    """(login name, role) for a valid, unexpired cookie whose login is still active, else None."""
+    try:
+        name, expires, signature = token.split(".")
+        if len(token) > 400 or int(expires) < time():
+            return None
+        username = base64.urlsafe_b64decode(name.encode()).decode()
+    except (ValueError, binascii.Error, UnicodeDecodeError):
+        return None
+    found = _session_key(app, username, configuration)
+    if found is None or not compare_digest(_signature(found[0], name, expires), signature):
+        return None
+    return username, found[1]
+
+
+login_router = APIRouter(include_in_schema=False)
+
+
+@login_router.post(f"/api/{settings.API_VERSION}/workshop/login")
+async def sign_in(request: Request, username: str = Form("", max_length=200), password: str = Form("", max_length=1024)):
+    """The sign-in page posts here; the middleware has already checked the request comes from the workshop page."""
+    configuration = _configuration()
+    try:
+        username, _ = await run_in_threadpool(_verify, HTTPBasicCredentials(username=username, password=password),
+                                              configuration, request.app, request.client.host if request.client else "")
+    except HTTPException as error:
+        return RedirectResponse(LOGIN_PAGE + ("?error=locked" if error.status_code == 429 else "?error=wrong"), status_code=303)
+    token = await run_in_threadpool(session_token, request.app, username, configuration)
+    response = RedirectResponse("/workshop", status_code=303)
+    response.set_cookie(SESSION_COOKIE, token, max_age=SESSION_SECONDS, path="/", httponly=True, samesite="strict",
+                        secure=configuration[3][0] == "https")
+    return response
+
+
+@login_router.post(f"/api/{settings.API_VERSION}/workshop/logout")
+def sign_out():
+    # ponytail: the cookie is removed from this browser only; a copied cookie stays valid until it expires (12 hours)
+    # or that login's password changes. Keep a server-side list of sessions if that matters.
+    response = RedirectResponse(LOGIN_PAGE + "?error=out", status_code=303)
+    response.delete_cookie(SESSION_COOKIE, path="/")
+    return response
 
 
 class WorkshopAccessMiddleware:
@@ -140,27 +208,35 @@ class WorkshopAccessMiddleware:
     async def __call__(self, scope, receive, send):
         prefix = f"/api/{settings.API_VERSION}/workshop"
         path = scope.get("path", "").rstrip("/")
-        if scope["type"] != "http" or not (path == "/workshop" or path == prefix or path.startswith(prefix + "/")):
-            if scope["type"] == "http" and settings.WORKSHOP_ONLY and path != "/health" and not path.startswith("/static/"):
+        if scope["type"] != "http" or not (path in {"/workshop", LOGIN_PAGE} or path == prefix or path.startswith(prefix + "/")):
+            if scope["type"] == "http" and settings.WORKSHOP_ONLY and path != "/health" and not path.startswith("/static/workshop"):
                 response = RedirectResponse("/workshop") if path == "" else JSONResponse(status_code=404, content={"detail": "Not found"})
                 return await response(scope, receive, send)
             return await self.app(scope, receive, send)
-        try:
-            request = Request(scope)
-            configuration = _check_request(request)
-            if len(request.headers.get("authorization", "")) > 4096:
-                raise HTTPException(status_code=401, detail="Workshop authentication required", headers=CHALLENGE)
-            credentials = await BASIC(request)
-            username, role = await run_in_threadpool(_verify, credentials, configuration, scope.get("app"),
-                                                     request.client.host if request.client else "")
-            scope.setdefault("state", {}).update(workshop_user=username, workshop_role=role)
-        except HTTPException as error:
-            response = JSONResponse(status_code=error.status_code, content={"detail":error.detail},
-                                    headers={**(error.headers or {}), "Cache-Control":"no-store"})
-            return await response(scope, receive, send)
         async def private_send(message):
             if message["type"] == "http.response.start":
                 message["headers"] = [(key, value) for key, value in message.get("headers", []) if key.lower() != b"cache-control"]
                 message["headers"].append((b"cache-control", b"no-store"))
             await send(message)
+        try:
+            request = Request(scope)
+            configuration = _check_request(request)
+            if path in {LOGIN_PAGE, prefix + "/login", prefix + "/logout"}:
+                return await self.app(scope, receive, private_send)
+            signed_in = await run_in_threadpool(_session, scope.get("app"), request.cookies.get(SESSION_COOKIE, ""), configuration)
+            if signed_in is None:
+                if len(request.headers.get("authorization", "")) > 4096:
+                    raise HTTPException(status_code=401, detail="Workshop authentication required")
+                credentials = await BASIC(request)
+                if credentials is None and path == "/workshop":
+                    return await RedirectResponse(LOGIN_PAGE, status_code=303, headers={"Cache-Control": "no-store"})(scope, receive, send)
+                signed_in = await run_in_threadpool(_verify, credentials, configuration, scope.get("app"),
+                                                    request.client.host if request.client else "")
+            username, role = signed_in
+            scope.setdefault("state", {}).update(workshop_user=username, workshop_role=role)
+        except HTTPException as error:
+            response = JSONResponse(status_code=error.status_code, content={"detail":error.detail},
+                                    headers={**{key: value for key, value in (error.headers or {}).items()
+                                                if key.lower() != "www-authenticate"}, "Cache-Control":"no-store"})
+            return await response(scope, receive, send)
         await self.app(scope, receive, private_send)

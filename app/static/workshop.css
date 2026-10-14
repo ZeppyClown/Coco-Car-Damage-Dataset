@@ -116,3 +116,9 @@ label.inline > input:not([type=checkbox]) { display: inline-block; width: auto; 
 #profit-table { white-space: normal; } #profit-table td:last-child { white-space: nowrap; }
 #signed-in { margin: 0; padding: .15rem 1rem 0; text-align: right; background: #dbe6ea; }
 #users-table td, #users-table th { text-align: left; }
+.sign-in main { max-width: 24rem; margin: 12vh auto 0; padding: 0 1rem; }
+.sign-in h1 { margin: 0 0 .25rem; }
+.sign-in label { margin: .75rem 0; }
+.sign-in button { background: #12313d; color: #fff; width: 100%; margin-top: .5rem; }
+.sign-in #status { border: 0; padding: .5rem .75rem; border-radius: 5px; }
+.signout { display: inline; margin: 0; }

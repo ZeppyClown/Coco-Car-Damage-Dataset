@@ -260,6 +260,7 @@ function renderSummary() {
 // ---- server calls ----------------------------------------------------------
 async function request(path, options = {}) {
   const response = await fetch(api + path, options);
+  if (response.status === 401) { location.href = "/workshop/login"; throw new Error("Please sign in again."); }
   const data = await response.json();
   if (!response.ok) {
     const detail = Array.isArray(data.detail) ? data.detail.slice(0, 20).map(error => error.msg.replace(/^Value error, /, "")).join("\n") : data.detail || data.error;

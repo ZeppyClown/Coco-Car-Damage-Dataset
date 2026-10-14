@@ -301,3 +301,7 @@ Books now shows the profit on each job (what was charged less the expenses recor
 ### F19 — ready to host, 14 October 2026
 
 The container now updates its own database when it starts, so no database command is run by hand. Staff get their own logins (added by the owner), the blank job-sheet picture is uploaded in the app and kept in the database, repeated wrong passwords lock an address out for five minutes, and every table is closed to Supabase's public data API. New: `scripts/run_workshop.sh`, `scripts/backup_workshop.sh`, [hosting guide](WORKSHOP_HOSTING.md). Full suite with PostgreSQL **352 passed, 0 skipped, 0 failed**. **Not hosted yet**: that needs the owner's Supabase and host accounts. Details: [master section 16](WORKSHOP_MASTER_PLAN.md#16-work-log).
+
+### F20 — sign-in page, 14 October 2026
+
+The browser's password pop-up is replaced by a sign-in page and a **Sign out** button. The password is checked once at sign-in instead of on every click, which matters on Render's free service where each check took 2.3 seconds. Changing a password or switching a staff login off ends its sign-ins. Full suite **337 passed, 22 skipped, 0 failed**; checked in Chrome at desktop and phone size. Details: [master section 16](WORKSHOP_MASTER_PLAN.md#16-work-log).

@@ -201,4 +201,6 @@ def test_hosted_copy_serves_only_the_workshop(shop, monkeypatch):
     shop.auth = None
     assert [shop.get(path, follow_redirects=False).status_code for path in ("/", "/docs", "/openapi.json", "/api/v1/query", "/health")] == [307, 404, 404, 404, 200]
     assert shop.get("/", follow_redirects=False).headers["location"] == "/workshop"
-    assert shop.get("/static/workshop.js").status_code == 200 and shop.get("/workshop").status_code == 401
+    assert shop.get("/static/workshop.js").status_code == 200 and shop.get("/static/index.html").status_code == 404
+    assert shop.get("/workshop", follow_redirects=False).headers["location"] == "/workshop/login"
+    assert shop.get("/workshop/login").status_code == 200

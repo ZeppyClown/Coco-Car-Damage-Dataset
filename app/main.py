@@ -9,7 +9,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from pathlib import Path
 
 from app.core.config import settings
-from app.core.workshop_auth import WorkshopAccessMiddleware
+from app.core.workshop_auth import WorkshopAccessMiddleware, login_router
 from app.core.logging import get_logger
 from app.core.middleware import (
     error_handling_middleware,
@@ -105,6 +105,23 @@ def workshop_page(request: Request):
     page = (Path(__file__).parent / "templates/workshop.html").read_text(encoding="utf-8")
     page = page.replace("{{workshop_api}}", escape(f"/api/{settings.API_VERSION}/workshop", quote=True))
     page = page.replace("{{workshop_user}}", escape(request.state.workshop_user, quote=True))
+    return HTMLResponse(page, headers={"Cache-Control": "no-store"})
+
+
+SIGN_IN_MESSAGES = {
+    "wrong": "That login name or password is not right. Try again.",
+    "locked": "Too many wrong passwords. Wait five minutes and try again.",
+    "out": "You have signed out.",
+}
+app.include_router(login_router)
+
+
+@app.get("/workshop/login", include_in_schema=False)
+def workshop_login_page(error: str = ""):
+    page = (Path(__file__).parent / "templates/workshop_login.html").read_text(encoding="utf-8")
+    page = page.replace("{{workshop_api}}", escape(f"/api/{settings.API_VERSION}/workshop", quote=True))
+    message = SIGN_IN_MESSAGES.get(error)
+    page = page.replace("{{message}}", f'<p id="status" role="status" class="{"" if error == "out" else "error"}">{message}</p>' if message else "")
     return HTMLResponse(page, headers={"Cache-Control": "no-store"})
 
 @app.on_event("startup")

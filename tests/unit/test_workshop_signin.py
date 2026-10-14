@@ -93,3 +93,24 @@ def test_sign_in_from_another_site_is_refused(browser):
     response = browser.post(API + "/login", data={"username": TEST_OPERATOR, "password": TEST_PASSWORD},
                             headers={"Origin": "https://example.invalid"}, follow_redirects=False)
     assert response.status_code == 403 and "set-cookie" not in response.headers
+
+
+def test_changing_address_does_not_dodge_the_lockout(client):
+    """Behind some hosts the address comes from a header the visitor can fake, so wrong passwords also count per name."""
+    from fastapi import HTTPException
+    from fastapi.security import HTTPBasicCredentials
+    from app.core.workshop_auth import _configuration, _verify
+    configuration = _configuration()
+    for number in range(10):
+        with pytest.raises(HTTPException) as wrong:
+            _verify(HTTPBasicCredentials(username=TEST_OPERATOR, password="not the fictional password"), configuration,
+                    address=f"203.0.113.{number}")
+        assert wrong.value.status_code == 401
+    with pytest.raises(HTTPException) as locked:
+        _verify(HTTPBasicCredentials(username=TEST_OPERATOR, password=TEST_PASSWORD), configuration, address="198.51.100.7")
+    assert locked.value.status_code == 429
+
+
+def test_only_two_password_checks_run_at_once():
+    from app.core.workshop_auth import CHECKS
+    assert CHECKS._initial_value == 2

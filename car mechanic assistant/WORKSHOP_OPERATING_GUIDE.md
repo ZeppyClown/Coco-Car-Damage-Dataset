@@ -174,3 +174,9 @@ Run `python -m alembic upgrade head` once to add the payments table (`20261013_p
 ## First-time setup, expenses and accident jobs (13 October 2026)
 
 Run `python -m alembic upgrade head` once to add the workshop-details and expenses tables (`20261014_company_expenses`). The first time `/workshop` is opened it shows **Workshop details**: type the workshop name, address, telephone and GST registration no. (leave the GST no. empty if not registered) and save. Invoices cannot be issued until this is saved. **Add example jobs** fills an empty app with made-up jobs, invoices, payments and expenses; they cannot be removed, so use it only on a trial copy. Record supplier bills, wages and rent in **Books → Money paid out**; the profit and loss is at the bottom of Books. For an accident job, open **Accident or insurance job** on step 1. The app keeps the details only; it does not report to an insurer.
+
+### Hosted copy: backups, example jobs, photos (F21)
+
+- **Download backup** (Workshop details, owner only) saves every job, invoice, payment, expense, login and photo as one zip. Keep one at least weekly, off the shop computer. `scripts/restore_workshop.py <zip>` with `DATABASE_URL` set puts it into an empty database that the app has started against once.
+- **Remove example jobs** (Workshop details, owner only) deletes every made-up example job with its invoices, payments, downloads and expenses. Real records stay. Invoice numbering carries on from the last real invoice of each year. On PostgreSQL the database still refuses to delete any real invoice or checked job.
+- **Photos and per-job downloads** are stored in the database from F21 on. Older ones are still read from `WORKSHOP_STORAGE_DIR`.

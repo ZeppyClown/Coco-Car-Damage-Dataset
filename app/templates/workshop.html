@@ -57,8 +57,11 @@
         <select id="user-role" aria-label="Kind of login"><option value="staff">Staff</option><option value="owner">Owner</option></select>
         <button type="button" id="add-user">Add login / set new password</button></div>
     </li>
-    <li id="example-step"><b>Example jobs (optional).</b> Adds three months of made-up jobs, invoices, payments and expenses in your workshop's name, so every page has something to show. The people and vehicle numbers are invented. They stay in the books and use up the first invoice numbers, so only add them on a computer you are trying the app on.
-      <div><button type="button" id="add-examples">Add example jobs</button> <span id="example-state" class="hint"></span></div>
+    <li id="example-step"><b>Example jobs (optional).</b> Adds three months of made-up jobs, invoices, payments and expenses in your workshop's name, so every page has something to show. The people and vehicle numbers are invented. Remove them before you start real work: removing takes out every example job with its invoices, payments and expenses, and invoice numbers start again after your last real one.
+      <div><button type="button" id="add-examples">Add example jobs</button> <button type="button" id="remove-examples" hidden>Remove example jobs</button> <span id="example-state" class="hint"></span></div>
+    </li>
+    <li id="backup-step"><b>Backup.</b> Download a copy of everything (jobs, invoices, payments, expenses, photos) at least once a week and keep it off this computer, for example in your e-mail or a USB stick. The free database keeps no copies of its own.
+      <div><a class="button" id="download-backup" href="{{workshop_api}}/backup" download>Download backup</a></div>
     </li>
     <li><b>Start.</b> <button type="button" id="setup-start">Start my first job</button> <button type="button" data-step="help">Read how to use it first</button></li>
   </ol>

@@ -1,9 +1,14 @@
+import os
+from datetime import datetime
+from tempfile import NamedTemporaryFile
 from uuid import UUID
+from zoneinfo import ZoneInfo
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from sqlalchemy.orm import Session
+from starlette.background import BackgroundTask
 
 from app.core.config import settings
 from app.core.workshop_auth import BASIC
@@ -14,7 +19,8 @@ from app.services.workshop import create_job, get_job, update_job, attach_docume
 from app.schemas.workshop_invoice import InvoiceRequest, InvoiceIssueRequest, InvoicePreview, InvoiceResponse, InvoiceSettingsResponse
 from app.schemas.workshop_books import CompanyRequest, ExpenseRequest, PaymentRequest, UserRequest, UserSwitch
 from app.services.workshop_books import month_sheet, month_csv, payments, add_payment, vehicle_history, guide_pictures, guide_picture, expense_sheet, expense_csv, add_expense, profit_and_loss
-from app.services.workshop_setup import setup_state, save_company, add_example_data, save_form, users, save_user, switch_user, MAX_FORM_BYTES
+from app.services.workshop_backup import write_backup
+from app.services.workshop_setup import setup_state, save_company, add_example_data, remove_example_data, save_form, users, save_user, switch_user, MAX_FORM_BYTES
 from app.services.workshop_sheet import job_sheet_html, invoice_sheet_html, car_outline
 from app.services.workshop_invoice import billing_supplier, preview_invoice, issue_invoice, get_invoice, job_invoice, invoice_response, invoice_html
 
@@ -45,7 +51,7 @@ def upload_source(file: UploadFile = File(...), data_origin: DataOrigin = Form(.
 @router.get("/documents/{document_id}/preview")
 def preview_source(document_id: UUID, db: Session = Depends(get_db)):
     document = get_document(db, document_id)
-    return FileResponse(
+    return Response(
         document_file(document), media_type=document.media_type,
         headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
     )
@@ -101,9 +107,10 @@ def create_job_download(revision_id: UUID, db: Session = Depends(get_db)):
 @router.get("/exports/{export_id}/download")
 def download_job_file(export_id: UUID, db: Session = Depends(get_db)):
     export = get_export(db, export_id)
-    return FileResponse(
-        export_file(export), media_type="text/csv; charset=utf-8", filename=f"workshop-job-{export.id}.csv",
-        headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
+    return Response(
+        export_file(export), media_type="text/csv; charset=utf-8",
+        headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff",
+                 "Content-Disposition": f'attachment; filename="workshop-job-{export.id}.csv"'},
     )
 
 
@@ -234,6 +241,26 @@ def write_setup(request: CompanyRequest, db: Session = Depends(get_db), actor: s
 @router.post("/setup/example-jobs", status_code=201)
 def example_jobs(db: Session = Depends(get_db), actor: str = Depends(require_owner)):
     return add_example_data(db, actor)
+
+
+@router.get("/backup")
+def download_backup(db: Session = Depends(get_db), actor: str = Depends(require_owner)):
+    """Everything in the workshop tables, photos included, as one zip file for the owner to keep."""
+    handle = NamedTemporaryFile(suffix=".zip", delete=False)
+    handle.close()
+    try:
+        write_backup(db.connection(), handle.name)
+    except Exception:
+        os.unlink(handle.name)
+        raise
+    day = datetime.now(ZoneInfo("Asia/Singapore")).strftime("%Y-%m-%d-%H%M")
+    return FileResponse(handle.name, media_type="application/zip", filename=f"workshop-backup-{day}.zip",
+                        headers={"Cache-Control": "no-store"}, background=BackgroundTask(os.unlink, handle.name))
+
+
+@router.delete("/setup/example-jobs")
+def drop_example_jobs(db: Session = Depends(get_db), actor: str = Depends(require_owner)):
+    return remove_example_data(db)
 
 
 @router.put("/setup/form")

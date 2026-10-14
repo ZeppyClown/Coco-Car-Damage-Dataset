@@ -40,9 +40,9 @@ def test_upload_preview_duplicate_and_untrusted_filename(source_client, test_db)
     assert duplicate.json()["id"] == source_id
     assert upload(source_client, origin="private_source").status_code == 422
     assert test_db.scalar(select(func.count()).select_from(WorkshopDocument)) == 1
-    files = list(settings.WORKSHOP_STORAGE_DIR.iterdir())
-    assert len(files) == 1 and files[0].name != "outside.png"
-    assert files[0].read_bytes() == PNG
+    stored = test_db.scalar(select(WorkshopDocument))
+    assert stored.content == PNG and stored.storage_key != "outside.png"
+    assert not settings.WORKSHOP_STORAGE_DIR.exists()  # kept in the database, so hosts without a disk keep it
 
 
 def test_jpeg_is_decoded_and_retained(source_client):
@@ -99,33 +99,39 @@ def test_unknown_missing_corrupt_and_unsafe_stored_path(source_client, test_db):
     assert source_client.get(f"{PREFIX}/{uuid4()}/preview").status_code == 404
     created = upload(source_client).json()
     document = test_db.scalar(select(WorkshopDocument))
-    path = settings.WORKSHOP_STORAGE_DIR / document.storage_key
-    path.write_bytes(b"changed")
+    document.content = b"changed"
+    test_db.commit()
     assert source_client.get(f"{PREFIX}/{created['id']}/preview").status_code == 503
     assert upload(source_client).status_code == 503
-    path.unlink()
+    # A row saved before files moved into the database is read from the storage folder.
+    document.content = None
+    test_db.commit()
+    assert source_client.get(f"{PREFIX}/{created['id']}/preview").status_code == 503
+    settings.WORKSHOP_STORAGE_DIR.mkdir()
+    (settings.WORKSHOP_STORAGE_DIR / document.storage_key).write_bytes(PNG)
+    assert source_client.get(f"{PREFIX}/{created['id']}/preview").content == PNG
+    (settings.WORKSHOP_STORAGE_DIR / document.storage_key).write_bytes(b"changed")
     assert source_client.get(f"{PREFIX}/{created['id']}/preview").status_code == 503
     document.storage_key = "../../outside.png"
     test_db.commit()
     assert source_client.get(f"{PREFIX}/{created['id']}/preview").status_code == 503
 
 
-def test_database_failure_removes_new_file(source_client, test_db, monkeypatch):
+def test_database_failure_saves_nothing(source_client, test_db, monkeypatch):
     def fail_commit():
         raise OperationalError("fixture", {}, RuntimeError("PRIVATE TEST VALUE"))
     with monkeypatch.context() as patch:
         patch.setattr(test_db, "commit", fail_commit)
         result = upload(source_client)
     assert result.status_code == 500 and "PRIVATE TEST VALUE" not in result.text
-    assert list(settings.WORKSHOP_STORAGE_DIR.iterdir()) == []
+    assert not settings.WORKSHOP_STORAGE_DIR.exists()
     assert test_db.scalar(select(func.count()).select_from(WorkshopDocument)) == 0
 
 
-def test_storage_failure_and_static_directory_rejected(source_client, test_db, monkeypatch, tmp_path):
-    blocker = tmp_path / "not-a-directory"
-    blocker.write_text("fictional blocker")
-    monkeypatch.setattr(settings, "WORKSHOP_STORAGE_DIR", blocker)
-    assert upload(source_client).status_code == 503
+def test_old_files_are_never_read_from_the_public_static_folder(source_client, test_db, monkeypatch):
+    created = upload(source_client).json()
+    document = test_db.scalar(select(WorkshopDocument))
+    document.content = None
+    test_db.commit()
     monkeypatch.setattr(settings, "WORKSHOP_STORAGE_DIR", Path("app/static/private"))
-    assert upload(source_client).status_code == 503
-    assert test_db.scalar(select(func.count()).select_from(WorkshopDocument)) == 0
+    assert source_client.get(f"{PREFIX}/{created['id']}/preview").status_code == 503

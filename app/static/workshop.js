@@ -579,15 +579,17 @@ function showSetup(state) {
   for (const [id, name] of [["company-name", "name"], ["company-phone", "phone"], ["company-gst", "gst_registration_number"], ["company-address", "address"]]) $(id).value = company?.[name] ?? "";
   $("company-state").textContent = company ? "Saved." : "Not saved yet.";
   $("add-examples").disabled = !company || state.jobs > 0;
-  $("example-state").textContent = state.jobs > 0 ? `The app already has ${state.jobs} job${state.jobs > 1 ? "s" : ""}, so examples cannot be added.` : company ? "" : "Save the workshop details first.";
+  $("remove-examples").hidden = !state.examples;
+  $("example-state").textContent = state.examples ? `${state.examples} example job${state.examples > 1 ? "s are" : " is"} in the app.`
+    : state.jobs > 0 ? `The app already has ${state.jobs} job${state.jobs > 1 ? "s" : ""}, so examples cannot be added.` : company ? "" : "Save the workshop details first.";
   $("setup-hint").hidden = Boolean(company) && state.jobs > 0;
   $("form-state").textContent = state.form === "uploaded" ? "A picture is saved." : state.form === "file" ? "Using the picture stored on this computer; upload one here to keep it with the books." : "No picture yet: print-outs will be plain until one is added.";
 }
 function showUsers(account) {
   $("signed-in").textContent = `Signed in as ${account.me}` + (account.role === "owner" ? " (owner)" : "");
   const owner = account.role === "owner", table = $("users-table"); table.replaceChildren();
-  for (const id of ["save-company", "upload-form", "add-user", "add-examples"]) if (!owner) $(id).disabled = true;
-  if (!owner) { $("company-state").textContent = "Only an owner login can change this page."; $("users-step").hidden = true; return; }
+  for (const id of ["save-company", "upload-form", "add-user", "add-examples", "remove-examples"]) if (!owner) $(id).disabled = true;
+  if (!owner) { $("company-state").textContent = "Only an owner login can change this page."; $("users-step").hidden = true; $("backup-step").hidden = true; return; }
   const head = table.insertRow(); for (const label of ["Login", "Kind", "", ""]) head.append(element("th", label));
   for (const user of account.users) {
     const row = table.insertRow(); row.insertCell().textContent = user.username; row.insertCell().textContent = user.role === "owner" ? "Owner" : "Staff";
@@ -627,6 +629,10 @@ $("save-company").addEventListener("click", () => action(async () => {
 $("add-examples").addEventListener("click", () => {
   if (!window.confirm("Add three months of made-up jobs, invoices, payments and expenses? They cannot be removed afterwards.")) return;
   action(async () => { const state = await request("/setup/example-jobs", { method: "POST" }); status(`${state.jobs} example jobs added. Open “Books” or “Find job” to see them.`); setTimeout(() => showSetup(state)); });
+});
+$("remove-examples").addEventListener("click", () => {
+  if (!window.confirm("Remove every example job with its invoices, payments and expenses? Your real jobs stay.")) return;
+  action(async () => { const state = await request("/setup/example-jobs", { method: "DELETE" }); status("Example jobs removed. Only your real records are left."); setTimeout(() => showSetup(state)); });
 });
 $("setup-start").addEventListener("click", () => { showStep("car"); $("job_reference").focus(); });
 document.querySelector('.tools [data-step="setup"]').addEventListener("click", () => loadSetup().catch(error => status(error.message, true)));

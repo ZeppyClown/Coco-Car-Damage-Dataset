@@ -7,10 +7,10 @@ from uuid import UUID
 
 import httpx
 import pytest
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update
 
 from app.core.config import settings
-from app.db.models import WorkshopJob, WorkshopJobRevision, WorkshopExport
+from app.db.models import WorkshopDocument, WorkshopJob, WorkshopJobRevision, WorkshopExport
 from app.services import workshop_extraction as extraction
 
 
@@ -66,14 +66,16 @@ def test_proposals_never_confirm_save_or_choose_stage(ai_client, test_db, monkey
 
 
 @pytest.mark.parametrize("change,status", [("disabled",503), ("key",503), ("model",503), ("private",403), ("corrupt",503), ("ack",422), ("extra",422)])
-def test_no_call_without_enabled_config_permitted_source_and_explicit_request(ai_client, monkeypatch, change, status):
+def test_no_call_without_enabled_config_permitted_source_and_explicit_request(ai_client, test_db, monkeypatch, change, status):
     called = MagicMock(side_effect=AssertionError("Must not call provider"))
     monkeypatch.setattr(extraction, "call_gemini", called)
     source_id = source(ai_client, "private_source" if change == "private" else "synthetic_demo")
     if change == "disabled": monkeypatch.setattr(settings, "WORKSHOP_AI_ENABLED", False)
     if change == "key": monkeypatch.setattr(settings, "GOOGLE_API_KEY", None)
     if change == "model": monkeypatch.setattr(settings, "WORKSHOP_AI_MODEL", None)
-    if change == "corrupt": next(settings.WORKSHOP_STORAGE_DIR.iterdir()).write_bytes(b"corrupt")
+    if change == "corrupt":
+        test_db.execute(update(WorkshopDocument).values(content=b"corrupt"))
+        test_db.commit()
     body = {"send_to_gemini": False} if change == "ack" else {"send_to_gemini": True, "job_id": str(UUID(int=1))} if change == "extra" else {}
     assert propose(ai_client, source_id, **body).status_code == status
     called.assert_not_called()

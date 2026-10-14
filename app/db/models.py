@@ -298,6 +298,8 @@ class WorkshopDocument(Base):
     id = Column(Uuid, primary_key=True, default=uuid4)
     checksum = Column(String(64), nullable=False, unique=True)
     storage_key = Column(String(120), nullable=False, unique=True)
+    # The file itself; NULL only for rows saved before files moved into the database (then read from the storage folder).
+    content = deferred(Column(LargeBinary))
     media_type = Column(String(20), nullable=False)
     byte_size = Column(Integer, nullable=False)
     data_origin = Column(String(20), nullable=False)
@@ -348,6 +350,8 @@ class WorkshopExport(Base):
     mapping_version = Column(String(40), nullable=False)
     checksum = Column(String(64), nullable=False)
     storage_key = Column(String(120), nullable=False, unique=True)
+    # The file itself; NULL only for rows saved before files moved into the database (then read from the storage folder).
+    content = deferred(Column(LargeBinary))
     byte_size = Column(Integer, nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 

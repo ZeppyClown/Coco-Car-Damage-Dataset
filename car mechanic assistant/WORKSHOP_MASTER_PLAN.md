@@ -1,6 +1,6 @@
 # Workshop job-sheet project — master plan and implementation ledger
 
-**Last updated:** 14 October 2026 (F20). **Current phase:** standalone local capture/review/history/lookup/record export and F13 SGD invoicing/GST delivered; local saving/corrections/access/recovery and billing verified. Usefulness and removal of old financial/GST software are user assumptions. Business-benefit studies/external integrations are optional. F13 invoice/GST workflow is verified locally; real issuance is disabled pending Q11 supplier configuration/operation. Real-source permission/quality/meanings/labels and actual company pilot operation remain unverified. See [actual artifacts and fresh verification](WORKSHOP_VERIFICATION_REPORT.md).
+**Last updated:** 14 October 2026 (F21). **Current phase:** standalone local capture/review/history/lookup/record export and F13 SGD invoicing/GST delivered; local saving/corrections/access/recovery and billing verified. Usefulness and removal of old financial/GST software are user assumptions. Business-benefit studies/external integrations are optional. F13 invoice/GST workflow is verified locally; real issuance is disabled pending Q11 supplier configuration/operation. Real-source permission/quality/meanings/labels and actual company pilot operation remain unverified. See [actual artifacts and fresh verification](WORKSHOP_VERIFICATION_REPORT.md).
 
 This is the authoritative implementation/handoff document for the workshop administrative project. Every contributor, including Codex and Claude, must update it for **every feature or implementation part**, including partial work, fixes, migrations, tests, configuration and changed decisions. Do not rely on chat history to resume the work.
 
@@ -382,6 +382,7 @@ Allowed statuses: `READY`, `IN_PROGRESS`, `IMPLEMENTED_UNVERIFIED`, `VERIFIED`, 
 | F18 | Profit per job, invoice counter, job numbers enforced for old jobs, demo labels out of slides and downloads | VERIFIED locally: SQLite scratch run and PostgreSQL integration tests; `yap_workshop` tables NOT yet built | F17; same migration `20261014_company_expenses` (amended before it was applied anywhere) | Expenses tied to a job by a foreign key; profit on each job; invoice numbers from a locked counter row; migration gives earlier jobs their number; full 349 passed, 0 skipped, with PostgreSQL |
 | F19 | Ready to host: self-updating database, staff logins, form picture in the database, lockout, hosted-database lock-down | VERIFIED locally (SQLite scratch run in Chrome, PostgreSQL integration tests); NOT hosted; local `yap_workshop` needs the new update | F18; migration `20261015_users_hosting` | Container updates the database at start; owner/staff logins kept in the database; blank form uploaded in the app; ten wrong passwords lock an address for five minutes; row level security on every table; backup and start scripts; hosting guide; full 352 passed with PostgreSQL |
 | F20 | Sign-in page and sign-out instead of the browser's password pop-up | VERIFIED locally (unit tests, Chrome on a SQLite scratch copy); live Render copy deployed with F19 and confirmed answering, F20 not yet deployed | F19 | `/workshop/login` page, signed 12-hour cookie, Sign out button; leftover `/static/index.html` hidden on hosted copies; full 337 passed, 22 skipped |
+| F21 | Fixes for the hosted copy: files in the database, removable example jobs, backup and restore, lockout by name, keep-awake, system design | VERIFIED locally (SQLite unit tests, PostgreSQL integration tests, Chrome on a SQLite scratch copy); not yet deployed to Render | F20; migration `20261016_files_in_database` | Full suite with PostgreSQL 366 passed, 0 skipped |
 
 If a feature takes several turns, add subrows such as `F03.a upload validation` and `F03.b preview route`. Each subrow needs its own status and verification notes. Do not wait until the parent feature is finished to record partial work.
 
@@ -855,6 +856,21 @@ remain recorded and unanswered.
 ```
 
 ## 16. Work log
+
+### 14 October 2026 — F21 fix the problems found on the hosted copy; system design
+
+- **User decision:** fix all the problems found on the live copy and write a system design diagram.
+- **Guessing passwords (open in F20):** wrong passwords now also count per login name, so faking the address header no longer dodges the 10-in-5-minutes lockout. Render's handling of that header is not documented and forum reports conflict, so the app does not rely on it. A test that changes address on every try is locked out on the 11th; it fails with the name counter removed.
+- **Memory from parallel password checks:** at most two scrypt checks (16 MB each) run at once; others wait. The table of recent failures is pruned once it passes 10,000 names.
+- **Photos lost on restart:** job-sheet photos and per-job download files are now stored in the database (new `content` columns, migration `20261016_files_in_database`). Rows from before are still read from `WORKSHOP_STORAGE_DIR`. The database dump test now shows a dump alone restores photos; before, it needed the folder too. Ceiling: Supabase free holds 500 MB, shared with the books.
+- **Example jobs could not be removed:** *Remove example jobs* (owner) deletes example jobs with their checked versions, invoices, payments, downloads and expenses, and resets invoice counters to the last real invoice. Example expenses without a job no. are recognised by the example supplier names and their 10:00 stamp, because expenses carry no example flag. On PostgreSQL the same migration lets the invoice and checked-job guards allow deletion only of example rows, and only while the app sets `workshop.remove_examples` for that transaction; a test shows the database still refuses real ones and refuses example ones without the switch.
+- **Sleeping and pausing:** `.github/workflows/keep-awake.yml` asks `/health` every 10 minutes from 07:00 to 22:00 Singapore time. `/health` now runs `SELECT 1`, so the ping is database activity and a lost database shows as 503. **Not run on GitHub yet** (it starts after the push).
+- **No backups:** *Download backup* (owner) streams every workshop table, photos included, into a zip; `scripts/restore_workshop.py` loads it into an empty database at the same version, in one transaction. pg_dump was not used because this laptop has version 14, older than Supabase's server. Round trip tested on SQLite and between two PostgreSQL schemas.
+- **Sydney database:** cannot be moved from here; the steps (backup, new Singapore project, change `DATABASE_URL`, restore) are in the hosting guide.
+- **System design:** [WORKSHOP_SYSTEM_DESIGN.md](WORKSHOP_SYSTEM_DESIGN.md) with parts diagram, sign-in sequence, invoice flow and database rules.
+- **Verification:** full suite with PostgreSQL on the throwaway `yap_test_f21` (local PostgreSQL 14): **366 passed, 0 skipped, 0 failed**. Chrome on a fresh SQLite scratch copy with `WORKSHOP_ONLY=true`: signed in, saved details, added 75 example jobs, downloaded a 52 KB backup zip, removed the examples (0 jobs left), attached a photo with no storage folder created, `/static/index.html` 404, `/health` 200, no page errors.
+- **Next:** push so Render deploys F20 and F21; owner signs in, downloads a first backup; decide on moving the database to Singapore.
+
 
 ### 14 October 2026 — F20 sign-in page instead of the browser pop-up; hosted copy live
 

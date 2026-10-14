@@ -5,11 +5,11 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update
 from sqlalchemy.exc import OperationalError
 
 from app.core.config import settings
-from app.db.models import WorkshopJobRevision
+from app.db.models import WorkshopDocument, WorkshopJobRevision
 
 
 EXAMPLE = json.loads((Path(__file__).parents[1] / "fixtures/workshop/examples.json").read_text())["examples"][0]["record"]
@@ -91,10 +91,12 @@ def test_review_failure_rolls_back_and_history_bounds(review_client, test_db, mo
     assert review_client.get(f"{PREFIX}/{uuid4()}/revisions").status_code == 404
 
 
-def test_missing_stored_source_blocks_review(review_client, monkeypatch, tmp_path):
+def test_missing_stored_source_blocks_review(review_client, test_db, monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "WORKSHOP_STORAGE_DIR", tmp_path)
     png = (Path(__file__).parents[1] / "fixtures/workshop/synthetic-sheet.png").read_bytes()
     source = review_client.post("/api/v1/workshop/documents", data={"data_origin": "synthetic_demo"}, files={"file": ("demo.png", png, "image/png")}).json()
     job = review_client.post(PREFIX, json={**EXAMPLE, "manual_provenance": None, "source_document_id": source["id"]}).json()
-    next(tmp_path.iterdir()).unlink()
+    # An older row whose file is gone from the storage folder.
+    test_db.execute(update(WorkshopDocument).values(content=None))
+    test_db.commit()
     assert review_client.post(f"{PREFIX}/{job['id']}/confirm", json=REVIEW).status_code == 503

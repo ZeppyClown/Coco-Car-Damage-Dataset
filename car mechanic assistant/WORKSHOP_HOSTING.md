@@ -1,16 +1,19 @@
 # Putting the workshop app on the internet
 
-Written 14 October 2026. **Nothing has been hosted yet.** These are the steps, and what was and was not tested.
+Written 14 October 2026. **Hosted on 14 October 2026** at `https://yap-workshop.onrender.com` (Render free plan, Singapore) with a Supabase database in Sydney. These are the steps, and what was and was not tested. How the parts fit together: [system design](WORKSHOP_SYSTEM_DESIGN.md).
 
 The app has two parts: the **program** (this repository, packaged by the `Dockerfile`) and the **database** (PostgreSQL). Supabase can hold the database. Supabase does not run the program, so the program needs a second service that runs a Docker container, such as Render, Fly.io or Railway. Both must be set up by the account owner; they cannot be created from this repository.
 
 ## What the app now does for itself
 
 - **Updates its own database.** Each time the container starts it brings the tables up to date before serving. Nobody runs a database command by hand.
-- **Keeps the blank job-sheet picture in the database.** Upload it once in *Workshop details*; printing then needs no files on the server.
+- **Keeps every file in the database.** The blank job-sheet picture, job-sheet photos and per-job download files are stored in the database, so a host with no disk loses nothing on restart. Photos saved by older versions are still read from the `WORKSHOP_STORAGE_DIR` folder.
 - **Closes the tables to Supabase's public data API.** Supabase publishes tables in the `public` schema through a web address unless row level security is on. The app's update switches it on for every table, with no policies, so only the app's own database login can read or write. Checked by a PostgreSQL test; not checked on a real Supabase project.
 - **Per-staff logins**, added by the owner in *Workshop details*.
-- **Locks out guessing.** Ten wrong passwords from one address in five minutes makes that address wait. This counter lives in memory and resets when the program restarts.
+- **Sign-in page.** People sign in on `/workshop/login` and stay signed in for 12 hours; **Sign out** is in the top bar.
+- **Locks out guessing.** Ten wrong passwords in five minutes, from one address or for one login name, makes further tries wait. Counting by name matters because Render passes on the visitor's address in a header the visitor can fake. Only two password checks run at once, so a burst of guesses queues instead of running the 512 MB server out of memory. The counters live in memory and reset when the program restarts.
+- **Stays awake.** `.github/workflows/keep-awake.yml` asks `/health` every 10 minutes from 07:00 to 22:00 Singapore time (about 465 of the free 750 hours a month). `/health` also asks the database a trivial question, which keeps a free Supabase project from pausing. GitHub may run these late and switches them off after 60 days without commits; switch it back on under the repository's *Actions* tab.
+- **Backups without PostgreSQL tools.** *Workshop details → Download backup* (owner only) saves everything, photos included, as one zip. `scripts/restore_workshop.py` loads it into an empty database.
 - **Works behind the host's HTTPS.** The container trusts the forwarding headers the host adds. Only use it behind such a host, never open to the internet directly.
 
 ## Steps
@@ -36,12 +39,22 @@ The app has two parts: the **program** (this repository, packaged by the `Docker
 
 ## What hosting does not solve, and what to do
 
-- **Job-sheet photos need a disk.** Attached photos and per-job download files are written to a folder (`WORKSHOP_STORAGE_DIR`). Most hosts wipe the container's folder on every restart. Either add the host's persistent disk and point `WORKSHOP_STORAGE_DIR` at it, or do not attach photos. Everything else (jobs, invoices, payments, expenses, the form picture) is in the database.
+- **Database size.** Supabase's free database holds 500 MB. Photos are kept as uploaded (up to 8 MB each); phone photos of a sheet are usually 1–3 MB, so roughly 150–400 photos fit next to the books. Watch *Database size* in Supabase; past that, a paid plan or moving photos to Supabase Storage is needed.
 - **Paper guide pictures** are read from a folder (`WORKSHOP_GUIDE_DIR`) and are not in the database. Without that folder the pop-up says none are set up.
-- **Backups.** Supabase's free plan pauses a project after about a week of low activity and, according to third-party write-ups, keeps no backups; the paid plan keeps daily ones. Check Supabase's current pricing page before relying on either. Independently of the plan, `scripts/backup_workshop.sh` saves a dated copy of the whole database to a folder of your choice; run it daily from a computer you control.
-- **Sign-in page.** People sign in on `/workshop/login` and stay signed in for 12 hours. On a shared counter computer, staff must click **Sign out** before the next person, or everything is recorded under one name.
+- **Backups are a person's job.** Supabase's free plan, according to third-party write-ups, keeps no backups. The owner should click *Download backup* at least weekly and keep the file off the shop computer. `scripts/backup_workshop.sh` (pg_dump) also works, but needs PostgreSQL client tools at least as new as Supabase's server; this laptop's pg_dump 14 is too old.
+- **Shared counter computer.** Staff must click **Sign out** before the next person, or everything is recorded under one name. Sign-out removes the cookie from that browser only; a copied cookie would keep working until it expires (12 hours) or that login's password changes.
 - **The other pages of this program** (the parts and vehicle assistant at `/`) are not behind the workshop login. Set `WORKSHOP_ONLY=true` (the Render blueprint does) and they answer “not found”; `/` goes to `/workshop`.
 - **Customer data on the internet.** Names, vehicle numbers and phone numbers will sit with Supabase and the host. The workshop should agree to that before real customers are entered.
+
+## Moving the database to Singapore
+
+The first Supabase project was made in Sydney while the app runs in Singapore, so every database question crosses that distance. To move it:
+
+1. Sign in as the owner and click *Workshop details → Download backup*.
+2. In Supabase create a new project in **Southeast Asia (Singapore)**, with a password of letters and digits only.
+3. In Render, change `DATABASE_URL` to the new project's **Session pooler** string and save. The app starts and creates its empty tables.
+4. On the laptop: `DATABASE_URL='<new session pooler string>' /Volumes/T9/Coco-Car-Damage-Dataset/.venv/bin/python scripts/restore_workshop.py <the backup zip>`. It refuses if the new database already has workshop records or is at a different version.
+5. Sign in and check Books and a few jobs, then delete the Sydney project.
 
 ## Running it on one computer instead
 

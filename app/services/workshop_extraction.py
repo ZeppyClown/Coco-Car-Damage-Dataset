@@ -72,7 +72,7 @@ def extract_source(db: Session, document_id: UUID) -> WorkshopDraft:
         raise HTTPException(status_code=503, detail="Optional AI drafting is disabled; manual entry remains available")
     if not settings.GOOGLE_API_KEY or not (settings.WORKSHOP_AI_MODEL or "").strip():
         raise HTTPException(status_code=503, detail="Gemini key/model is not configured; manual entry remains available")
-    content = document_file(document).read_bytes()
+    content = document_file(document)
     try:
         text = call_gemini(content, document.media_type)
     except (httpx.TimeoutException, TimeoutError):

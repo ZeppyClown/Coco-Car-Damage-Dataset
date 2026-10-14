@@ -7,13 +7,14 @@ from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException
 from PIL import Image, UnidentifiedImageError
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, or_, select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.workshop_auth import STAFF_PASSWORD_LENGTH, hash_password, valid_username
-from app.db.models import WorkshopCompany, WorkshopExpense, WorkshopJob, WorkshopJobRevision, WorkshopPayment, WorkshopUser
+from app.db.models import (WorkshopCompany, WorkshopExpense, WorkshopExport, WorkshopInvoice, WorkshopInvoiceCounter, WorkshopJob,
+                           WorkshopJobRevision, WorkshopPayment, WorkshopUser)
 from app.schemas.workshop import WorkshopReviewedDraft
 from app.schemas.workshop_books import CompanyRequest, UserRequest
 from app.schemas.workshop_invoice import InvoiceRequest
@@ -27,10 +28,15 @@ def company(db: Session) -> dict | None:
                                      "gst_registration_number": row.gst_registration_number}
 
 
+# Example jobs are the ones the app made up at set-up; their saved record says so.
+EXAMPLE_JOB = WorkshopJob.draft["data_origin"].as_string() == "synthetic_demo"
+
+
 def setup_state(db: Session) -> dict:
     uploaded = db.scalar(select(func.length(WorkshopCompany.sheet_template)).where(WorkshopCompany.id == 1))
     template = settings.WORKSHOP_SHEET_TEMPLATE
     return {"company": company(db), "jobs": db.scalar(select(func.count()).select_from(WorkshopJob)),
+            "examples": db.scalar(select(func.count()).select_from(WorkshopJob).where(EXAMPLE_JOB)),
             "form": "uploaded" if uploaded else "file" if template and str(template) != "." and template.is_file() else None}
 
 
@@ -261,3 +267,42 @@ def _expense(db: Session, day: date, supplier: str, category: str, what: str, am
                            job_number=number_key(job),
                            amount=amount, gst=(amount * gst_share).quantize(CENT), recorded_by=actor,
                            recorded_at=datetime.combine(day, time(10), tzinfo=timezone.utc)))
+
+
+def _example_expense_ids(db: Session) -> list:
+    """Expenses the example set-up added without a job no.: its own supplier names, stamped at exactly 10:00.
+    # ponytail: matched by name and time because expenses carry no example flag; add a flag column if this ever misfires."""
+    names = [name for group in SUPPLIERS.values() for name in group] + [row[1] for row in FIXED]
+    rows = db.execute(select(WorkshopExpense.id, WorkshopExpense.recorded_at).where(
+        WorkshopExpense.job_number.is_(None), WorkshopExpense.supplier.in_(names))).all()
+    return [row.id for row in rows if (row.recorded_at.astimezone(timezone.utc) if row.recorded_at.tzinfo else row.recorded_at).time() == time(10)]
+
+
+def remove_example_data(db: Session) -> dict:
+    """Delete every example job with its invoices, payments, downloads and expenses; real records are untouched.
+    Invoice numbering then carries on from the last real invoice of each year."""
+    if not db.scalar(select(func.count()).select_from(WorkshopJob).where(EXAMPLE_JOB)):
+        raise HTTPException(409, "There are no example jobs to remove")
+    jobs = select(WorkshopJob.id).where(EXAMPLE_JOB)
+    invoices = select(WorkshopInvoice.id).where(WorkshopInvoice.job_id.in_(jobs))
+    numbers = select(WorkshopJob.job_number).where(EXAMPLE_JOB, WorkshopJob.job_number.is_not(None))
+    try:
+        if db.get_bind().dialect.name == "postgresql":
+            # The database refuses to delete issued invoices and checked jobs unless this is on, and then only example ones.
+            db.execute(text("SET LOCAL workshop.remove_examples = 'on'"))
+        expenses = _example_expense_ids(db)
+        db.execute(delete(WorkshopPayment).where(WorkshopPayment.invoice_id.in_(invoices)))
+        db.execute(delete(WorkshopInvoice).where(WorkshopInvoice.job_id.in_(jobs)))
+        revisions = select(WorkshopJobRevision.id).where(WorkshopJobRevision.job_id.in_(jobs))
+        db.execute(delete(WorkshopExport).where(WorkshopExport.revision_id.in_(revisions)))
+        db.execute(delete(WorkshopExpense).where(or_(WorkshopExpense.job_number.in_(numbers), WorkshopExpense.id.in_(expenses))))
+        db.execute(delete(WorkshopJobRevision).where(WorkshopJobRevision.job_id.in_(jobs)))
+        db.execute(delete(WorkshopJob).where(EXAMPLE_JOB))
+        for counter in db.scalars(select(WorkshopInvoiceCounter)).all():
+            left = db.scalars(select(WorkshopInvoice.number).where(WorkshopInvoice.number.like(f"INV-{counter.year}-%"))).all()
+            counter.last = max((int(number.rsplit("-", 1)[1]) for number in left if number.rsplit("-", 1)[1].isdigit()), default=0)
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        raise
+    return setup_state(db)

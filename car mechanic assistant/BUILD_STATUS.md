@@ -305,3 +305,7 @@ The container now updates its own database when it starts, so no database comman
 ### F20 — sign-in page, 14 October 2026
 
 The browser's password pop-up is replaced by a sign-in page and a **Sign out** button. The password is checked once at sign-in instead of on every click, which matters on Render's free service where each check took 2.3 seconds. Changing a password or switching a staff login off ends its sign-ins. Full suite **337 passed, 22 skipped, 0 failed**; checked in Chrome at desktop and phone size. Details: [master section 16](WORKSHOP_MASTER_PLAN.md#16-work-log).
+
+### F21 — fixes for the hosted copy, 14 October 2026
+
+Photos and download files now live in the database, so the free host's restarts lose nothing. The owner can download a full backup and remove the example jobs. The lockout can no longer be dodged by faking an address, and parallel password checks are limited. A scheduled ping keeps the free server awake during shop hours. Full suite with PostgreSQL **366 passed, 0 skipped, 0 failed**; checked in Chrome. System design: [WORKSHOP_SYSTEM_DESIGN.md](WORKSHOP_SYSTEM_DESIGN.md). Details: [master section 16](WORKSHOP_MASTER_PLAN.md#16-work-log).

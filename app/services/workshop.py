@@ -3,7 +3,6 @@ from uuid import UUID, uuid4
 from hashlib import sha256
 from io import BytesIO, StringIO
 import csv
-import os
 import re
 from datetime import date, datetime, time, timezone
 from pathlib import Path
@@ -38,21 +37,26 @@ def storage_directory() -> Path:
     return directory
 
 
-def _stored_file(storage_key: str, byte_size: int, checksum: str, label: str) -> Path:
-    directory = storage_directory()
-    path = (directory / storage_key).resolve()
-    if path.parent != directory:
-        raise HTTPException(status_code=503, detail=f"Stored {label} is unavailable")
-    try:
-        if path.stat().st_size != byte_size or sha256(path.read_bytes()).hexdigest() != checksum:
-            raise HTTPException(status_code=503, detail=f"Stored {label} failed its integrity check")
-    except OSError:
-        raise HTTPException(status_code=503, detail=f"Stored {label} is unavailable") from None
-    return path
+def _stored_bytes(record, label: str) -> bytes:
+    """The saved file, checked against its recorded size and checksum. Rows from before files moved into the database
+    have no content and are read from the storage folder."""
+    content = record.content
+    if content is None:
+        directory = storage_directory()
+        path = (directory / record.storage_key).resolve()
+        if path.parent != directory:
+            raise HTTPException(status_code=503, detail=f"Stored {label} is unavailable")
+        try:
+            content = path.read_bytes()
+        except OSError:
+            raise HTTPException(status_code=503, detail=f"Stored {label} is unavailable") from None
+    if len(content) != record.byte_size or sha256(content).hexdigest() != record.checksum:
+        raise HTTPException(status_code=503, detail=f"Stored {label} failed its integrity check")
+    return content
 
 
-def document_file(document: WorkshopDocument) -> Path:
-    return _stored_file(document.storage_key, document.byte_size, document.checksum, "source")
+def document_file(document: WorkshopDocument) -> bytes:
+    return _stored_bytes(document, "source")
 
 
 def get_document(db: Session, document_id: UUID) -> WorkshopDocument:
@@ -99,37 +103,23 @@ def attach_document(db: Session, content: bytes, filename: str, media_type: str,
         return _document_response(existing, origin, True)
     document_id = uuid4()
     suffix = ".png" if actual_type == "image/png" else ".jpg"
-    directory = storage_directory()
-    path = directory / (document_id.hex + suffix)
-    created = False
-    # shortcut: a process crash can orphan a file; reconcile storage during F12.
+    # ponytail: photos live in the database (Supabase free: 500 MB, about 60+ photos at the 8 MB limit, far more at
+    # phone sizes); move them to object storage if the database fills up.
     try:
-        directory.mkdir(parents=True, exist_ok=True, mode=0o700)
-        with os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "wb") as output:
-            created = True
-            output.write(content)
-            output.flush()
-            os.fsync(output.fileno())
         document = WorkshopDocument(
-            id=document_id, checksum=checksum, storage_key=path.name, media_type=actual_type,
-            byte_size=len(content), data_origin=origin,
+            id=document_id, checksum=checksum, storage_key=document_id.hex + suffix, media_type=actual_type,
+            byte_size=len(content), data_origin=origin, content=content,
         )
         db.add(document)
         db.commit()
     except IntegrityError:
         db.rollback()
-        if created:
-            path.unlink(missing_ok=True)
         existing = db.scalar(select(WorkshopDocument).where(WorkshopDocument.checksum == checksum))
         if existing is None:
             raise
         return _document_response(existing, origin, True)
-    except (SQLAlchemyError, OSError) as error:
+    except SQLAlchemyError:
         db.rollback()
-        if created:
-            path.unlink(missing_ok=True)
-        if isinstance(error, OSError):
-            raise HTTPException(status_code=503, detail="Source storage failed") from None
         raise
     return _document_response(document, origin, False)
 
@@ -363,8 +353,8 @@ def get_export(db: Session, export_id: UUID) -> WorkshopExport:
     return export
 
 
-def export_file(export: WorkshopExport) -> Path:
-    return _stored_file(export.storage_key, export.byte_size, export.checksum, "job download")
+def export_file(export: WorkshopExport) -> bytes:
+    return _stored_bytes(export, "job download")
 
 
 def _export_response(export: WorkshopExport):
@@ -378,8 +368,6 @@ def _export_response(export: WorkshopExport):
 
 
 def generate_export(db: Session, revision_id: UUID):
-    path = None
-    created = False
     try:
         revision = db.scalar(select(WorkshopJobRevision).where(WorkshopJobRevision.id == revision_id)
                              .with_for_update().execution_options(populate_existing=True))
@@ -396,27 +384,14 @@ def generate_export(db: Session, revision_id: UUID):
             response = _export_response(existing)
             db.commit()
             return response
-        directory = storage_directory()
-        directory.mkdir(parents=True, exist_ok=True, mode=0o700)
         export_id = uuid4()
-        path = directory / (export_id.hex + ".csv")
-        # shortcut: a crash can orphan this file; F12 reconciles private storage.
-        with os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "wb") as output:
-            created = True
-            output.write(content)
-            output.flush()
-            os.fsync(output.fileno())
         export = WorkshopExport(id=export_id, revision_id=revision_id, mapping_version=MAPPING_VERSION,
-                                checksum=checksum, storage_key=path.name, byte_size=len(content))
+                                checksum=checksum, storage_key=export_id.hex + ".csv", byte_size=len(content), content=content)
         db.add(export)
         db.flush()
         response = _export_response(export)
         db.commit()
         return response
-    except (SQLAlchemyError, OSError, HTTPException) as error:
+    except (SQLAlchemyError, HTTPException):
         db.rollback()
-        if created:
-            path.unlink(missing_ok=True)
-        if isinstance(error, OSError):
-            raise HTTPException(status_code=503, detail="Download storage failed") from None
         raise

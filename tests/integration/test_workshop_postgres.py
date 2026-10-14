@@ -16,7 +16,7 @@ from alembic.migration import MigrationContext
 from alembic.script import ScriptDirectory
 from fastapi import HTTPException
 import pytest
-from sqlalchemy import create_engine, inspect, select, text, Table, MetaData
+from sqlalchemy import create_engine, func, inspect, select, text, Table, MetaData
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError, DBAPIError
 from sqlalchemy.orm import Session
@@ -178,9 +178,8 @@ def test_concurrent_identical_sources_reuse_one_row_and_file(workshop_postgres, 
         results = list(pool.map(attach, range(2)))
     assert results[0].id == results[1].id
     assert sorted(result.duplicate for result in results) == [False, True]
-    assert len(list(settings.WORKSHOP_STORAGE_DIR.iterdir())) == 1
     with Session(engine) as db:
-        assert len(db.scalars(select(WorkshopDocument)).all()) == 1
+        assert [row.content for row in db.scalars(select(WorkshopDocument))] == [content]
 
 
 class _LegacyJob:
@@ -250,6 +249,15 @@ def test_stale_cached_job_cannot_confirm_and_correction_preserves_history(worksh
         assert list_revisions(stale, job_id)[0].record.job_reference == "DEMO-CORRECTED"
 
 
+def legacy_file(db, table, row, content):
+    """Save a photo or download the way older versions did: a file in the storage folder, nothing in the database."""
+    settings.WORKSHOP_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+    (settings.WORKSHOP_STORAGE_DIR / row["storage_key"]).write_bytes(content)
+    row = {**row, "checksum": sha256(content).hexdigest(), "byte_size": len(content)}
+    db.execute(text(f"INSERT INTO {table} ({', '.join(row)}) VALUES ({', '.join(':' + name for name in row)})"), row)
+    db.commit()
+
+
 def test_review_guard_upgrade_preserves_existing_snapshot(workshop_postgres, tmp_path, monkeypatch):
     engine = workshop_postgres
     migrate(engine, "20261011_workshop")
@@ -259,7 +267,9 @@ def test_review_guard_upgrade_preserves_existing_snapshot(workshop_postgres, tmp
     reviewed_at = datetime.now(timezone.utc)
     with Session(engine) as db:
         content = (Path(__file__).parents[1] / "fixtures/workshop/synthetic-sheet.png").read_bytes()
-        source = attach_document(db, content, "demo.png", "image/png", "synthetic_demo")
+        source = _LegacyJob(uuid4())
+        legacy_file(db, "workshop_documents", {"id": source.id, "storage_key": source.id.hex + ".png", "media_type": "image/png",
+                                               "data_origin": "synthetic_demo"}, content)
         draft.source_document_id = source.id
         job_id = legacy_job(db, draft).id
     # Insert using the old table shape; current ORM requires the new source column.
@@ -276,6 +286,7 @@ def test_review_guard_upgrade_preserves_existing_snapshot(workshop_postgres, tmp
         assert revision.record.model_dump(mode="json") == draft.model_dump(mode="json")
         assert revision.reviewer == "Fictional migration reviewer"
         assert db.get(WorkshopJobRevision, revision_id).source_document_id == source.id
+        assert document_file(get_document(db, source.id)) == content  # older photos are still read from the folder
 
 
 def test_detaching_current_source_cannot_delete_reviewed_source(workshop_postgres, tmp_path, monkeypatch):
@@ -323,8 +334,8 @@ def test_export_migration_and_simultaneous_generation(workshop_postgres, tmp_pat
     assert results[0].model_dump() == results[1].model_dump()
     with Session(engine) as db:
         exports = db.scalars(select(WorkshopExport)).all()
-        assert len(exports) == 1 and len(list(tmp_path.iterdir())) == 1
-        assert export_file(exports[0]).read_bytes().startswith(b"\xef\xbb\xbf")
+        assert len(exports) == 1 and not list(tmp_path.iterdir())
+        assert export_file(exports[0]).startswith(b"\xef\xbb\xbf")
         assert list_revisions(db, job_id)[0].model_dump() == revision.model_dump()
 
 
@@ -343,13 +354,9 @@ def test_auth_upgrade_preserves_legacy_review_and_existing_csv(workshop_postgres
             record=draft.model_dump(mode="json"), reviewer=legacy.reviewer, reviewed_at=legacy.reviewed_at))
     content = job_csv(legacy)
     export_id = uuid4()
-    output = tmp_path / (export_id.hex + ".csv")
-    output.write_bytes(content)
-    output.chmod(0o600)
     with Session(engine) as db:
-        db.add(WorkshopExport(id=export_id, revision_id=legacy.id, mapping_version=MAPPING_VERSION,
-            checksum=sha256(content).hexdigest(), byte_size=len(content), storage_key=output.name))
-        db.commit()
+        legacy_file(db, "workshop_exports", {"id": export_id, "revision_id": legacy.id, "mapping_version": MAPPING_VERSION,
+                                             "storage_key": export_id.hex + ".csv"}, content)
     migrate(engine)
     with Session(engine) as db:
         restored = list_revisions(db, job_id)[0]
@@ -357,7 +364,7 @@ def test_auth_upgrade_preserves_legacy_review_and_existing_csv(workshop_postgres
         repeated = confirm_job(db, job_id, WorkshopConfirmRequest(expected_version=1, reviewer="fictional-operator", acknowledged=True), authenticated=True)
         assert repeated.model_dump() == legacy.model_dump()
         assert generate_export(db, legacy.id).id == export_id
-        assert export_file(get_export(db, export_id)).read_bytes() == content
+        assert export_file(get_export(db, export_id)) == content
         draft.job_reference = "DEMO-AUTH-CORRECTED"
         update_job(db, job_id, WorkshopDraftUpdate(expected_version=1, draft=draft))
         new = confirm_job(db, job_id, WorkshopConfirmRequest(expected_version=2, reviewer="fictional-operator", acknowledged=True), authenticated=True)
@@ -406,7 +413,6 @@ def test_disposable_dump_restore_recovers_history_sources_outputs_and_guards(wor
     engine = workshop_postgres
     migrate(engine)
     live = tmp_path / "live-private"
-    backup_files = tmp_path / "backup-private"
     restored_files = tmp_path / "restored-private"
     monkeypatch.setattr(settings, "WORKSHOP_STORAGE_DIR", live)
     content = (Path(__file__).parents[1] / "fixtures/workshop/synthetic-sheet.png").read_bytes()
@@ -440,7 +446,6 @@ def test_disposable_dump_restore_recovers_history_sources_outputs_and_guards(wor
     dump.touch(mode=0o600)
     subprocess.run(["pg_dump", "--format=custom", "--no-owner", "--no-acl", "--schema", schema, "--file", str(dump)],
                    env=environment, check=True, capture_output=True, timeout=30)
-    shutil.copytree(live, backup_files)
     engine.dispose()
     archived = schema + "_before_restore"
     admin = create_engine(os.environ["YAP_TEST_POSTGRES_URL"])
@@ -449,12 +454,8 @@ def test_disposable_dump_restore_recovers_history_sources_outputs_and_guards(wor
             connection.execute(text(f'ALTER SCHEMA "{schema}" RENAME TO "{archived}"'))
         subprocess.run(["pg_restore", "--exit-on-error", "--no-owner", "--no-acl", "--dbname", url.database, str(dump)],
                        env=environment, check=True, capture_output=True, timeout=30)
+        # Photos and downloads are inside the database now, so the dump alone restores them; no folder is needed.
         monkeypatch.setattr(settings, "WORKSHOP_STORAGE_DIR", restored_files)
-        with Session(engine) as db:
-            with pytest.raises(HTTPException) as missing:
-                document_file(get_document(db, source.id))
-            assert missing.value.status_code == 503, "A database dump alone is not a source backup"
-        shutil.copytree(backup_files, restored_files)
         with Session(engine) as db:
             assert get_job(db, job_id).draft == expected_job and get_job(db, job_id).draft_version == 2
             assert [row.model_dump(mode="json") for row in list_revisions(db, job_id)] == expected_history
@@ -462,12 +463,11 @@ def test_disposable_dump_restore_recovers_history_sources_outputs_and_guards(wor
             assert invoice_response(restored_invoice).model_dump(mode="json") == invoice.model_dump(mode="json")
             assert invoice_html(restored_invoice) == expected_invoice_html
             assert issue_invoice(db, second.id, InvoiceRequest.model_validate(billing_request()), "Fictional retry").model_dump(mode="json") == invoice.model_dump(mode="json")
-            assert document_file(get_document(db, source.id)).read_bytes() == content
+            assert document_file(get_document(db, source.id)) == content
             for expected in (first_output, second_output):
                 assert generate_export(db, expected.revision_id).model_dump() == expected.model_dump()
-                restored = export_file(get_export(db, expected.id))
-                assert restored.read_bytes() == (live / restored.name).read_bytes()
-            assert len(list(restored_files.iterdir())) == 3
+                assert sha256(export_file(get_export(db, expected.id))).hexdigest() == expected.checksum
+            assert not restored_files.exists()
         with engine.connect() as connection:
             assert compare_metadata(MigrationContext.configure(connection), Base.metadata) == []
             assert connection.scalar(text("SELECT version_num FROM alembic_version")) == ScriptDirectory.from_config(Config("alembic.ini")).get_current_head()
@@ -530,13 +530,14 @@ def test_invoice_migration_preserves_auth_head_reviews_and_exports(workshop_post
                         "(:id, :job, 1, CAST(:record AS JSON), 'Fictional', 'authenticated', :at)"),
                    {"id": review.id, "job": job_id, "record": review.record.model_dump_json(), "at": review.reviewed_at})
         db.commit()
-        output = generate_export(db, review.id)
-        original = export_file(get_export(db, output.id)).read_bytes()
+        original, export_id = job_csv(review), uuid4()
+        legacy_file(db, "workshop_exports", {"id": export_id, "revision_id": review.id, "mapping_version": MAPPING_VERSION,
+                                             "storage_key": export_id.hex + ".csv"}, original)
     migrate(engine)
     with Session(engine) as db:
         assert list_revisions(db, job_id)[0].model_dump() == review.model_dump()
-        assert generate_export(db, review.id).model_dump() == output.model_dump()
-        assert export_file(get_export(db, output.id)).read_bytes() == original
+        assert generate_export(db, review.id).id == export_id
+        assert export_file(get_export(db, export_id)) == original
         invoice = issue_invoice(db, review.id, InvoiceRequest.model_validate(billing_request()), "Fictional operator")
     with Session(engine) as db:
         assert invoice_response(get_invoice(db, invoice.id)).model_dump(mode="json") == invoice.model_dump(mode="json")
@@ -636,3 +637,65 @@ def test_tables_are_closed_to_hosted_data_apis_but_open_to_the_app(workshop_post
         # The app signs in as the tables' owner, which row level security does not restrict.
         job_id = create_job(db, reviewed_fixture()).id
         assert get_job(db, job_id).job_number == "DEMOJOB001"
+
+
+def test_only_example_invoices_and_checks_can_be_removed(workshop_postgres):
+    from app.services.workshop_setup import remove_example_data
+    engine = workshop_postgres
+    migrate(engine)
+    with Session(engine) as db:
+        example = _finished(db, "EXAMPLE-1")
+        issue_invoice(db, example.id, InvoiceRequest.model_validate(billing_request()), "Fictional operator")
+        draft = reviewed_fixture()
+        draft.data_origin, draft.record_stage, draft.job_reference = "private_source", "completed_work", "REAL-1"
+        real_job = create_job(db, draft).id
+        real = confirm_job(db, real_job, WorkshopConfirmRequest(expected_version=1, reviewer="Fictional", acknowledged=True))
+    # Without the switch the database still refuses, even for example rows.
+    with engine.connect() as connection, pytest.raises(DBAPIError, match="Issued invoices cannot change"):
+        connection.execute(text("DELETE FROM workshop_invoices"))
+    # With the switch, a real checked job is still refused.
+    with engine.connect() as connection, pytest.raises(DBAPIError, match="Reviewed revisions cannot change"):
+        connection.execute(text("SET LOCAL workshop.remove_examples = 'on'"))
+        connection.execute(text("DELETE FROM workshop_job_revisions WHERE id = :id"), {"id": real.id})
+    with Session(engine) as db:
+        state = remove_example_data(db)
+        assert state["examples"] == 0 and state["jobs"] == 1
+        assert db.scalars(select(WorkshopJobRevision.id)).all() == [real.id]
+        assert db.scalar(select(WorkshopInvoice)) is None
+    with engine.connect() as connection:  # the switch lasted only for that removal
+        assert connection.scalar(text("SELECT current_setting('workshop.remove_examples', true)")) in (None, "")
+
+
+def test_backup_file_moves_the_books_to_another_database(workshop_postgres, tmp_path):
+    from app.services.workshop_backup import TABLES, restore_backup, write_backup
+    engine = workshop_postgres
+    migrate(engine)
+    content = (Path(__file__).parents[1] / "fixtures/workshop/synthetic-sheet.png").read_bytes()
+    with Session(engine) as db:
+        source = attach_document(db, content, "fictional.png", "image/png", "synthetic_demo")
+        revision = _finished(db, "MOVE-1")
+        generate_export(db, revision.id)
+        issue_invoice(db, revision.id, InvoiceRequest.model_validate(billing_request()), "Fictional operator")
+    backup = tmp_path / "backup.zip"
+    with engine.connect() as connection:
+        write_backup(connection, backup)
+        before = {table.name: connection.scalar(select(func.count()).select_from(table)) for table in TABLES}
+    url = os.environ["YAP_TEST_POSTGRES_URL"]
+    other = "workshop_" + uuid4().hex
+    admin = create_engine(url)
+    with admin.begin() as connection:
+        connection.execute(text(f'CREATE SCHEMA "{other}"'))
+    target = create_engine(url, connect_args={"options": f"-csearch_path={other}"})
+    try:
+        migrate(target)
+        with target.begin() as connection:
+            restore_backup(connection, backup)
+        with Session(target) as db:
+            assert {table.name: db.scalar(select(func.count()).select_from(table)) for table in TABLES} == before
+            assert document_file(get_document(db, source.id)) == content
+            assert db.scalar(select(WorkshopInvoice)).number.endswith("-0001")
+    finally:
+        target.dispose()
+        with admin.begin() as connection:
+            connection.execute(text(f'DROP SCHEMA IF EXISTS "{other}" CASCADE'))
+        admin.dispose()

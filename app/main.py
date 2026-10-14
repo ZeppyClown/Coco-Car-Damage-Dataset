@@ -2,13 +2,16 @@ from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from html import escape
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 from pathlib import Path
 
 from app.core.config import settings
+from app.db.session import get_db
 from app.core.workshop_auth import WorkshopAccessMiddleware, login_router
 from app.core.logging import get_logger
 from app.core.middleware import (
@@ -82,8 +85,13 @@ async def root():
 
 # Health check endpoint
 @app.get("/health")
-async def health_check():
-    """Health check endpoint"""
+def health_check(db: Session = Depends(get_db)):
+    """Health check endpoint. It also asks the database one trivial question, so a host's health check notices a lost
+    database, and the scheduled keep-awake ping counts as database activity (free Supabase projects pause when idle)."""
+    try:
+        db.execute(text("SELECT 1"))
+    except SQLAlchemyError:
+        return JSONResponse(status_code=503, content={"status": "database unavailable", "service": settings.APP_NAME})
     return {
         "status": "healthy",
         "service": settings.APP_NAME,

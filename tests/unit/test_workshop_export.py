@@ -111,7 +111,7 @@ def test_export_repeat_download_correction_and_draft_gate(export_client, test_db
     assert sha256(download.content).hexdigest() == exported["checksum"]
     assert len(download.content) == exported["byte_size"]
     stored = test_db.get(WorkshopExport, UUID(exported["id"]))
-    assert os.stat(settings.WORKSHOP_STORAGE_DIR / stored.storage_key).st_mode & 0o777 == 0o600
+    assert stored.content == download.content
     corrected = {**job["draft"], "job_reference": "DEMO-CORRECTED"}
     export_client.patch(API + f"/jobs/{job['id']}", json={"expected_version": 1, "draft": corrected})
     second = export_client.post(API + f"/jobs/{job['id']}/confirm", json={
@@ -123,19 +123,15 @@ def test_export_repeat_download_correction_and_draft_gate(export_client, test_db
     assert test_db.scalar(select(func.count()).select_from(WorkshopExport)) == 2
 
 
-@pytest.mark.parametrize("failure", ["storage", "database"])
-def test_failed_generation_leaves_no_success_row_or_file(export_client, test_db, monkeypatch, failure):
+def test_failed_generation_leaves_no_success_row(export_client, test_db, monkeypatch):
     _, snapshot = confirmed(export_client)
     def fail(*args, **kwargs):
-        if failure == "storage":
-            raise OSError("PRIVATE TEST PATH")
         raise OperationalError("fictional", {}, RuntimeError("PRIVATE TEST VALUE"))
     with monkeypatch.context() as patch:
-        patch.setattr(os if failure == "storage" else test_db, "open" if failure == "storage" else "commit", fail)
+        patch.setattr(test_db, "commit", fail)
         result = export_client.post(API + f"/revisions/{snapshot['id']}/exports")
-    assert result.status_code == (503 if failure == "storage" else 500) and "PRIVATE TEST" not in result.text
+    assert result.status_code == 500 and "PRIVATE TEST" not in result.text
     assert test_db.scalar(select(func.count()).select_from(WorkshopExport)) == 0
-    assert not list(settings.WORKSHOP_STORAGE_DIR.iterdir())
     assert export_client.post(API + f"/revisions/{snapshot['id']}/exports").status_code == 200
 
 
@@ -144,12 +140,13 @@ def test_corrupt_missing_or_unsafe_output_not_reused_or_served(export_client, te
     path = API + f"/revisions/{snapshot['id']}/exports"
     exported = export_client.post(path).json()
     stored = test_db.get(WorkshopExport, UUID(exported["id"]))
-    file = settings.WORKSHOP_STORAGE_DIR / stored.storage_key
-    file.write_bytes(b"tampered")
+    stored.content = b"tampered"
+    test_db.commit()
     download = API + f"/exports/{exported['id']}/download"
     assert export_client.get(download).status_code == 503
     assert export_client.post(path).status_code == 503
-    file.unlink()
+    stored.content = None  # an older row whose file is missing from the storage folder
+    test_db.commit()
     assert export_client.get(download).status_code == 503
     stored.storage_key = "../private.csv"
     test_db.commit()

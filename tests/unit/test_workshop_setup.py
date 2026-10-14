@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy import func, select
 
 from app.core.config import settings
-from app.db.models import WorkshopInvoice, WorkshopInvoiceCounter, WorkshopJob, WorkshopUser
+from app.db.models import WorkshopExpense, WorkshopInvoice, WorkshopInvoiceCounter, WorkshopJob, WorkshopPayment, WorkshopUser
 from app.schemas.workshop import WorkshopDraft
 from app.services.workshop_extraction import extraction_schema
 
@@ -44,11 +44,11 @@ def issue(client, revision, supplier=SUPPLIER):
 
 
 def test_saved_workshop_details_unlock_invoices_with_running_numbers(shop):
-    assert shop.get(API + "/setup").json() | {"form": None} == {"company": None, "jobs": 0, "form": None}
+    assert shop.get(API + "/setup").json() | {"form": None} == {"company": None, "jobs": 0, "examples": 0, "form": None}
     first, second = finished(shop, "J-1"), finished(shop, "J-2")
     assert issue(shop, first).status_code == 403
     assert shop.put(API + "/setup", json={**COMPANY, "name": ""}).status_code == 422
-    assert shop.put(API + "/setup", json=COMPANY).json() | {"form": None} == {"company": COMPANY, "jobs": 2, "form": None}
+    assert shop.put(API + "/setup", json=COMPANY).json() | {"form": None} == {"company": COMPANY, "jobs": 2, "examples": 0, "form": None}
     assert shop.get(API + "/billing-settings").json() == {"real_invoices_enabled": True, "supplier": SUPPLIER}
     assert issue(shop, first, {**SUPPLIER, "name": "Someone else"}).status_code == 422
     year = TODAY[:4]
@@ -113,6 +113,25 @@ def test_accident_details_are_kept_and_never_sent_to_the_ai(shop):
     assert "accident" not in schema["properties"] and "AccidentDetails" not in schema["$defs"]
 
 
+def test_example_jobs_can_be_removed_leaving_real_records(shop, test_db):
+    assert shop.delete(API + "/setup/example-jobs").status_code == 409
+    shop.put(API + "/setup", json=COMPANY)
+    examples = shop.post(API + "/setup/example-jobs").json()["examples"]
+    assert examples > 40 and shop.get(API + "/setup").json()["examples"] == examples
+    real = shop.post(API + "/jobs", json={**EXAMPLE, "data_origin": "private_source", "job_reference": "REAL-1"})
+    assert real.status_code == 201
+    assert shop.post(API + "/expenses", json={"spent_on": TODAY, "supplier": "Fictional Parts", "category": "parts",
+                                              "description": "Real bill", "amount": "50.00", "gst": "0"}).status_code == 201
+    state = shop.delete(API + "/setup/example-jobs").json()
+    assert state["examples"] == 0 and state["jobs"] == 1
+    assert test_db.scalars(select(WorkshopJob.id)).all() == [__import__("uuid").UUID(real.json()["id"])]
+    assert [row.description for row in test_db.scalars(select(WorkshopExpense))] == ["Real bill"]
+    assert test_db.scalar(select(func.count()).select_from(WorkshopInvoice)) == 0
+    assert test_db.scalar(select(func.count()).select_from(WorkshopPayment)) == 0
+    assert all(counter.last == 0 for counter in test_db.scalars(select(WorkshopInvoiceCounter)))
+    assert shop.delete(API + "/setup/example-jobs").status_code == 409
+
+
 def test_example_jobs_fill_the_books_once(shop, test_db):
     assert shop.post(API + "/setup/example-jobs").status_code == 409
     shop.put(API + "/setup", json=COMPANY)
@@ -157,6 +176,7 @@ def test_staff_logins_roles_switch_off_and_lockout(shop, test_db):
                                ("post", "/users/meiling/active", {"active": True})):
         assert getattr(shop, method)(API + path, json=body).status_code == 403
     assert shop.put(API + "/setup/form", files={"file": ("form.png", b"x", "image/png")}).status_code == 403
+    assert shop.delete(API + "/setup/example-jobs").status_code == 403
     shop.auth = ("meiling", "wrong-password-here")
     assert shop.get(API + "/setup").status_code == 401
     shop.auth = owner

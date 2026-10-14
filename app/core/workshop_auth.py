@@ -6,6 +6,7 @@ import hmac
 from hashlib import scrypt, sha256
 from collections import deque
 from secrets import compare_digest, token_bytes
+from threading import BoundedSemaphore
 from time import monotonic, time
 from urllib.parse import urlsplit
 
@@ -24,9 +25,12 @@ HASH_PREFIX = "scrypt$16384$8$5"
 
 
 STAFF_PASSWORD_LENGTH = 10
-# Wrong passwords from one address: after 10 in 5 minutes that address waits. Kept in memory, so it resets on restart.
+# Wrong passwords: after 10 in 5 minutes from one address, or for one login name, further tries wait. Counting by name
+# matters because the address comes from a header the visitor can fake behind some hosts. Kept in memory; resets on restart.
 MAX_FAILURES, FAILURE_WINDOW = 10, 300
 FAILURES: dict[str, deque] = {}
+# One password check holds 16 MB; allow two at once so a burst of guesses queues instead of exhausting a 512 MB server.
+CHECKS = BoundedSemaphore(2)
 # No WWW-Authenticate header is ever sent, so browsers show the sign-in page instead of their own password pop-up.
 SESSION_COOKIE, SESSION_SECONDS = "workshop_session", 12 * 3600
 LOGIN_PAGE = "/workshop/login"
@@ -113,16 +117,25 @@ def _staff_login(app, username: str) -> tuple[bytes, bytes, str] | None:
             db.close()
 
 
+def _failures(key: str) -> deque:
+    """Recent wrong-password times for one address or name, with old ones dropped."""
+    if len(FAILURES) > 10_000:  # made-up names would otherwise grow this without limit
+        for stale in [name for name, times in FAILURES.items() if not times or monotonic() - times[-1] > FAILURE_WINDOW]:
+            del FAILURES[stale]
+    recent = FAILURES.setdefault(key, deque())
+    while recent and monotonic() - recent[0] > FAILURE_WINDOW:
+        recent.popleft()
+    return recent
+
+
 def _verify(credentials, configuration, app=None, address: str = ""):
     """Return (login name, role). The owner login comes from the server settings; other names are looked up as staff."""
     username, salt, expected, _ = configuration
     password = credentials.password if credentials else ""
     if not credentials or len(password) > 1024:
         raise HTTPException(status_code=401, detail="Workshop authentication required")
-    recent = FAILURES.setdefault(address, deque())
-    while recent and monotonic() - recent[0] > FAILURE_WINDOW:
-        recent.popleft()
-    if len(recent) >= MAX_FAILURES:
+    counters = [_failures("address:" + address), _failures("name:" + credentials.username.lower()[:200])]
+    if any(len(recent) >= MAX_FAILURES for recent in counters):
         raise HTTPException(status_code=429, detail="Too many wrong passwords. Wait five minutes and try again.",
                             headers={"Retry-After": str(FAILURE_WINDOW)})
     role = "owner"
@@ -130,9 +143,11 @@ def _verify(credentials, configuration, app=None, address: str = ""):
         staff = _staff_login(app, credentials.username) if valid_username(credentials.username) else None
         # An unknown name still costs one password check, so names cannot be found by timing.
         salt, expected, role = staff or (salt, b"", "staff")
-    candidate = scrypt(password.encode(), salt=salt, n=16384, r=8, p=5, dklen=32, maxmem=32*1024*1024)
+    with CHECKS:
+        candidate = scrypt(password.encode(), salt=salt, n=16384, r=8, p=5, dklen=32, maxmem=32*1024*1024)
     if not compare_digest(candidate, expected):
-        recent.append(monotonic())
+        for recent in counters:
+            recent.append(monotonic())
         raise HTTPException(status_code=401, detail="Workshop authentication required")
     return credentials.username, role
 

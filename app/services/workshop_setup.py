@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.workshop_auth import STAFF_PASSWORD_LENGTH, hash_password, valid_username
 from app.db.models import (WorkshopCompany, WorkshopExpense, WorkshopExport, WorkshopInvoice, WorkshopInvoiceCounter, WorkshopJob,
-                           WorkshopJobRevision, WorkshopPayment, WorkshopUser)
+                           WorkshopGuidePicture, WorkshopJobRevision, WorkshopPayment, WorkshopUser)
 from app.schemas.workshop import WorkshopReviewedDraft
 from app.schemas.workshop_books import CompanyRequest, UserRequest
 from app.schemas.workshop_invoice import InvoiceRequest
@@ -65,6 +65,32 @@ def save_form(db: Session, content: bytes, actor: str) -> dict:
         db.rollback()
         raise
     return setup_state(db)
+
+
+GUIDE_NAME = r"^[\w ().,-]{1,150}\.(png|jpe?g)$"
+
+
+def save_guide_picture(db: Session, name: str, content: bytes, actor: str) -> dict:
+    """Add or replace one page of the paper guide. Pages show in name order, so start names with 01, 02, ..."""
+    if not content or len(content) > MAX_FORM_BYTES:
+        raise HTTPException(413, "The picture must be smaller than 8 MB")
+    try:
+        with Image.open(BytesIO(content)) as image:
+            kind = image.format
+    except (UnidentifiedImageError, OSError, ValueError, SyntaxError, Image.DecompressionBombError):
+        raise HTTPException(422, "That file is not a picture the app can read") from None
+    if kind not in {"PNG", "JPEG"}:
+        raise HTTPException(415, "Use a PNG or JPEG picture")
+    row = db.get(WorkshopGuidePicture, name) or WorkshopGuidePicture(name=name)
+    row.media_type, row.content = "image/png" if kind == "PNG" else "image/jpeg", content
+    row.updated_by, row.updated_at = actor, datetime.now(timezone.utc)
+    try:
+        db.add(row)
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        raise
+    return {"name": name, "media_type": row.media_type}
 
 
 def users(db: Session) -> list[dict]:

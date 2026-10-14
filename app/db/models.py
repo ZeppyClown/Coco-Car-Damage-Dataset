@@ -400,6 +400,17 @@ class WorkshopCompany(Base):
     updated_at = Column(DateTime(timezone=True), nullable=False)
 
 
+class WorkshopGuidePicture(Base):
+    """A page of the paper guide (part names, sample sheets), uploaded by an owner so a hosted copy needs no folder."""
+    __tablename__ = "workshop_guide_pictures"
+
+    name = Column(String(200), primary_key=True)
+    media_type = Column(String(50), nullable=False)
+    content = deferred(Column(LargeBinary, nullable=False))
+    updated_by = Column(String(200), nullable=False)
+    updated_at = Column(DateTime(timezone=True), nullable=False)
+
+
 class WorkshopExpense(Base):
     """Money paid out to a supplier or for running costs; entries are added, never edited."""
     __tablename__ = "workshop_expenses"

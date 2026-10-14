@@ -97,6 +97,21 @@ def test_same_car_is_found_however_the_number_is_typed(books, test_db):
         "number": "NEW1", "owner": None, "contact": None, "make": None, "model": None, "jobs": []}
 
 
+def test_owner_uploads_guide_pictures_into_the_database(books, monkeypatch, tmp_path):
+    from io import BytesIO
+    from PIL import Image
+    picture = BytesIO(); Image.new("RGB", (20, 10), "white").save(picture, "JPEG")
+    upload = lambda name, content: books.put(API + "/setup/guide/" + name, files={"file": ("x", content, "image/jpeg")})
+    assert upload("03 Car front.jpg", picture.getvalue()).status_code == 200
+    assert upload("notes.txt", picture.getvalue()).status_code == 422
+    assert upload("04 Car back.jpg", b"not a picture").status_code == 422
+    guide = tmp_path / "guide"; guide.mkdir(); (guide / "01 job sheet.png").write_bytes(b"\x89PNGpng")
+    monkeypatch.setattr(settings, "WORKSHOP_GUIDE_DIR", guide)
+    assert books.get(API + "/guide").json() == ["01 job sheet.png", "03 Car front.jpg"]
+    served = books.get(API + "/guide/03 Car front.jpg")
+    assert served.content == picture.getvalue() and served.headers["content-type"] == "image/jpeg"
+
+
 def test_picture_guide_lists_and_serves_only_pictures_in_its_folder(books, monkeypatch, tmp_path):
     assert books.get(API + "/guide").json() == []
     guide = tmp_path / "guide"; guide.mkdir()

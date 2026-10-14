@@ -17,7 +17,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.db.models import WorkshopExpense, WorkshopInvoice, WorkshopJob, WorkshopJobRevision, WorkshopPayment
+from app.db.models import WorkshopExpense, WorkshopGuidePicture, WorkshopInvoice, WorkshopJob, WorkshopJobRevision, WorkshopPayment
 from app.schemas.workshop_books import ExpenseRequest, PaymentRequest
 from app.services.workshop import number_key
 from app.services.workshop_invoice import get_invoice
@@ -211,15 +211,23 @@ def vehicle_history(db: Session, number: str) -> dict:
                 for job_id, revision in latest.items()]}
 
 
-def guide_pictures() -> list[str]:
+def _guide_folder() -> list[str]:
     folder: Path | None = settings.WORKSHOP_GUIDE_DIR
     if not folder or folder == Path(".") or not folder.is_dir():
         return []
-    return sorted(path.name for path in folder.iterdir() if path.is_file() and path.suffix.lower() in PICTURES)
+    return [path.name for path in folder.iterdir() if path.is_file() and path.suffix.lower() in PICTURES]
 
 
-def guide_picture(name: str) -> tuple[Path, str]:
+def guide_pictures(db: Session) -> list[str]:
+    """Pictures uploaded into the database, plus any in the guide folder on this computer."""
+    return sorted(set(_guide_folder()) | set(db.scalars(select(WorkshopGuidePicture.name))))
+
+
+def guide_picture(db: Session, name: str) -> tuple[bytes, str]:
+    stored = db.get(WorkshopGuidePicture, name)
+    if stored is not None:
+        return stored.content, stored.media_type
     # Only names from the folder listing are served, so a crafted path cannot reach other files.
-    if name not in guide_pictures():
+    if name not in _guide_folder():
         raise HTTPException(status_code=404, detail="Guide picture not found")
-    return settings.WORKSHOP_GUIDE_DIR / name, PICTURES[Path(name).suffix.lower()]
+    return (settings.WORKSHOP_GUIDE_DIR / name).read_bytes(), PICTURES[Path(name).suffix.lower()]

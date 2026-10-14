@@ -5,7 +5,7 @@ from uuid import UUID
 from zoneinfo import ZoneInfo
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Path, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from sqlalchemy.orm import Session
 from starlette.background import BackgroundTask
@@ -20,7 +20,7 @@ from app.schemas.workshop_invoice import InvoiceRequest, InvoiceIssueRequest, In
 from app.schemas.workshop_books import CompanyRequest, ExpenseRequest, PaymentRequest, UserRequest, UserSwitch
 from app.services.workshop_books import month_sheet, month_csv, payments, add_payment, vehicle_history, guide_pictures, guide_picture, expense_sheet, expense_csv, add_expense, profit_and_loss
 from app.services.workshop_backup import write_backup
-from app.services.workshop_setup import setup_state, save_company, add_example_data, remove_example_data, save_form, users, save_user, switch_user, MAX_FORM_BYTES
+from app.services.workshop_setup import setup_state, save_company, add_example_data, remove_example_data, save_form, save_guide_picture, GUIDE_NAME, users, save_user, switch_user, MAX_FORM_BYTES
 from app.services.workshop_sheet import job_sheet_html, invoice_sheet_html, car_outline
 from app.services.workshop_invoice import billing_supplier, preview_invoice, issue_invoice, get_invoice, job_invoice, invoice_response, invoice_html
 
@@ -196,14 +196,20 @@ def car_history(number: str = Query(min_length=1, max_length=200), db: Session =
 
 
 @router.get("/guide")
-def guide_list():
-    return guide_pictures()
+def guide_list(db: Session = Depends(get_db)):
+    return guide_pictures(db)
 
 
 @router.get("/guide/{name}")
-def guide_file(name: str):
-    path, media_type = guide_picture(name)
-    return FileResponse(path, media_type=media_type, headers={"Cache-Control": "no-store"})
+def guide_file(name: str, db: Session = Depends(get_db)):
+    content, media_type = guide_picture(db, name)
+    return Response(content, media_type=media_type, headers={"Cache-Control": "no-store"})
+
+
+@router.put("/setup/guide/{name}")
+def upload_guide_picture(name: str = Path(pattern=GUIDE_NAME), file: UploadFile = File(...), db: Session = Depends(get_db),
+                         actor: str = Depends(require_owner)):
+    return save_guide_picture(db, name, file.file.read(MAX_FORM_BYTES + 1), actor)
 
 
 MONTH = Query(pattern=r"^\d{4}-(0[1-9]|1[0-2])$")

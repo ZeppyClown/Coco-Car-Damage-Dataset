@@ -12,7 +12,8 @@ class Config:
     """Configuration class for RAG system"""
 
     # API Keys
-    GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+    # The hosted app uses GEMINI_API_KEY so the main app's GOOGLE_API_KEY features stay off.
+    GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 
     # Paths
     BASE_DIR = Path(__file__).parent.parent

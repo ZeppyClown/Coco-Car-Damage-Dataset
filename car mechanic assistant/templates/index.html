@@ -165,13 +165,13 @@
                     formData.append('query', query || 'Please analyze this image.');
                     formData.append('image', selectedImage);
 
-                    response = await fetch('/query', {
+                    response = await fetch('query', {
                         method: 'POST',
                         body: formData
                     });
                 } else {
                     // Send as JSON (text only)
-                    response = await fetch('/query', {
+                    response = await fetch('query', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -228,7 +228,7 @@
         }
 
         async function submitFeedback(rating) {
-            const response = await fetch('/feedback', {method: 'POST', headers: {'Content-Type': 'application/json'},
+            const response = await fetch('feedback', {method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({query_id: window.lastQueryId, rating: rating,
                     comment: document.getElementById('feedbackComment').value})});
             document.getElementById('feedbackStatus').textContent = response.ok ? 'Feedback saved.' : 'Could not save feedback.';

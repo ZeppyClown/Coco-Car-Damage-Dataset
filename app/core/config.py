@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     WORKSHOP_AI_ENABLED: bool = False
     # Hosted copies: serve only the workshop app; every other page and API of this program answers 404.
     WORKSHOP_ONLY: bool = False
+    # The manual assistant (/assistant) and the parts/vehicle tools, behind the workshop sign-in. The assistant reads GEMINI_API_KEY.
+    AI_TOOLS_ENABLED: bool = False
     WORKSHOP_AI_MODEL: Optional[str] = None
     WORKSHOP_AUTH_USERNAME: Optional[str] = None
     WORKSHOP_AUTH_PASSWORD_HASH: Optional[SecretStr] = None

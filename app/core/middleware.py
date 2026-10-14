@@ -18,7 +18,7 @@ class WorkshopUploadLimitMiddleware:
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        if scope["type"] != "http" or scope.get("method") != "POST" or not scope.get("path", "").rstrip("/").endswith("/workshop/documents"):
+        if scope["type"] != "http" or scope.get("method") != "POST" or not (scope.get("path", "").rstrip("/").endswith("/workshop/documents") or scope.get("path", "").startswith("/assistant/")):
             return await self.app(scope, receive, send)
         received, messages = 0, []
         while True:

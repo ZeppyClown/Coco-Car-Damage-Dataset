@@ -17,6 +17,8 @@ body { margin: 0; }
 #steps .active b { background: #12313d; }
 #steps button + button::before { content: "›"; margin: 0 .35rem 0 -.3rem; color: #7fa3b0; }
 .tools button { border: 1px solid #5c8796; }
+.ai-link { color: #cfe0e6; font-size: .92rem; padding: .45rem; border: 1px solid #5c8796; border-radius: 6px; text-decoration: none; white-space: nowrap; }
+.ai-link:hover { background: #1f4a5a; }
 
 .jobline, #status { margin: 0; padding: .4rem 1rem; }
 .jobline { background: #dbe6ea; font-weight: 600; }

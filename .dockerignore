@@ -2,6 +2,13 @@
 .env
 .venv/
 **/__pycache__/
-car mechanic assistant/
+car mechanic assistant/*
+!car mechanic assistant/src
+!car mechanic assistant/templates
+!car mechanic assistant/static
+!car mechanic assistant/web_app.py
+!car mechanic assistant/workshop_policy.md
+!car mechanic assistant/knowledge_base
+!car mechanic assistant/public_reference_corpus
 data/
 *.db

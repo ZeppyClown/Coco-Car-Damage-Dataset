@@ -383,6 +383,7 @@ Allowed statuses: `READY`, `IN_PROGRESS`, `IMPLEMENTED_UNVERIFIED`, `VERIFIED`, 
 | F19 | Ready to host: self-updating database, staff logins, form picture in the database, lockout, hosted-database lock-down | VERIFIED locally (SQLite scratch run in Chrome, PostgreSQL integration tests); NOT hosted; local `yap_workshop` needs the new update | F18; migration `20261015_users_hosting` | Container updates the database at start; owner/staff logins kept in the database; blank form uploaded in the app; ten wrong passwords lock an address for five minutes; row level security on every table; backup and start scripts; hosting guide; full 352 passed with PostgreSQL |
 | F20 | Sign-in page and sign-out instead of the browser's password pop-up | VERIFIED locally (unit tests, Chrome on a SQLite scratch copy); live Render copy deployed with F19 and confirmed answering, F20 not yet deployed | F19 | `/workshop/login` page, signed 12-hour cookie, Sign out button; leftover `/static/index.html` hidden on hosted copies; full 337 passed, 22 skipped |
 | F21 | Fixes for the hosted copy: files in the database, removable example jobs, backup and restore, lockout by name, keep-awake, system design | VERIFIED locally (SQLite unit tests, PostgreSQL integration tests, Chrome on a SQLite scratch copy); not yet deployed to Render | F20; migration `20261016_files_in_database` | Full suite with PostgreSQL 366 passed, 0 skipped |
+| F22 | AI tools (manual assistant, parts/vehicle tools) behind the workshop sign-in on the hosted copy | VERIFIED locally; not deployed (branch `assistant-hosted`) | F20, F21; `AI_TOOLS_ENABLED`, `GEMINI_API_KEY` | Full suite with PostgreSQL 373 passed, 0 skipped |
 
 If a feature takes several turns, add subrows such as `F03.a upload validation` and `F03.b preview route`. Each subrow needs its own status and verification notes. Do not wait until the parent feature is finished to record partial work.
 
@@ -856,6 +857,14 @@ remain recorded and unanswered.
 ```
 
 ## 16. Work log
+
+### 14 October 2026 — F22 AI tools behind the workshop sign-in
+
+- **User decision:** put the manual assistant and the automotive tools on the hosted site, behind the existing workshop sign-in; no second login system; Toyota manuals stay off the hosted site.
+- **Delivered:** `AI_TOOLS_ENABLED` setting; `WorkshopAccessMiddleware` now also guards `/assistant` and, on `WORKSHOP_ONLY` copies, `/api/v1/{query,parts,valuation,paint-code,specifications,diagnostics}` and `/static/index.html` (pages redirect to sign-in, APIs 401, same origin checks). `app/assistant.py` mounts the Flask app through Starlette's WSGI bridge, loaded on first use, with friendly "not configured" / "still preparing" pages. The assistant reads `GEMINI_API_KEY` (after `GOOGLE_API_KEY`) so the main app's Google features stay off. `scripts/start_hosted.sh` builds the library in a background process with a 10-minute limit. The workshop top bar shows two links when enabled. The upload limit now also covers `/assistant/`.
+- **Verification:** `tests/unit/test_hosted_ai_tools.py` (6 tests: strangers refused, signed-in and password use work, cross-origin refused, no key, library not ready, switched off). Full suite with PostgreSQL `yap_test_f21`: **373 passed, 0 skipped, 0 failed**. Real local run with a Gemini key: library built (150 passages), answers with sources; peak RSS about 195 MB serving and 135 MB building (macOS; Docker is not installed, so the image itself was not built).
+- **Limits:** library rebuilt after every restart (no disk); feedback lost on restart; Starlette's WSGI bridge is deprecated (swap to a2wsgi if removed); one of four live questions failed the assistant's own citation check (existing behaviour, shows "Assistant unavailable").
+- **Next:** owner reviews, merges and pushes; adds `GEMINI_API_KEY` and `AI_TOOLS_ENABLED=true` in Render; checks memory in Render *Metrics*.
 
 ### 14 October 2026 — F21 fix the problems found on the hosted copy; system design
 

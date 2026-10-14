@@ -43,8 +43,35 @@ The app has two parts: the **program** (this repository, packaged by the `Docker
 - **Paper guide pictures** are read from a folder (`WORKSHOP_GUIDE_DIR`) and are not in the database. Without that folder the pop-up says none are set up.
 - **Backups are a person's job.** Supabase's free plan, according to third-party write-ups, keeps no backups. The owner should click *Download backup* at least weekly and keep the file off the shop computer. `scripts/backup_workshop.sh` (pg_dump) also works, but needs PostgreSQL client tools at least as new as Supabase's server; this laptop's pg_dump 14 is too old.
 - **Shared counter computer.** Staff must click **Sign out** before the next person, or everything is recorded under one name. Sign-out removes the cookie from that browser only; a copied cookie would keep working until it expires (12 hours) or that login's password changes.
-- **The other pages of this program** (the parts and vehicle assistant at `/`) are not behind the workshop login. Set `WORKSHOP_ONLY=true` (the Render blueprint does) and they answer “not found”; `/` goes to `/workshop`.
+- **The other pages of this program** answer “not found” when `WORKSHOP_ONLY=true` (the Render blueprint sets it); `/` goes to `/workshop`. The exception is the AI tools below, which open only for people signed in to the workshop.
 - **Customer data on the internet.** Names, vehicle numbers and phone numbers will sit with Supabase and the host. The workshop should agree to that before real customers are entered.
+
+## AI tools on the hosted copy (branch `assistant-hosted`, not yet deployed)
+
+With `AI_TOOLS_ENABLED=true` two more things open, **only for people signed in to the workshop** (owner or staff). Anyone else is sent to the sign-in page, and scripts without a password get “401”. The workshop top bar then shows two extra links:
+
+- **Manual assistant** (`/assistant/`): ask a repair question and get an answer with the notes it came from. It searches the 14 development notes in `knowledge_base/` and the 12 public summaries in `public_reference_corpus/`. These are prototype material, not Yap Motor manuals: answers need a mechanic's check.
+- **Parts & vehicle tools** (`/static/index.html`): the older parts, valuation, paint-code, VIN and diagnostic tools. They need no key. Google search and eBay stay off.
+
+How it runs on the free plan:
+
+- **The library is rebuilt after every restart.** The free plan has no disk, so each time the app starts (after a deploy or after waking from sleep) it builds the assistant's search library in the background: 150 passages, 5 calls to Google, about 2 minutes. Until then the assistant page says it is still preparing. The rest of the app works at once.
+- **Feedback is lost on restart.** The usefulness ratings and the question log are kept in a file in the container, which a restart wipes. Treat them as a demo, not a record.
+- **Memory.** Measured on the Mac (no Docker there), not on Render: the app uses about 120 MB before the assistant is opened and about 195 MB at its highest after assistant questions; the background library build peaks at about 135 MB and ends before the assistant opens. Together that stays under about 260 MB, half of the 512 MB limit. Watch *Metrics* in Render after the first deploy to confirm.
+- **Cost.** Each question is one embedding call and one Gemini Flash-Lite call, plus the 5 library-building calls per restart. Google's free tier is rate-limited and its terms change; check Google's pricing page for the key you use.
+
+### What Victor does in Render
+
+1. Get a Gemini API key from Google AI Studio (aistudio.google.com → *Get API key*). **Never paste the key into a chat, an email or a file in this repository.**
+2. In Render open **yap-workshop → Environment** and add:
+   - `GEMINI_API_KEY` = the key (type or paste it into Render only)
+   - `AI_TOOLS_ENABLED` = `true` (the blueprint has it, but an existing service may not pick it up)
+   Leave `USE_GOOGLE_CSE`, `USE_EBAY_API` and `WORKSHOP_AI_ENABLED` at `false`.
+3. Save, then **Manual Deploy → Deploy latest commit** (once this branch is merged and pushed).
+4. Test: in a private window open `https://yap-workshop.onrender.com/assistant/` and check it sends you to the sign-in page. Sign in, click **Manual assistant**, wait until it stops saying “preparing” (about 2 minutes after the deploy), ask “Engine cranks but will not start when hot” and check the answer lists its sources. Click **Parts & vehicle tools** and run one lookup.
+5. If the assistant page keeps saying “preparing” for more than 5 minutes, open *Logs* in Render and look for “Manual assistant library build failed” (usually a wrong key or Google's rate limit); fix the key and redeploy.
+
+To switch the AI tools off again set `AI_TOOLS_ENABLED=false`: the links disappear and the pages answer “not found”. Without a key the assistant page says “The AI assistant is not configured yet” instead of failing.
 
 ## Moving the database to Singapore
 

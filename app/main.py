@@ -14,6 +14,7 @@ from app.core.config import settings
 from app.db.session import get_db
 from app.core.workshop_auth import WorkshopAccessMiddleware, login_router
 from app.core.logging import get_logger
+from app.assistant import assistant_app
 from app.core.middleware import (
     error_handling_middleware,
     validation_exception_handler,
@@ -56,6 +57,7 @@ app.middleware("http")(error_handling_middleware)
 static_dir = Path(__file__).parent / "static"
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+app.mount("/assistant", assistant_app)
 
 # Root endpoint - Serve web interface
 @app.get("/")
@@ -108,11 +110,16 @@ app.include_router(diagnostics.router, prefix=f"/api/{settings.API_VERSION}", ta
 app.include_router(workshop.router, prefix=f"/api/{settings.API_VERSION}", tags=["Workshop"])
 
 
+AI_LINKS = ('<a class="ai-link" href="/assistant/">Manual assistant</a>'
+            '<a class="ai-link" href="/static/index.html">Parts &amp; vehicle tools</a>')
+
+
 @app.get("/workshop", dependencies=[Depends(workshop.require_workshop_enabled)], include_in_schema=False)
 def workshop_page(request: Request):
     page = (Path(__file__).parent / "templates/workshop.html").read_text(encoding="utf-8")
     page = page.replace("{{workshop_api}}", escape(f"/api/{settings.API_VERSION}/workshop", quote=True))
     page = page.replace("{{workshop_user}}", escape(request.state.workshop_user, quote=True))
+    page = page.replace("{{ai_links}}", AI_LINKS if settings.AI_TOOLS_ENABLED else "")
     return HTMLResponse(page, headers={"Cache-Control": "no-store"})
 
 

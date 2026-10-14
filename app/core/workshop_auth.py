@@ -216,6 +216,22 @@ def sign_out():
     return response
 
 
+AI_TOOL_PATHS = tuple(f"/api/{settings.API_VERSION}/{name}" for name in
+                      ("query", "parts", "valuation", "paint-code", "specifications", "diagnostics")) + ("/static/index.html",)
+SIGN_IN_PAGES = {"/workshop", "/assistant", "/static/index.html"}  # strangers are sent to the sign-in page, not given 401
+
+
+def _under(path: str, prefixes) -> bool:
+    return any(path == prefix or path.startswith(prefix + "/") for prefix in prefixes)
+
+
+def _signed_in_only(path: str, prefix: str) -> bool:
+    """Workshop paths always; with AI_TOOLS_ENABLED also the assistant, and on hosted copies the parts/vehicle tools."""
+    if path in {"/workshop", LOGIN_PAGE} or _under(path, [prefix]):
+        return True
+    return settings.AI_TOOLS_ENABLED and (_under(path, ["/assistant"]) or settings.WORKSHOP_ONLY and _under(path, AI_TOOL_PATHS))
+
+
 class WorkshopAccessMiddleware:
     def __init__(self, app):
         self.app = app
@@ -223,7 +239,7 @@ class WorkshopAccessMiddleware:
     async def __call__(self, scope, receive, send):
         prefix = f"/api/{settings.API_VERSION}/workshop"
         path = scope.get("path", "").rstrip("/")
-        if scope["type"] != "http" or not (path in {"/workshop", LOGIN_PAGE} or path == prefix or path.startswith(prefix + "/")):
+        if scope["type"] != "http" or not _signed_in_only(path, prefix):
             if scope["type"] == "http" and settings.WORKSHOP_ONLY and path != "/health" and not path.startswith("/static/workshop"):
                 response = RedirectResponse("/workshop") if path == "" else JSONResponse(status_code=404, content={"detail": "Not found"})
                 return await response(scope, receive, send)
@@ -243,7 +259,7 @@ class WorkshopAccessMiddleware:
                 if len(request.headers.get("authorization", "")) > 4096:
                     raise HTTPException(status_code=401, detail="Workshop authentication required")
                 credentials = await BASIC(request)
-                if credentials is None and path == "/workshop":
+                if credentials is None and path in SIGN_IN_PAGES:
                     return await RedirectResponse(LOGIN_PAGE, status_code=303, headers={"Cache-Control": "no-store"})(scope, receive, send)
                 signed_in = await run_in_threadpool(_verify, credentials, configuration, scope.get("app"),
                                                     request.client.host if request.client else "")

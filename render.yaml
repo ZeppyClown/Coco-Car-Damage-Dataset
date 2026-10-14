@@ -1,5 +1,5 @@
 # Render blueprint: the workshop app as one free web service. The database is a separate Supabase project.
-# In Render choose New > Blueprint and pick this repository; it asks for the four values marked "sync: false".
+# In Render choose New > Blueprint and pick this repository; it asks for the values marked "sync: false".
 services:
   - type: web
     name: yap-workshop
@@ -19,6 +19,10 @@ services:
       - key: WORKSHOP_ENABLED
         value: "true"
       - key: WORKSHOP_ONLY
+        value: "true"
+      - key: GEMINI_API_KEY          # Google AI Studio key for the manual assistant; type it into Render yourself
+        sync: false
+      - key: AI_TOOLS_ENABLED        # manual assistant and parts/vehicle tools, signed-in owner and staff only
         value: "true"
       - key: WORKSHOP_AI_ENABLED
         value: "false"
